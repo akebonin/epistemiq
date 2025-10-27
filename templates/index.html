@@ -637,6 +637,9 @@ const usePapersToggle = document.getElementById('usePapersToggle');
 const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
+const API_BASE = window.location.hostname.includes("vercel.app")
+  ? "https://YOURUSERNAME.pythonanywhere.com"
+  : "";
 let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
