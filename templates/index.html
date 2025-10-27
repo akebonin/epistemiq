@@ -842,7 +842,7 @@ toggleLoading(processImageBtn, true, 'Processing image...');
 const formData = new FormData();
 formData.append('image', currentImageFile);
 try {
-const response = await fetch('/api/process-image', {
+const response = await fetch('${API_BASE}/api/process-image', {
 method: 'POST',
 body: formData
 });
@@ -870,7 +870,7 @@ toggleLoading(processVideoBtn, true, 'Processing video...');
 const formData = new FormData();
 formData.append('video', currentVideoFile);
 try {
-const response = await fetch('/api/process-video', {
+const response = await fetch('${API_BASE}/api/process-video', {
 method: 'POST',
 body: formData
 });
@@ -901,7 +901,7 @@ return;
 }
 toggleLoading(transcribeVideoUrlBtn, true, 'Transcribing...');
 try {
-const response = await fetch('/api/transcribe-video-url', {
+const response = await fetch('${API_BASE}/api/transcribe-video-url', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ video_url: videoUrl })
@@ -997,7 +997,7 @@ if (!autoLoad && button) {
 toggleLoading(button, true, "Loading details...");
 }
 try {
-const response = await fetch('/api/get-claim-details', {
+const response = await fetch('${API_BASE}/api/get-claim-details', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ claim_idx: claimIdx })
@@ -1058,7 +1058,7 @@ toggleLoading(button, true, "Verifying...");
 verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
 sourcesContainer.innerHTML = '';
 try {
-const response = await fetch('/api/verify-external', {
+const response = await fetch('${API_BASE}/api/verify-external', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ claim_idx: claimIdx })
@@ -1122,7 +1122,7 @@ button.disabled = true;
 button.innerHTML = 'Generating...';
 }
 try {
-const response = await fetch('/api/generate-report', {
+const response = await fetch('${API_BASE}/api/generate-report', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ claim_idx: claimIdx, question_idx: questionIdx })
@@ -1220,7 +1220,7 @@ button.innerHTML = 'Generate Report';
 async function openReportSelectionModal() {
 try {
 toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
-const response = await fetch('/api/available-reports');
+const response = await fetch('${API_BASE}/api/available-reports');
 if (!response.ok) {
 throw new Error('Failed to load available reports');
 }
@@ -1298,7 +1298,7 @@ return;
 const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
 try {
 toggleLoading(generatePdfBtn, true, 'Generating PDF...');
-const response = await fetch('/export-pdf', {
+const response = await fetch('${API_BASE}/export-pdf', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
