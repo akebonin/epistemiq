@@ -7,7 +7,7 @@
   <meta name="description" content="Epistemiq – Verify scientific and factual claims using hybrid AI." />
   <link rel="icon" href="static/favicon.png" type="image/png" />
   <link rel="apple-touch-icon" href="static/favicon.png" />
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="/static/manifest.json" />
 
   <title>Epistemiq – AI Claims Verification</title>
 
@@ -694,7 +694,7 @@ const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
 const API_BASE = window.location.hostname.includes("vercel.app")
-  ? "https://YOURUSERNAME.pythonanywhere.com"
+  ? "https://epistemiq.pythonanywhere.com"
   : "";
 let generatedReports = [];
 let currentImageFile = null;
