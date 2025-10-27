@@ -18,7 +18,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
 
   <!-- ✅ Custom Styles -->
-  <link rel="stylesheet" href="static/styles.css" />
+  <link rel="stylesheet" href="templates/static/styles.css" />
 
   <!-- ✅ Google Tag Manager / Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
@@ -29,11 +29,6 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
-  <!-- ✅ API base (auto-detects Vercel vs. Flask host) -->
-  <script>
-    const API_BASE = window.location.hostname.includes("vercel.app")
-      ? "https://epistemiq.pythonanywhere.com"
-      : "";
 
     window.addEventListener("DOMContentLoaded", () => {
       const hasAI = typeof window.ai !== "undefined" && typeof window.ai.prompt === "function";
@@ -693,9 +688,7 @@ const usePapersToggle = document.getElementById('usePapersToggle');
 const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
-const API_BASE = window.location.hostname.includes("vercel.app")
-  ? "https://epistemiq.pythonanywhere.com"
-  : "";
+const API_BASE = "https://epistemiq.pythonanywhere.com;
 let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
