@@ -1,30 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script type="text/javascript">
-var _iub = _iub || [];
-_iub.csConfiguration = {"siteId":4149829,"cookiePolicyId":82404675,"lang":"en","storage":{"useSiteId":true}};
-</script>
-<script type="text/javascript" src="https://cs.iubenda.com/autoblocking/4149829.js"></script>
-<script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/stub-v2.js"></script>
-<script type="text/javascript" src="//cdn.iubenda.com/cs/tcf/safe-tcf-v2.js"></script>
-<script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
-<script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta http-equiv="Content-Security-Policy"
-      content="script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; object-src 'none';">
-<title>epistemiq</title>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
-<script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-H5SNSXX9K0');
-</script>
-<link rel="manifest" href="/static/manifest.json">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="description" content="Epistemiq – Verify scientific and factual claims using hybrid AI." />
+  <link rel="icon" href="static/favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="static/favicon.png" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- ✅ Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'
+                              https://cdn.jsdelivr.net https://cdnjs.cloudflare.com
+                              https://www.googletagmanager.com https://www.google-analytics.com
+                              https://iubenda.com https://*.iubenda.com;
+                 style-src 'self' 'unsafe-inline'
+                            https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com;
+                 font-src 'self' https://fonts.gstatic.com;
+                 connect-src 'self'
+                              https://epistemiq.pythonanywhere.com
+                              https://api.openai.com
+                              https://api.openrouter.ai
+                              https://www.google-analytics.com;
+                 img-src 'self' data: https:;
+                 object-src 'none';">
+
+  <title>Epistemiq – AI Claims Verification</title>
+
+  <!-- ✅ Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+        crossorigin="anonymous" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+  <!-- ✅ Custom Styles -->
+  <link rel="stylesheet" href="static/styles.css" />
+
+  <!-- ✅ Google Tag Manager / Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-H5SNSXX9K0');  
+  </script>
+
+  <!-- ✅ API base (auto-detects Vercel vs. Flask host) -->
+  <script>
+    const API_BASE = window.location.hostname.includes("vercel.app")
+      ? "https://epistemiq.pythonanywhere.com"
+      : "";
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const hasAI = typeof window.ai !== "undefined" && typeof window.ai.prompt === "function";
+      if (hasAI) {
+        console.log("✅ Chrome AI detected – running in local mode.");
+        document.body.classList.add("chrome-ai-active");
+      } else {
+        console.log("ℹ️ Chrome AI not available – fallback to Flask backend.");
+      }
+    });
+  </script>
+
+  <!-- ✅ Iubenda Cookie Solution -->
+  <script type="text/javascript">
+    var _iub = _iub || [];
+    _iub.csConfiguration = {
+      "lang":"en",
+      "siteId":4149829,  /* ← replace with your Iubenda site ID */
+      "cookiePolicyId":82404675,
+      "banner":{ "position":"bottom","acceptButtonDisplay":true }
+    };
+  </script>
+  <script async src="https://cdn.iubenda.com/cs/iubenda_cs.js"></script>
 <style>
 body {
 background-color: #f8f9fa;
