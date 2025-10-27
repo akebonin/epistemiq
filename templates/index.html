@@ -1330,7 +1330,7 @@ return;
 const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
 try {
 toggleLoading(generatePdfBtn, true, 'Generating PDF...');
-const response = await fetch('${API_BASE}/export-pdf', {
+const response = await fetch('${API_BASE}/api/export-pdf', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
@@ -1415,7 +1415,7 @@ return;
 }
 toggleLoading(fetchArticleBtn, true, 'Fetching...');
 try {
-const response = await fetch('/api/extract-article', {
+const response = await fetch('${API_BASE}/api/extract-article', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ url: url }),
@@ -1451,7 +1451,7 @@ toggleLoading(runAnalysisBtn, true, 'Analyzing...');
 resultsContainer.innerHTML = '';
 generatedReports = [];
 try {
-const response = await fetch('/api/analyze', {
+const response = await fetch('${API_BASE}/api/analyze', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
