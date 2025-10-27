@@ -30,7 +30,7 @@ import hashlib
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables
-load_dotenv(dotenv_path="/home/scicheckagent/mysite/.env")
+load_dotenv(dotenv_path="/home/epistemiq/mysite/.env")
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
@@ -56,7 +56,7 @@ def new_analysis_id() -> str:
 
 # Database setup for normalized storage
 def init_db():
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
 
     # Workspace pointer only
@@ -152,7 +152,7 @@ def init_db():
     conn.close()
 
 def save_claims_for_analysis(analysis_id: str, claims_list: list):
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("DELETE FROM claims WHERE analysis_id=?", (analysis_id,))
 
@@ -168,7 +168,7 @@ def save_claims_for_analysis(analysis_id: str, claims_list: list):
     conn.close()
 
 def get_claims_for_analysis(analysis_id: str):
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal", (analysis_id,))
     rows = c.fetchall()
@@ -185,7 +185,7 @@ def compute_file_hash(file_path):
 
 def get_cached_media(file_hash):
     """Get cached media extraction result"""
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute('SELECT extracted_text FROM media_cache WHERE file_hash = ?', (file_hash,))
     result = c.fetchone()
@@ -194,7 +194,7 @@ def get_cached_media(file_hash):
 
 def store_media_cache(file_hash, media_type, extracted_text):
     """Store media extraction result in cache"""
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("""
     INSERT OR REPLACE INTO media_cache (file_hash, media_type, extracted_text)
@@ -205,7 +205,7 @@ def store_media_cache(file_hash, media_type, extracted_text):
 
 def cleanup_old_cache():
     """Clean up old cache entries to prevent database bloat"""
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     try:
         # Clean up media cache older than 30 days
@@ -386,7 +386,7 @@ def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False):
 def extract_article_from_url(url):
     """Fetch and extract article content from a URL using direct requests and BeautifulSoup."""
     try:
-        headers = {"User-Agent": "Epistemiq/1.0 (mailto:asparuh.kebonin@gmail.com)"}
+        headers = {"User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com)"}
         session = requests.Session()
         logging.info(f"Fetching URL: {url}")
         response = session.get(url, headers=headers, timeout=15)
@@ -529,7 +529,7 @@ def fetch_crossref(keywords):
 
     search_query = ' AND '.join([f'"{kw}"' if ' ' in kw else kw for kw in keywords])
     url = f"https://api.crossref.org/works?query={quote_plus(search_query)}&rows=3&select=title,URL,author,abstract"
-    headers = {"User-Agent": "Epistemiq/1.0 (mailto:asparuh.kebonin@gmail.com)"}
+    headers = {"User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com)"}
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -581,7 +581,7 @@ def fetch_semantic_scholar(keywords, max_results=3):
     search_query = ' '.join(keywords)
     headers = {
         "x-api-key": SEMANTIC_SCHOLAR_API_KEY,
-        "User-Agent": "Epistemiq/1.0 (mailto:asparuh.kebonin@gmail.com)"
+        "User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com"
     }
     params = {
         "query": search_query,
@@ -824,7 +824,7 @@ def poll_transcription_status(task_id, api_key, max_retries, retry_delay):
                 time.sleep(retry_delay)
     raise ValueError("Transcription timed out after maximum retries")
 
-def save_uploaded_file(file, upload_folder="/home/scicheckagent/mysite/uploads"):
+def save_uploaded_file(file, upload_folder="/home/epistemiq/mysite/uploads"):
     """Save uploaded file and return path"""
     try:
         os.makedirs(upload_folder, exist_ok=True)
@@ -1243,7 +1243,7 @@ def analyze():
 
     # Create new analysis
     analysis_id = new_analysis_id()
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("INSERT INTO analyses (analysis_id, mode) VALUES (?, ?)", (analysis_id, mode))
     conn.commit()
@@ -1298,7 +1298,7 @@ def get_claim_details():
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
     # 1) Get the claim text
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?", (analysis_id, int(ordinal)))
     row = c.fetchone()
@@ -1310,7 +1310,7 @@ def get_claim_details():
     ch = sha256_str(claim_text.strip().lower())
 
     # 2) Hit model_cache
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT verdict, questions_json, keywords_json FROM model_cache WHERE claim_hash=?", (ch,))
     hit = c.fetchone()
@@ -1329,7 +1329,7 @@ def get_claim_details():
     model_verdict_content, questions, search_keywords = generate_model_verdict_and_questions(verdict_prompt, claim_text)
 
     # 4) Store in model_cache
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("""
     INSERT INTO model_cache (claim_hash, verdict, questions_json, keywords_json, updated_at)
@@ -1360,7 +1360,7 @@ def verify_external():
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
     # 1) get claim text
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?", (analysis_id, int(ordinal)))
     row = c.fetchone()
@@ -1372,7 +1372,7 @@ def verify_external():
     ch = sha256_str(claim_text.strip().lower())
 
     # 2) check external_cache
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?", (ch,))
     hit = c.fetchone()
@@ -1382,7 +1382,7 @@ def verify_external():
         return jsonify({"verdict": hit[0], "sources": json_loads(hit[1], []), "cached": True})
 
     # 3) build keywords; if model_cache has them, reuse
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT keywords_json FROM model_cache WHERE claim_hash=?", (ch,))
     kw_row = c.fetchone()
@@ -1443,7 +1443,7 @@ Return a short verdict and concise justification."""
         external_verdict = "No relevant scientific papers found for this claim."
 
     # 6) store in external_cache
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("""
     INSERT INTO external_cache (claim_hash, verdict, sources_json, updated_at)
@@ -1582,7 +1582,7 @@ def generate_report():
         return Response(json.dumps({"error": "Analysis context missing. Please re-run analysis."}), mimetype='application/json', status=400)
 
     # Get claim text
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?", (analysis_id, int(claim_idx)))
     row = c.fetchone()
@@ -1614,7 +1614,7 @@ def generate_report():
     rq_hash = sha256_str((claim_text.strip().lower() + "||" + question_text.strip().lower()))
 
     # Hit cache
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
     hit = c.fetchone()
@@ -1630,7 +1630,7 @@ def generate_report():
     article_cache_data = {"text": "", "mode": session.get("mode", "General Analysis of Testable Claims")}
 
     # Get model verdict and external verdict from their caches
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
     c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
     model_row = c.fetchone()
@@ -1723,7 +1723,7 @@ You are an AI researcher writing a short, evidence-based report (maximum 1000 wo
             # Store in cache only if we have meaningful content
             if full_report_content.strip():
                 try:
-                    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+                    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
                     c = conn.cursor()
                     c.execute("""
                         INSERT OR REPLACE INTO report_cache
@@ -1747,7 +1747,7 @@ def get_available_reports():
     if not analysis_id:
         return jsonify({"error": "No active analysis session found."}), 400
 
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
 
     # Get claims for this analysis
@@ -1797,7 +1797,7 @@ def export_pdf():
     if not analysis_id:
         return "No active analysis session found. Please run an analysis first.", 400
 
-    conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
 
     # Get analysis mode
@@ -1829,7 +1829,7 @@ def export_pdf():
                     if ordinal == claim_idx:
                         claim_hash = sha256_str(claim_text.strip().lower())
 
-                        conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+                        conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
                         c = conn.cursor()
 
                         c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
@@ -1867,7 +1867,7 @@ def export_pdf():
                     if ordinal == claim_idx:
                         claim_hash = sha256_str(claim_text.strip().lower())
 
-                        conn = sqlite3.connect('/home/scicheckagent/mysite/sessions.db')
+                        conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
                         c = conn.cursor()
 
                         # Get question text
