@@ -871,7 +871,6 @@ formData.append('image', currentImageFile);
 try {
 const response = await fetch(`${API_BASE}/api/process-image`, {
 method: 'POST',
-credentials: 'include',
 body: formData
 });
 const data = await response.json();
@@ -900,7 +899,6 @@ formData.append('video', currentVideoFile);
 try {
 const response = await fetch(`${API_BASE}/api/process-video`, {
 method: 'POST',
-credentials: 'include',
 body: formData
 });
 const data = await response.json();
@@ -933,7 +931,6 @@ try {
 const response = await fetch(`${API_BASE}/api/transcribe-video-url`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-credentials: 'include',
 body: JSON.stringify({ video_url: videoUrl })
 });
 const data = await response.json();
@@ -1032,7 +1029,7 @@ method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
     analysis_id: analysisId,    
-    claim_idx: claimIndex
+    claim_idx: idx
 }),
 });
 if (!response.ok) {
@@ -1097,7 +1094,7 @@ headers: { 'Content-Type': 'application/json' },
 credentials: 'include',
 body: JSON.stringify({
     analysis_id: analysisId,    
-    claim_idx: claimIndex
+    claim_idx: idx
 }),
 });
 const data = await response.json();
