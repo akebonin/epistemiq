@@ -869,6 +869,7 @@ formData.append('image', currentImageFile);
 try {
 const response = await fetch(`${API_BASE}/api/process-image`, {
 method: 'POST',
+credentials: 'include',
 body: formData
 });
 const data = await response.json();
@@ -897,6 +898,7 @@ formData.append('video', currentVideoFile);
 try {
 const response = await fetch(`${API_BASE}/api/process-video`, {
 method: 'POST',
+credentials: 'include',
 body: formData
 });
 const data = await response.json();
@@ -929,6 +931,7 @@ try {
 const response = await fetch(`${API_BASE}/api/transcribe-video-url`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+credentials: 'include',
 body: JSON.stringify({ video_url: videoUrl })
 });
 const data = await response.json();
@@ -1025,6 +1028,7 @@ try {
 const response = await fetch(`${API_BASE}/api/get-claim-details`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+credentials: 'include',
 body: JSON.stringify({ claim_idx: claimIdx })
 });
 if (!response.ok) {
@@ -1086,6 +1090,7 @@ try {
 const response = await fetch(`${API_BASE}/api/verify-external`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+credentials: 'include',
 body: JSON.stringify({ claim_idx: claimIdx })
 });
 const data = await response.json();
@@ -1147,11 +1152,7 @@ button.disabled = true;
 button.innerHTML = 'Generating...';
 }
 try {
-const response = await fetch(`${API_BASE}/api/generate-report`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ claim_idx: claimIdx, question_idx: questionIdx })
-});
+const es = new EventSource(`${API_BASE}/api/generate-report?...`, { withCredentials: true });
 if (!response.ok) {
 let errText;
 try { errText = await response.json(); errText = errText.error || JSON.stringify(errText); } catch(e){ errText = await response.text(); }
@@ -1245,7 +1246,10 @@ button.innerHTML = 'Generate Report';
 async function openReportSelectionModal() {
 try {
 toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
-const response = await fetch(`${API_BASE}/api/available-reports`);
+const response = await fetch(`${API_BASE}/api/available-reports`, {
+  method: 'GET',
+  credentials: 'include'          
+});
 if (!response.ok) {
 throw new Error('Failed to load available reports');
 }
@@ -1326,6 +1330,7 @@ toggleLoading(generatePdfBtn, true, 'Generating PDF...');
 const response = await fetch(`${API_BASE}/api/export-pdf`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+credentials: 'include',
 body: JSON.stringify({
 selected_reports: selectedReportIds,
 summary_contents: []
@@ -1411,6 +1416,7 @@ try {
 const response = await fetch(`${API_BASE}/api/extract-article`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+credentials: 'include',
 body: JSON.stringify({ url: url }),
 });
 const data = await response.json();
@@ -1447,6 +1453,7 @@ try {
 const response = await fetch(`${API_BASE}/api/analyze`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+credentials: 'include',  
 body: JSON.stringify({
 text: articleText,
 mode: promptModeSelect.value,
