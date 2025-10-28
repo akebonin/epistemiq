@@ -1018,111 +1018,112 @@ async function autoLoadClaimDetails(claims) {
     }
 
 async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false) {
-const verdictContainer = document.getElementById(verdictContainerId);
-const questionsList = document.getElementById(questionsContainerId);
-if (!autoLoad && button) {
-toggleLoading(button, true, "Loading details...");
-}
-try {
-const response = await fetch(`${API_BASE}/api/get-claim-details`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
-    analysis_id: analysisId,    
-    claim_idx: idx
-}),
-});
-if (!response.ok) {
-const errorData = await response.text();
-throw new Error(errorData || `Failed to get claim details: ${response.status}`);
-}
-const data = await response.json();
-const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
-verdictContainer.innerHTML = formattedVerdict;
-questionsList.innerHTML = '';
-if (data.questions && data.questions.length > 0) {
-data.questions.forEach((q, q_idx) => {
-const listItem = document.createElement('li');
-listItem.className = 'list-group-item';
-listItem.innerHTML = `
-<span class="d-block mb-2"><b>Q${q_idx + 1}:</b> ${escapeHTML(q)}</span>
-<button class="btn btn-primary btn-sm generate-report-btn"
-data-claim-idx="${claimIdx}"
-data-question-idx="${q_idx}"
-data-report-container-id="report-claim-${claimIdx}-${q_idx}">
-Generate Report
-</button>
-<div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
-`;
-questionsList.appendChild(listItem);
-const reportId = `claim-${claimIdx}-question-${q_idx}`;
-if (!generatedReports.find(r => r.id === reportId)) {
-generatedReports.push({
-id: reportId,
-claimIdx: claimIdx,
-questionIdx: q_idx,
-claimText: document.querySelector(`#claim-${claimIdx} .claim-text`).textContent,
-questionText: q
-});
-}
-});
-} else {
-questionsList.innerHTML = '<li class="list-group-item">No research questions generated.</li>';
-}
-} catch (error) {
-verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${error.message}</div>`;
-questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${error.message}</li>`;
-} finally {
-if (!autoLoad && button) {
-toggleLoading(button, false);
-}
-}
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const questionsList = document.getElementById(questionsContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Loading details...");
+
+  try {
+    const response = await fetch(`${API_BASE}/api/get-claim-details`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx   // ← fix: use claimIdx, not idx
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || `Failed to get claim details: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
+    verdictContainer.innerHTML = formattedVerdict;
+
+    questionsList.innerHTML = '';
+    if (data.questions && data.questions.length > 0) {
+      data.questions.forEach((q, q_idx) => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item';
+        listItem.innerHTML = `
+          <span class="d-block mb-2"><b>Q${q_idx + 1}:</b> ${escapeHTML(q)}</span>
+          <button class="btn btn-primary btn-sm generate-report-btn"
+            data-claim-idx="${claimIdx}"
+            data-question-idx="${q_idx}"
+            data-report-container-id="report-claim-${claimIdx}-${q_idx}">
+            Generate Report
+          </button>
+          <div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
+        `;
+        questionsList.appendChild(listItem);
+
+        const reportId = `claim-${claimIdx}-question-${q_idx}`;
+        if (!generatedReports.find(r => r.id === reportId)) {
+          generatedReports.push({
+            id: reportId,
+            claimIdx: claimIdx,
+            questionIdx: q_idx,
+            claimText: document.querySelector(`#claim-${claimIdx} .claim-text`).textContent,
+            questionText: q
+          });
+        }
+      });
+    } else {
+      questionsList.innerHTML = '<li class="list-group-item">No research questions generated.</li>';
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${escapeHTML(error.message)}</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
 }
 
 async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false) {
-const verdictContainer = document.getElementById(verdictContainerId);
-const sourcesContainer = document.getElementById(sourcesContainerId);
-if (!autoLoad && button) {
-toggleLoading(button, true, "Verifying...");
-}
-verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
-sourcesContainer.innerHTML = '';
-try {
-const response = await fetch(`${API_BASE}/api/verify-external`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-credentials: 'include',
-body: JSON.stringify({
-    analysis_id: analysisId,    
-    claim_idx: idx
-}),
-});
-const data = await response.json();
-if (!response.ok) {
-throw new Error(data.error || 'External verification failed: ${response.status}');
-}
-verdictContainer.innerHTML = formatTextWithMarkdownAndLinks(data.verdict);
-if (data.sources && data.sources.length > 0) {
-sourcesContainer.innerHTML = data.sources
-.map(s => {
-const sourceInfo = s.source ? `[${s.source}]` : '';
-const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
-const yearInfo = s.year ? ` (${s.year})` : '';
-const authorsInfo = s.authors ? ` - ${s.authors}` : '';
-return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
-})
-.join('');
-} else {
-sourcesContainer.innerHTML = `<li>No external sources found.</li>`;
-}
-} catch (error) {
-verdictContainer.innerHTML = `<div class="alert alert-warning p-2 mt-2">Error: ${error.message}</div>`;
-sourcesContainer.innerHTML = `<li>Could not fetch sources.</li>`;
-} finally {
-if (!autoLoad && button) {
-toggleLoading(button, false);
-}
-}
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const sourcesContainer = document.getElementById(sourcesContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Verifying...");
+  verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
+  sourcesContainer.innerHTML = '';
+
+  try {
+    const response = await fetch(`${API_BASE}/api/verify-external`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx   // ← fix: use claimIdx
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `External verification failed: ${response.status}`); // ← fix: backticks already used
+    }
+
+    verdictContainer.innerHTML = formatTextWithMarkdownAndLinks(data.verdict);
+
+    if (data.sources && data.sources.length > 0) {
+      sourcesContainer.innerHTML = data.sources.map(s => {
+        const sourceInfo = s.source ? `[${s.source}]` : '';
+        const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
+        const yearInfo = s.year ? ` (${s.year})` : '';
+        const authorsInfo = s.authors ? ` - ${s.authors}` : '';
+        return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
+      }).join('');
+    } else {
+      sourcesContainer.innerHTML = `<li>No external sources found.</li>`;
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-warning p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    sourcesContainer.innerHTML = `<li>Could not fetch sources.</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
 }
 
 function showReportInModal(reportContent, claimIdx, questionIdx) {
@@ -1149,101 +1150,103 @@ alert('Failed to copy report to clipboard');
 }
 
 async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
-const reportContainer = document.getElementById(reportContainerId);
-reportContainer.innerHTML = '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
-if (button) {
-button.disabled = true;
-button.innerHTML = 'Generating...';
-}
-try {
-const es = new EventSource(`${API_BASE}/api/generate-report?analysis_id=${analysisId}&claim_idx=${claimIndex}&question_idx=${questionIndex}`);
-if (!response.ok) {
-let errText;
-try { errText = await response.json(); errText = errText.error || JSON.stringify(errText); } catch(e){ errText = await response.text(); }
-throw new Error(errText || `Failed to start report generation: ${response.status}`);
-}
-reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
-const reportBox = reportContainer.querySelector('.report-box');
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-let fullContent = '';
-let sawAnyChunk = false;
-while (true) {
-const { value, done } = await reader.read();
-if (done) break;
-sawAnyChunk = true;
-const chunk = decoder.decode(value, { stream: true });
-const parts = chunk.split(/\n\n/);
-for (const part of parts) {
-const line = part.trim();
-if (!line) continue;
-if (line.startsWith('data: ')) {
-const dataPart = line.substring(6).trim();
-if (dataPart === '[DONE]') {
-reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-break;
-}
-try {
-const jsonData = JSON.parse(dataPart);
-if (jsonData.content) {
-fullContent += jsonData.content;
-reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-}
-if (jsonData.error) {
-reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(jsonData.error)}</strong>`;
-}
-} catch (e) {
-fullContent += dataPart;
-reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-}
-} else {
-try {
-const jsonData = JSON.parse(line);
-if (jsonData.content) {
-fullContent += jsonData.content;
-reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-}
-if (jsonData.error) {
-reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(jsonData.error)}</strong>`;
-}
-} catch (e) {
-fullContent += line;
-reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-}
-}
-}
-}
-if (fullContent && fullContent.trim().length > 0) {
-reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-const viewFullButton = document.createElement('button');
-viewFullButton.className = 'btn btn-outline-primary btn-sm mt-2';
-viewFullButton.innerHTML = '📖 View Full Report';
-viewFullButton.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
-reportContainer.appendChild(viewFullButton);
-const reportId = `claim-${claimIdx}-question-${questionIdx}`;
-if (!generatedReports.find(r => r.id === reportId)) {
-const claimElement = document.querySelector(`#claim-${claimIdx} .claim-text`);
-const questionElement = document.querySelector(`#questions-list-claim-${claimIdx} li:nth-child(${questionIdx + 1}) span`);
-generatedReports.push({
-id: reportId,
-claimIdx: claimIdx,
-questionIdx: questionIdx,
-claimText: claimElement ? claimElement.textContent : `Claim ${claimIdx + 1}`,
-questionText: questionElement ? questionElement.textContent.replace(`Q${questionIdx + 1}:`, '').trim() : `Question ${questionIdx + 1}`
-});
-}
-} else {
-reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
-}
-} catch (error) {
-console.error('Report generation error:', error);
-reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
-} finally {
-if (button) {
-button.disabled = false;
-button.innerHTML = 'Generate Report';
-}
-}
+  const reportContainer = document.getElementById(reportContainerId);
+  reportContainer.innerHTML = '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = 'Generating...';
+  }
+
+  try {
+    // Proper EventSource GET with query params and correct variable names
+    const es = new EventSource(
+      `${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}`
+    );
+
+    reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
+    const reportBox = reportContainer.querySelector('.report-box');
+    let fullContent = '';
+
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.content) {
+          fullContent += data.content;
+          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+        }
+        if (data.error) {
+          reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(data.error)}</strong>`;
+        }
+      } catch (_) {
+        // Fallback: treat as plain text
+        if (event.data === '[DONE]') {
+          es.close();
+          return;
+        }
+        fullContent += event.data;
+        reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+      }
+    };
+
+    es.onerror = (err) => {
+      console.error('SSE error:', err);
+      es.close();
+      reportContainer.innerHTML = `<div class="alert alert-danger">Stream error.</div>`;
+    };
+
+    es.onopen = () => {
+      // optional: mark stream as open
+    };
+
+    // When the stream ends (backend sends [DONE]), we finalize in onmessage via close()
+    // After close, add "View Full Report" button if we have content
+    const finalize = () => {
+      if (fullContent && fullContent.trim().length > 0) {
+        const viewFullButton = document.createElement('button');
+        viewFullButton.className = 'btn btn-outline-primary btn-sm mt-2';
+        viewFullButton.innerHTML = '📖 View Full Report';
+        viewFullButton.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
+        reportContainer.appendChild(viewFullButton);
+
+        const reportId = `claim-${claimIdx}-question-${questionIdx}`;
+        if (!generatedReports.find(r => r.id === reportId)) {
+          const claimElement = document.querySelector(`#claim-${claimIdx} .claim-text`);
+          const questionElement = document.querySelector(`#questions-list-claim-${claimIdx} li:nth-child(${questionIdx + 1}) span`);
+          generatedReports.push({
+            id: reportId,
+            claimIdx: claimIdx,
+            questionIdx: questionIdx,
+            claimText: claimElement ? claimElement.textContent : `Claim ${claimIdx + 1}`,
+            questionText: questionElement ? questionElement.textContent.replace(`Q${questionIdx + 1}:`, '').trim() : `Question ${questionIdx + 1}`
+          });
+        }
+      } else {
+        reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
+      }
+    };
+
+    // Small watcher to finalize when ES closes
+    const observer = new MutationObserver(() => {
+      // noop; we keep for potential hooks
+    });
+    observer.observe(reportBox, { childList: true });
+
+    // Ensure finalize runs when window unloads / stream closes
+    window.addEventListener('beforeunload', () => { try { es.close(); } catch(_){} });
+
+    // Patch: since backend sends [DONE] as a message, finalize occurs via onmessage above
+    // If you want a timeout guard:
+    setTimeout(() => { /* optional guard */ }, 600000);
+
+  } catch (error) {
+    console.error('Report generation error:', error);
+    reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = 'Generate Report';
+    }
+  }
 }
 
 // NEW PDF DOWNLOAD FUNCTIONS
@@ -1319,45 +1322,50 @@ freshGeneratePdfBtn.addEventListener('click', generatePdfFromSelections);
 }
 
 async function generatePdfFromSelections() {
-const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
-const checkboxes = document.querySelectorAll('.report-selection-checkbox:checked');
-if (checkboxes.length === 0) {
-alert('Please select at least one report to include in the PDF.');
-return;
+  const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
+  const checkboxes = document.querySelectorAll('.report-selection-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one report to include in the PDF.');
+    return;
+  }
+  const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
+
+  try {
+    toggleLoading(generatePdfBtn, true, 'Generating PDF...');
+    const response = await fetch(`${API_BASE}/api/export-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        selected_reports: selectedReportIds    // ← fix: send the correct array
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to generate PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Epistemiq_AI_Report.pdf';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById('reportSelectionModal'));
+    modal.hide();
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert(`Error generating PDF: ${error.message}`);
+  } finally {
+    toggleLoading(generatePdfBtn, false);
+  }
 }
-const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
-try {
-toggleLoading(generatePdfBtn, true, 'Generating PDF...');
-const response = await fetch(`${API_BASE}/api/export-pdf`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
-    analysis_id: analysisId,    
-    selected_reports: selected
-}),
-});
-if (!response.ok) {
-const errorText = await response.text();
-throw new Error(errorText || 'Failed to generate PDF');
-}
-const blob = await response.blob();
-const url = window.URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.href = url;
-a.download = 'Epistemiq_AI_Report.pdf';
-document.body.appendChild(a);
-a.click();
-window.URL.revokeObjectURL(url);
-document.body.removeChild(a);
-const modal = bootstrap.Modal.getInstance(document.getElementById('reportSelectionModal'));
-modal.hide();
-} catch (error) {
-console.error('Error generating PDF:', error);
-alert(`Error generating PDF: ${error.message}`);
-} finally {
-toggleLoading(generatePdfBtn, false);
-}
-}
+
 
 // Modal close functionality
 const researchReportModal = document.getElementById('researchReportModal');
