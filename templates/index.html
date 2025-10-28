@@ -689,9 +689,11 @@ const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
 const API_BASE = "https://epistemiq.pythonanywhere.com";
+const [analysisId, setAnalysisId] = useState(null);
 let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
+let analysisId = null;
 
 // UI/Display Functions
 
@@ -1028,8 +1030,10 @@ try {
 const response = await fetch(`${API_BASE}/api/get-claim-details`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-credentials: 'include',
-body: JSON.stringify({ claim_idx: claimIdx })
+body: JSON.stringify({
+    analysis_id: analysisId,    
+    claim_idx: claimIndex
+}),
 });
 if (!response.ok) {
 const errorData = await response.text();
@@ -1091,7 +1095,10 @@ const response = await fetch(`${API_BASE}/api/verify-external`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 credentials: 'include',
-body: JSON.stringify({ claim_idx: claimIdx })
+body: JSON.stringify({
+    analysis_id: analysisId,    
+    claim_idx: claimIndex
+}),
 });
 const data = await response.json();
 if (!response.ok) {
@@ -1152,7 +1159,7 @@ button.disabled = true;
 button.innerHTML = 'Generating...';
 }
 try {
-const es = new EventSource(`${API_BASE}/api/generate-report?...`, { withCredentials: true });
+const es = new EventSource(`${API_BASE}/api/generate-report?analysis_id=${analysisId}&claim_idx=${claimIndex}&question_idx=${questionIndex}`);
 if (!response.ok) {
 let errText;
 try { errText = await response.json(); errText = errText.error || JSON.stringify(errText); } catch(e){ errText = await response.text(); }
@@ -1246,10 +1253,7 @@ button.innerHTML = 'Generate Report';
 async function openReportSelectionModal() {
 try {
 toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
-const response = await fetch(`${API_BASE}/api/available-reports`, {
-  method: 'GET',
-  credentials: 'include'          
-});
+const response = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`);
 if (!response.ok) {
 throw new Error('Failed to load available reports');
 }
@@ -1330,11 +1334,10 @@ toggleLoading(generatePdfBtn, true, 'Generating PDF...');
 const response = await fetch(`${API_BASE}/api/export-pdf`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-credentials: 'include',
 body: JSON.stringify({
-selected_reports: selectedReportIds,
-summary_contents: []
-})
+    analysis_id: analysisId,    
+    selected_reports: selected
+}),
 });
 if (!response.ok) {
 const errorText = await response.text();
@@ -1416,7 +1419,6 @@ try {
 const response = await fetch(`${API_BASE}/api/extract-article`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-credentials: 'include',
 body: JSON.stringify({ url: url }),
 });
 const data = await response.json();
@@ -1453,7 +1455,6 @@ try {
 const response = await fetch(`${API_BASE}/api/analyze`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-credentials: 'include',  
 body: JSON.stringify({
 text: articleText,
 mode: promptModeSelect.value,
@@ -1461,6 +1462,7 @@ usePapers: usePapersToggle.checked
 }),
 });
 const data = await response.json();
+analysisId = data.analysis_id;   
 if (!response.ok) {
 const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
 throw new Error(errorMessage);
