@@ -700,34 +700,36 @@ let currentVideoFile = null;
 
 
 //------------------------------------------------------
-// ✅ Temporary Chrome AI simulation for demo purposes
+// ✅ Chrome AI detection + simulation (for demo)
 //------------------------------------------------------
 (async () => {
   try {
-    // Try to detect real Chrome AI first
+    const banner = document.getElementById("chrome-ai-info");
+
+    // Try real Chrome AI detection
     if (window.ai && typeof window.ai.canCreateTextSession === "function") {
       const status = await window.ai.canCreateTextSession();
       if (status === "readily") {
+        banner.classList.remove("d-none");
         console.log("✅ Chrome AI (Gemini Nano) detected — running real local model.");
-        return; // real detection — no need to simulate
+        return;
       }
     }
 
-    // --- Otherwise simulate the presence of Chrome AI ---
-    console.warn("⚠️ Chrome AI not available — simulating local Gemini Nano session for demo.");
-
+    // Otherwise, simulate Chrome AI (demo mode)
+    console.warn("⚠️ Chrome AI not available — simulating local Gemini Nano for demo.");
     window.ai = {
       canCreateTextSession: async () => "readily",
       createTextSession: async () => ({
-        prompt: async (promptText) => {
-          console.log("[Simulated Gemini Nano] prompt received:", promptText);
-          // You can customize this response for your demo
-          return `🧠 Simulated Gemini Nano output for prompt:\n"${promptText}"`;
-        },
-      }),
+        prompt: async (p) => `🧠 Simulated Gemini Nano output:\n${p}`
+      })
     };
+
+    // Show banner even when simulated
+    banner.classList.remove("d-none");
+    banner.innerHTML = "🧠 <strong>Simulated Chrome AI Mode Active</strong><br>This is a demo of Gemini Nano local mode.";
   } catch (err) {
-    console.error("Chrome AI detection error:", err);
+    console.error("Chrome AI detection/simulation error:", err);
   }
 })();
   
