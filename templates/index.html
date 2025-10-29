@@ -1525,6 +1525,19 @@ const { claimIdx, questionIdx, reportContainerId } = targetBtn.dataset;
 generateReport(parseInt(claimIdx), parseInt(questionIdx), reportContainerId, targetBtn);
 }
 });
+
+// 🔧 Force Chrome AI dev preview (insert here)
+window.ai = {
+  languageModel: {
+    create: async () => ({
+      prompt: async () => "Simulated Chrome AI output"
+    })
+  }
+};
+console.log("✅ Forcing Chrome AI dev preview...");
+const hasChromeAI = true;
+showChromeAIEnabledUI();
+ 
 });
 
 if ('serviceWorker' in navigator) {
@@ -1753,24 +1766,6 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 });
 
 
-// 🔧 Force Chrome AI dev preview (wait until everything is loaded)
-window.addEventListener("DOMContentLoaded", () => {
-  // Fake Chrome AI interface for testing
-  window.ai = {
-    languageModel: {
-      create: async () => ({
-        prompt: async () => "Simulated Chrome AI output"
-      })
-    }
-  };
-
-  if (typeof detectChromeAI === "function") {
-    console.log("✅ Forcing Chrome AI dev preview...");
-    detectChromeAI();
-  } else {
-    console.warn("⚠️ detectChromeAI() not found yet – check script load order.");
-  }
-});
 
   
 </script>
