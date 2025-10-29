@@ -18,7 +18,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
 
   <!-- ✅ Custom Styles -->
-  <-- <link rel="stylesheet" href="templates/static/styles.css" /> -->
+  <!-- <link rel="stylesheet" href="templates/static/styles.css" /> -->
 
   <!-- ✅ Google Tag Manager / Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
@@ -696,6 +696,32 @@ let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
 
+// Track all reports that the user generated (from cache or new) in this session
+const reportSessionMap = new Map();
+
+function sessionKey(c, q) { 
+  return `${c}-${q}`; 
+}
+
+// ✅ Register a report as “generated” this session
+function markReportGenerated(claimIdx, questionIdx) {
+  const claimTextEl = document.querySelector(`#claim-${claimIdx} .claim-text`);
+  const claimText = claimTextEl ? claimTextEl.textContent : `Claim ${claimIdx + 1}`;
+
+  // Extract question text (for modal display)
+  const qLi = document.querySelector(`#report-claim-${claimIdx}-${questionIdx}`)?.closest('li');
+  const qSpan = qLi ? qLi.querySelector('span') : null;
+  const questionTextRaw = qSpan ? qSpan.textContent : `Question ${questionIdx + 1}`;
+  const questionText = questionTextRaw.replace(/^Q\d+:\s*/i, '').trim();
+
+  reportSessionMap.set(sessionKey(claimIdx, questionIdx), {
+    claimIdx,
+    questionIdx,
+    claimText,
+    questionText
+  });
+}
+  
 
 // UI/Display Functions
 
@@ -1229,7 +1255,7 @@ throw new Error('Failed to load available reports');
 const availableReports = await response.json();
 
 const sessionReports = availableReports.filter(r =>
-  generatedReports.some(g => g.claimIdx === r.claimIdx && g.questionIdx === r.questionIdx)
+  reportSessionMap.has(`${r.claimIdx}-${r.questionIdx}`)
 );
 
 if (!sessionReports || sessionReports.length === 0) {
