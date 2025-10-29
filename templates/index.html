@@ -1204,27 +1204,36 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
     // After close, add "View Full Report" button if we have content
     const finalize = () => {
       if (fullContent && fullContent.trim().length > 0) {
-        const viewFullButton = document.createElement('button');
-        viewFullButton.className = 'btn btn-outline-primary btn-sm mt-2';
-        viewFullButton.innerHTML = '📖 View Full Report';
-        viewFullButton.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
-        reportContainer.appendChild(viewFullButton);
+  reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
 
-        const reportId = `claim-${claimIdx}-question-${questionIdx}`;
-        if (!generatedReports.find(r => r.id === reportId)) {
-          const claimElement = document.querySelector(`#claim-${claimIdx} .claim-text`);
-          const questionElement = document.querySelector(`#questions-list-claim-${claimIdx} li:nth-child(${questionIdx + 1}) span`);
-          generatedReports.push({
-            id: reportId,
-            claimIdx: claimIdx,
-            questionIdx: questionIdx,
-            claimText: claimElement ? claimElement.textContent : `Claim ${claimIdx + 1}`,
-            questionText: questionElement ? questionElement.textContent.replace(`Q${questionIdx + 1}:`, '').trim() : `Question ${questionIdx + 1}`
-          });
-        }
-      } else {
-        reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
-      }
+  // ✅ Restore "View Full Report" button
+  const viewFullButton = document.createElement("button");
+  viewFullButton.className = "btn btn-outline-primary btn-sm mt-2";
+  viewFullButton.textContent = "📖 View Full Report";
+  viewFullButton.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
+  reportContainer.appendChild(viewFullButton);
+
+  // ✅ Cache metadata for PDF selection
+  const reportId = `claim-${claimIdx}-question-${questionIdx}`;
+  if (!generatedReports.find(r => r.id === reportId)) {
+    const claimElement = document.querySelector(`#claim-${claimIdx} .claim-text`);
+    const questionElement = document.querySelector(
+      `#questions-list-${claimIdx} li:nth-child(${questionIdx + 1}) span`
+    );
+    generatedReports.push({
+      id: reportId,
+      claimIdx,
+      questionIdx,
+      claimText: claimElement ? claimElement.textContent : `Claim ${claimIdx + 1}`,
+      questionText: questionElement
+        ? questionElement.textContent.replace(`Q${questionIdx + 1}:`, "").trim()
+        : `Question ${questionIdx + 1}`
+    });
+  }
+} else {
+  reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
+}
+
     };
 
     // Small watcher to finalize when ES closes
