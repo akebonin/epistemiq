@@ -1753,10 +1753,10 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 });
 
 
-// Dev-only trigger: simulate Chrome AI detection
-window.ai = { prompt: () => Promise.resolve("Simulated output") };
-window.dispatchEvent(new Event("DOMContentLoaded"));
-    
+// 🔧 Force Chrome AI dev preview
+window.ai = { languageModel: { create: async () => ({ prompt: async () => "Simulated Chrome AI output" }) } };
+detectChromeAI();
+  
 </script>
 </body>
 </html>
