@@ -1254,9 +1254,18 @@ throw new Error('Failed to load available reports');
 }
 const availableReports = await response.json();
 
-const sessionReports = availableReports.filter(r =>
-  reportSessionMap.has(`${r.claimIdx}-${r.questionIdx}`)
-);
+// Map all current session reports by string key
+const sessionKeys = Array.from(reportSessionMap.keys());
+
+// Filter available reports whose indices match session ones
+const sessionReports = availableReports.filter(r => {
+  // Normalize property names from backend (camelCase or snake_case)
+  const cIdx = r.claimIdx ?? r.claim_idx ?? r.claim_index ?? null;
+  const qIdx = r.questionIdx ?? r.question_idx ?? r.question_index ?? null;
+  if (cIdx === null || qIdx === null) return false;
+  return sessionKeys.includes(`${cIdx}-${qIdx}`);
+});
+
 
 if (!sessionReports || sessionReports.length === 0) {
   alert('No reports generated in this session. Please generate at least one report first.');
