@@ -1250,43 +1250,48 @@ async function openReportSelectionModal() {
   try {
     toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
 
-    const response = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`);
+    // Always ask the backend what reports exist
+    const response = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`, {
+      credentials: "include"
+    });
     if (!response.ok) throw new Error('Failed to load available reports');
     const availableReports = await response.json();
 
-    // Map session-generated reports
-    const sessionKeys = Array.from(reportSessionMap.keys());
+    // Always allow modal to open, even with 0 reports
+    let sessionKeys = Array.from(reportSessionMap.keys());
+    let sessionReports = [];
 
-    // Reports actually generated this session
-    const sessionReports = availableReports.filter(r => {
-      const cIdx = r.claimIdx ?? r.claim_idx ?? r.claim_index ?? null;
-      const qIdx = r.questionIdx ?? r.question_idx ?? r.question_index ?? null;
-      if (cIdx === null || qIdx === null) return false;
-      return sessionKeys.includes(`${cIdx}-${qIdx}`);
+    // Include any reports user actually viewed/generated in this session
+    availableReports.forEach(r => {
+      const cIdx = r.claimIdx ?? r.claim_idx ?? null;
+      const qIdx = r.questionIdx ?? r.question_idx ?? null;
+      if (cIdx !== null && qIdx !== null && sessionKeys.includes(`${cIdx}-${qIdx}`)) {
+        sessionReports.push(r);
+      }
     });
 
-    // Always include the model verdict + external verification placeholders
-    const baseReports = [
-      {
-        id: "model-verdicts",
-        type: "Model Verdicts",
-        description: "All AI-generated verdicts for analyzed claims."
-      },
-      {
-        id: "external-verifications",
-        type: "External Verifications",
-        description: "All external source-based verifications (CrossRef, CORE, PubMed)."
-      }
-    ];
+    // ✅ If no reports were generated this session, still show modal
+    // Add default pseudo-entries for base model/external verdicts
+    if (sessionReports.length === 0) {
+      sessionReports.push({
+        id: 'model-verdicts',
+        type: 'Model Verdicts Only',
+        description: 'Export all claims with their model verdicts (no research reports).'
+      });
+      sessionReports.push({
+        id: 'external-verifications',
+        type: 'External Verifications Only',
+        description: 'Export all claims with their external verification summaries.'
+      });
+    }
 
-    // Combine — always include the two base sections, plus any session reports
-    const finalReports = [...baseReports, ...sessionReports];
+    // Populate modal UI with whatever list we have
+    populateReportSelectionModal(sessionReports);
 
-    // Populate modal even if only base reports exist
-    populateReportSelectionModal(finalReports);
-
+    // Show the modal
     const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
     modal.show();
+
   } catch (error) {
     console.error('Error opening report selection modal:', error);
     alert(`Error: ${error.message}`);
@@ -1294,6 +1299,7 @@ async function openReportSelectionModal() {
     toggleLoading(downloadPdfBtn, false);
   }
 }
+
   
   
 function populateReportSelectionModal(availableReports) {
