@@ -1740,7 +1740,7 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
         chromeButtons.videourl.classList.remove("d-none");
         chromeButtons.videourl.querySelector("button").textContent = "🎧 Transcribe Video URL (Chrome AI)";
         chromeButtons.videourl.querySelector("button").onclick = () => chromeTranscribeMedia("videourl");
-/        break;
+        break;
       case "image":
         // keep the image Flask button visible
         if (btnProcessVideo) btnProcessVideo.classList.remove("d-none");
