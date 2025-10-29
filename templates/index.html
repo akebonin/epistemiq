@@ -697,42 +697,7 @@ let analysisId = null;
 let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
-
-
-//------------------------------------------------------
-// ✅ Chrome AI detection + simulation (for demo)
-//------------------------------------------------------
-(async () => {
-  try {
-    const banner = document.getElementById("chrome-ai-info");
-
-    // Try real Chrome AI detection
-    if (window.ai && typeof window.ai.canCreateTextSession === "function") {
-      const status = await window.ai.canCreateTextSession();
-      if (status === "readily") {
-        banner.classList.remove("d-none");
-        console.log("✅ Chrome AI (Gemini Nano) detected — running real local model.");
-        return;
-      }
-    }
-
-    // Otherwise, simulate Chrome AI (demo mode)
-    console.warn("⚠️ Chrome AI not available — simulating local Gemini Nano for demo.");
-    window.ai = {
-      canCreateTextSession: async () => "readily",
-      createTextSession: async () => ({
-        prompt: async (p) => `🧠 Simulated Gemini Nano output:\n${p}`
-      })
-    };
-
-    // Show banner even when simulated
-    banner.classList.remove("d-none");
-    banner.innerHTML = "🧠 <strong>Simulated Chrome AI Mode Active</strong><br>This is a demo of Gemini Nano local mode.";
-  } catch (err) {
-    console.error("Chrome AI detection/simulation error:", err);
-  }
-})();
-  
+ 
 
 // Track all reports that the user generated (from cache or new) in this session
 const reportSessionMap = new Map();
@@ -1787,6 +1752,65 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
   updateChromeButtons();
 });
 
+// ----------------------------------------------
+// 🧠 Dev-only Chrome AI Visual Toggle
+// ----------------------------------------------
+(function initChromeAIDevToggle() {
+  // Don't add twice
+  if (document.getElementById("dev-chromeai-toggle")) return;
+
+  // Create button
+  const btn = document.createElement("button");
+  btn.id = "dev-chromeai-toggle";
+  btn.textContent = "Chrome AI: OFF";
+  Object.assign(btn.style, {
+    position: "fixed",
+    right: "15px",
+    bottom: "15px",
+    padding: "8px 12px",
+    fontSize: "13px",
+    background: "#6c757d",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    zIndex: "99999",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
+  });
+
+  // Toggle logic
+  let fakeEnabled = false;
+  btn.addEventListener("click", () => {
+    fakeEnabled = !fakeEnabled;
+    if (fakeEnabled) {
+      window.ai = {
+        canCreateTextSession: async () => true,
+        createTextSession: async () => ({ sessionId: "dev-stub" }),
+      };
+      window.chromeAIEnabled = true;
+      document
+        .querySelectorAll("#chrome-ai-info, [data-chrome-ai], .chrome-ai-ui")
+        .forEach((el) => el.classList.remove("d-none"));
+      btn.textContent = "Chrome AI: ON";
+      btn.style.background = "#198754"; // green
+      console.log("✅ Fake Chrome AI activated for dev view");
+    } else {
+      delete window.ai;
+      window.chromeAIEnabled = false;
+      document
+        .querySelectorAll("#chrome-ai-info, [data-chrome-ai], .chrome-ai-ui")
+        .forEach((el) => el.classList.add("d-none"));
+      btn.textContent = "Chrome AI: OFF";
+      btn.style.background = "#6c757d"; // grey
+      console.log("❌ Fake Chrome AI disabled");
+    }
+  });
+
+  // Add to DOM
+  document.body.appendChild(btn);
+})();
+
+    
 </script>
 </body>
 </html>
