@@ -1525,19 +1525,6 @@ const { claimIdx, questionIdx, reportContainerId } = targetBtn.dataset;
 generateReport(parseInt(claimIdx), parseInt(questionIdx), reportContainerId, targetBtn);
 }
 });
-
-// 🔧 Force Chrome AI dev preview (insert here)
-window.ai = {
-  languageModel: {
-    create: async () => ({
-      prompt: async () => "Simulated Chrome AI output"
-    })
-  }
-};
-console.log("✅ Forcing Chrome AI dev preview...");
-const hasChromeAI = true;
-showChromeAIEnabledUI();
- 
 });
 
 if ('serviceWorker' in navigator) {
@@ -1570,10 +1557,19 @@ document.addEventListener("DOMContentLoaded", () => {
     videourl: document.getElementById("chrome-ai-videourl"),
   };
 
+  // Dev preview switch (no console needed): ?previewAI=1 to force on, ?previewAI=0 to clear
+const __params = new URLSearchParams(window.location.search);
+if (__params.get('previewAI') === '1') localStorage.setItem('forceChromeAI', '1');
+if (__params.get('previewAI') === '0') localStorage.removeItem('forceChromeAI');
+  
   // 🧠 Detect Chrome AI support
-  const hasChromeAI =
-    typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function";
+ // const hasChromeAI =
+ //   typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function";
 
+  let hasChromeAI =
+  typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function";
+hasChromeAI = (localStorage.getItem('forceChromeAI') === '1') || hasChromeAI;
+  
   if (!hasChromeAI) {
     console.info("Chrome AI not detected — using Flask backend normally.");
     // Show all Flask buttons for normal use
