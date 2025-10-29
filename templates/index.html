@@ -1248,57 +1248,55 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
 
 async function openReportSelectionModal() {
   try {
-    toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
-
-    // Always ask the backend what reports exist
-    const response = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`, {
-      credentials: "include"
-    });
-    if (!response.ok) throw new Error('Failed to load available reports');
-    const availableReports = await response.json();
-
-    // Always allow modal to open, even with 0 reports
-    let sessionKeys = Array.from(reportSessionMap.keys());
-    let sessionReports = [];
-
-    // Include any reports user actually viewed/generated in this session
-    availableReports.forEach(r => {
-      const cIdx = r.claimIdx ?? r.claim_idx ?? null;
-      const qIdx = r.questionIdx ?? r.question_idx ?? null;
-      if (cIdx !== null && qIdx !== null && sessionKeys.includes(`${cIdx}-${qIdx}`)) {
-        sessionReports.push(r);
-      }
-    });
-
-    // ✅ If no reports were generated this session, still show modal
-    // Add default pseudo-entries for base model/external verdicts
-    if (sessionReports.length === 0) {
-      sessionReports.push({
-        id: 'model-verdicts',
-        type: 'Model Verdicts Only',
-        description: 'Export all claims with their model verdicts (no research reports).'
-      });
-      sessionReports.push({
-        id: 'external-verifications',
-        type: 'External Verifications Only',
-        description: 'Export all claims with their external verification summaries.'
-      });
+    if (!analysisId) {
+      alert('No analysis found. Please run an analysis first.');
+      return;
     }
 
-    // Populate modal UI with whatever list we have
-    populateReportSelectionModal(sessionReports);
+    toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
 
-    // Show the modal
+    const resp = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`, {
+      credentials: "include"
+    });
+    if (!resp.ok) throw new Error('Failed to load available reports');
+
+    const available = await resp.json(); // [{ id, type, description }, ...]
+
+    // Always include claim summaries (model + external)
+    const summaries = available.filter(r => r.id && r.id.endsWith('-summary'));
+
+    // Only include research reports generated this session
+    const sessionKeys = Array.from(reportSessionMap.keys());
+    const sessionReports = available.filter(r => {
+      if (!r.id || !r.id.includes('question')) return false;
+      const parts = r.id.split('-');
+      if (parts.length !== 4) return false;
+      const c = parseInt(parts[1], 10);
+      const q = parseInt(parts[3], 10);
+      if (Number.isNaN(c) || Number.isNaN(q)) return false;
+      return sessionKeys.includes(`${c}-${q}`);
+    });
+
+    const listForModal = [...summaries, ...sessionReports];
+
+    if (!listForModal || listForModal.length === 0) {
+      alert('No reports or claim summaries found for this analysis.');
+      return;
+    }
+
+    populateReportSelectionModal(listForModal);
+
     const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
     modal.show();
 
-  } catch (error) {
-    console.error('Error opening report selection modal:', error);
-    alert(`Error: ${error.message}`);
+  } catch (err) {
+    console.error('Error opening report selection modal:', err);
+    alert(`Error: ${err.message}`);
   } finally {
     toggleLoading(downloadPdfBtn, false);
   }
 }
+
 
   
   
