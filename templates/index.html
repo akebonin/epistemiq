@@ -1245,45 +1245,57 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
 
 
 // NEW PDF DOWNLOAD FUNCTIONS
+
 async function openReportSelectionModal() {
-try {
-toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
-const response = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`);
-if (!response.ok) {
-throw new Error('Failed to load available reports');
+  try {
+    toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
+
+    const response = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`);
+    if (!response.ok) throw new Error('Failed to load available reports');
+    const availableReports = await response.json();
+
+    // Map session-generated reports
+    const sessionKeys = Array.from(reportSessionMap.keys());
+
+    // Reports actually generated this session
+    const sessionReports = availableReports.filter(r => {
+      const cIdx = r.claimIdx ?? r.claim_idx ?? r.claim_index ?? null;
+      const qIdx = r.questionIdx ?? r.question_idx ?? r.question_index ?? null;
+      if (cIdx === null || qIdx === null) return false;
+      return sessionKeys.includes(`${cIdx}-${qIdx}`);
+    });
+
+    // Always include the model verdict + external verification placeholders
+    const baseReports = [
+      {
+        id: "model-verdicts",
+        type: "Model Verdicts",
+        description: "All AI-generated verdicts for analyzed claims."
+      },
+      {
+        id: "external-verifications",
+        type: "External Verifications",
+        description: "All external source-based verifications (CrossRef, CORE, PubMed)."
+      }
+    ];
+
+    // Combine — always include the two base sections, plus any session reports
+    const finalReports = [...baseReports, ...sessionReports];
+
+    // Populate modal even if only base reports exist
+    populateReportSelectionModal(finalReports);
+
+    const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
+    modal.show();
+  } catch (error) {
+    console.error('Error opening report selection modal:', error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    toggleLoading(downloadPdfBtn, false);
+  }
 }
-const availableReports = await response.json();
-
-// Map all current session reports by string key
-const sessionKeys = Array.from(reportSessionMap.keys());
-
-// Filter available reports whose indices match session ones
-const sessionReports = availableReports.filter(r => {
-  // Normalize property names from backend (camelCase or snake_case)
-  const cIdx = r.claimIdx ?? r.claim_idx ?? r.claim_index ?? null;
-  const qIdx = r.questionIdx ?? r.question_idx ?? r.question_index ?? null;
-  if (cIdx === null || qIdx === null) return false;
-  return sessionKeys.includes(`${cIdx}-${qIdx}`);
-});
-
-
-if (!sessionReports || sessionReports.length === 0) {
-  alert('No reports generated in this session. Please generate at least one report first.');
-  return;
-}
-
-populateReportSelectionModal(sessionReports);
-
-const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
-modal.show();
-} catch (error) {
-console.error('Error opening report selection modal:', error);
-alert(`Error: ${error.message}`);
-} finally {
-toggleLoading(downloadPdfBtn, false);
-}
-}
-
+  
+  
 function populateReportSelectionModal(availableReports) {
 const selectionList = document.getElementById('report-selection-list');
 if (!availableReports || availableReports.length === 0) {
