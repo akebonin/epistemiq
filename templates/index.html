@@ -498,23 +498,23 @@ max-width: none;
 .chrome-ai-btn button:hover {
   background-color: #ffe9a8 !important;
 }
-/* Fix URL row layout & keep Chrome-AI button on a separate line (desktop + mobile) */
-#url-input-group .input-group { 
+/* Fix Video URL row wrapping & sizing when Chrome AI button is present */
+#video-url-input-group .input-group { 
   flex-wrap: wrap; 
   align-items: stretch;
 }
-#url-input-group .input-group > .form-control {
-  flex: 1 1 100%;
+#video-url-input-group .input-group > .form-control {
   min-width: 0;
+  flex: 1 1 70%;
 }
-#url-input-group .input-group > .btn:not(.chrome-ai-btn) {
-  margin-top: .5rem;
+#video-url-input-group .input-group > .btn {
+  flex: 0 0 auto;
 }
-#url-input-group .chrome-ai-btn {
+#video-url-input-group .chrome-ai-btn {
   width: 100%;
   margin-top: .5rem;
-  order: 2; /* force it to appear after the input and fetch button */
 }
+
 
 </style>
 </head>
