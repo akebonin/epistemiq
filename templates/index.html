@@ -1753,9 +1753,25 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 });
 
 
-// 🔧 Force Chrome AI dev preview
-window.ai = { languageModel: { create: async () => ({ prompt: async () => "Simulated Chrome AI output" }) } };
-detectChromeAI();
+// 🔧 Force Chrome AI dev preview (wait until everything is loaded)
+window.addEventListener("DOMContentLoaded", () => {
+  // Fake Chrome AI interface for testing
+  window.ai = {
+    languageModel: {
+      create: async () => ({
+        prompt: async () => "Simulated Chrome AI output"
+      })
+    }
+  };
+
+  if (typeof detectChromeAI === "function") {
+    console.log("✅ Forcing Chrome AI dev preview...");
+    detectChromeAI();
+  } else {
+    console.warn("⚠️ detectChromeAI() not found yet – check script load order.");
+  }
+});
+
   
 </script>
 </body>
