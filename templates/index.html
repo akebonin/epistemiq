@@ -698,6 +698,40 @@ let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
 
+
+//------------------------------------------------------
+// ✅ Temporary Chrome AI simulation for demo purposes
+//------------------------------------------------------
+(async () => {
+  try {
+    // Try to detect real Chrome AI first
+    if (window.ai && typeof window.ai.canCreateTextSession === "function") {
+      const status = await window.ai.canCreateTextSession();
+      if (status === "readily") {
+        console.log("✅ Chrome AI (Gemini Nano) detected — running real local model.");
+        return; // real detection — no need to simulate
+      }
+    }
+
+    // --- Otherwise simulate the presence of Chrome AI ---
+    console.warn("⚠️ Chrome AI not available — simulating local Gemini Nano session for demo.");
+
+    window.ai = {
+      canCreateTextSession: async () => "readily",
+      createTextSession: async () => ({
+        prompt: async (promptText) => {
+          console.log("[Simulated Gemini Nano] prompt received:", promptText);
+          // You can customize this response for your demo
+          return `🧠 Simulated Gemini Nano output for prompt:\n"${promptText}"`;
+        },
+      }),
+    };
+  } catch (err) {
+    console.error("Chrome AI detection error:", err);
+  }
+})();
+  
+
 // Track all reports that the user generated (from cache or new) in this session
 const reportSessionMap = new Map();
 
