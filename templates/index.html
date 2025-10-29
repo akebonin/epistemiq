@@ -1269,11 +1269,18 @@ if (!response.ok) {
 throw new Error('Failed to load available reports');
 }
 const availableReports = await response.json();
-if (!availableReports || availableReports.length === 0) {
-alert('No reports available for download. Please generate some analysis first.');
-return;
+
+const sessionReports = availableReports.filter(r =>
+  generatedReports.some(g => g.claimIdx === r.claimIdx && g.questionIdx === r.questionIdx)
+);
+
+if (!sessionReports || sessionReports.length === 0) {
+  alert('No reports generated in this session. Please generate at least one report first.');
+  return;
 }
-populateReportSelectionModal(availableReports);
+
+populateReportSelectionModal(sessionReports);
+
 const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
 modal.show();
 } catch (error) {
