@@ -1740,7 +1740,7 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
         chromeButtons.videourl.classList.remove("d-none");
         chromeButtons.videourl.querySelector("button").textContent = "🎧 Transcribe Video URL (Chrome AI)";
         chromeButtons.videourl.querySelector("button").onclick = () => chromeTranscribeMedia("videourl");
-        break;
+/        break;
       case "image":
         // keep the image Flask button visible
         if (btnProcessVideo) btnProcessVideo.classList.remove("d-none");
@@ -1752,64 +1752,10 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
   updateChromeButtons();
 });
 
-// ----------------------------------------------
-// 🧠 Dev-only Chrome AI Visual Toggle
-// ----------------------------------------------
-(function initChromeAIDevToggle() {
-  // Don't add twice
-  if (document.getElementById("dev-chromeai-toggle")) return;
 
-  // Create button
-  const btn = document.createElement("button");
-  btn.id = "dev-chromeai-toggle";
-  btn.textContent = "Chrome AI: OFF";
-  Object.assign(btn.style, {
-    position: "fixed",
-    right: "15px",
-    bottom: "15px",
-    padding: "8px 12px",
-    fontSize: "13px",
-    background: "#6c757d",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    zIndex: "99999",
-    boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
-  });
-
-  // Toggle logic
-  let fakeEnabled = false;
-  btn.addEventListener("click", () => {
-    fakeEnabled = !fakeEnabled;
-    if (fakeEnabled) {
-      window.ai = {
-        canCreateTextSession: async () => true,
-        createTextSession: async () => ({ sessionId: "dev-stub" }),
-      };
-      window.chromeAIEnabled = true;
-      document
-        .querySelectorAll("#chrome-ai-info, [data-chrome-ai], .chrome-ai-ui")
-        .forEach((el) => el.classList.remove("d-none"));
-      btn.textContent = "Chrome AI: ON";
-      btn.style.background = "#198754"; // green
-      console.log("✅ Fake Chrome AI activated for dev view");
-    } else {
-      delete window.ai;
-      window.chromeAIEnabled = false;
-      document
-        .querySelectorAll("#chrome-ai-info, [data-chrome-ai], .chrome-ai-ui")
-        .forEach((el) => el.classList.add("d-none"));
-      btn.textContent = "Chrome AI: OFF";
-      btn.style.background = "#6c757d"; // grey
-      console.log("❌ Fake Chrome AI disabled");
-    }
-  });
-
-  // Add to DOM
-  document.body.appendChild(btn);
-})();
-
+// Dev-only trigger: simulate Chrome AI detection
+window.ai = { prompt: () => Promise.resolve("Simulated output") };
+window.dispatchEvent(new Event("DOMContentLoaded"));
     
 </script>
 </body>
