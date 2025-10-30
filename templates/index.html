@@ -1597,19 +1597,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const availability = await Summarizer.availability();
         if (availability === "ready" || availability === "downloadable") {
           const summarizer = await Summarizer.create({
-            type: "key-points",
-            format: "markdown",
-            length: "medium",
-            outputLanguage: "en",
-            expectedInputLanguages: ["en", "bg", "de", "fr", "it", "es", "ja"],
-            expectedContextLanguages: ["en"],
-            expectedOutputLanguages: ["en"],
-            monitor(m) {
-              m.addEventListener("downloadprogress", (e) =>
-                console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
-              );
-            },
-          });
+  type: "key-points",
+  format: "markdown",
+  length: "medium",
+  outputLanguage: "en",
+  expectedInputLanguages: ["en", "es", "ja"],
+  expectedContextLanguages: ["en"],
+  expectedOutputLanguages: ["en"],
+  monitor(m) {
+    m.addEventListener("downloadprogress", (e) =>
+      console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
+    );
+  },
+});
+
           console.log("✅ Using Chrome Summarizer API");
           return await summarizer.summarize(plainText);
         }
