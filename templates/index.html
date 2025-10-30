@@ -1564,13 +1564,12 @@ document.addEventListener("DOMContentLoaded", () => {
   btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
   chromeBtnContainer.appendChild(btn);
 
- // --- Chrome Nano helper (no top-level await anywhere) ---
-async function aiPromptNano(text) {
-  // 1) Summarizer API (stable 138+)
+  async function aiPromptNano(text) {
+  // 1) Summarizer API
   if ("Summarizer" in self) {
     try {
       const summarizer = await Summarizer.create({
-        outputLanguage: "en",   // <- required to avoid the warning
+        outputLanguage: "en",
         type: "key-points",
         format: "markdown",
         length: "medium"
@@ -1581,37 +1580,64 @@ async function aiPromptNano(text) {
     }
   }
 
-  // 2) Legacy window.ai (older Canary/Dev preview)
+  // 2) Legacy window.ai
   if (window.ai && typeof window.ai.prompt === "function") {
     try {
-      const r = await window.ai.prompt(text);   // <- now safely inside async fn
+      const r = await window.ai.prompt(text);
       return r?.output ?? r?.text ?? String(r ?? "");
     } catch (err) {
       console.warn("window.ai.prompt failed → fallback", err);
     }
   }
 
-  // 3) No local AI available
   console.warn("❌ No local AI available");
   throw new Error("No local AI available");
 }
 
-// Optional small utilities that call the helper
-async function summarizeIfLong(t, limit = 5000) {
-  return t.length > limit ? await aiPromptNano(`Summarize for scientific claim analysis:\n\n${t}`) : t;
+// --- Chunked local summarization ---
+async function summarizeIfLong(text, limit = 4000) {
+  if (text.length <= limit) return await aiPromptNano(text);
+
+  console.log("📦 Chunking large input for local model…");
+
+  // Break text into ~limit chunks
+  const parts = [];
+  for (let i = 0; i < text.length; i += limit) {
+    parts.push(text.slice(i, i + limit));
+  }
+
+  const summaries = [];
+  for (const part of parts) {
+    try {
+      summaries.push(await aiPromptNano(`Summarize clearly:\n\n${part}`));
+    } catch (err) {
+      console.warn("Chunk summarize failed:", err);
+    }
+  }
+
+  const combined = summaries.join("\n\n");
+
+  // Final pass to condense result
+  return await aiPromptNano(
+    `Condense the following text into a clean English summary for scientific analysis:\n\n${combined}`
+  );
 }
 
-async function detectLang(t) {
-  const out = await aiPromptNano(`Return only ISO2 language code:\n${t.slice(0, 600)}`);
+// --- Language detect & translate ---
+async function detectLang(text) {
+  const out = await aiPromptNano(
+    `Return only ISO2 code for language:\n${text.slice(0, 600)}`
+  );
   return out.trim().toLowerCase().slice(0, 2) || "en";
 }
 
-async function translateIfNeeded(t) {
-  const lang = await detectLang(t);
-  if (lang === "en") return t;
-  return await aiPromptNano(`Translate to English only:\n\n${t}`);
+async function translateIfNeeded(text) {
+  const lang = await detectLang(text);
+  if (lang === "en") return text;
+  return await aiPromptNano(`Translate to English only:\n${text}`);
 }
 
+ 
   // --- Button action ---
   btn.addEventListener("click", async () => {
     let text = textInput.value.trim();
