@@ -1543,172 +1543,171 @@ document.addEventListener("DOMContentLoaded", () => {
   const textInput = document.getElementById("textInput");
   const chromeTextDiv = document.getElementById("chrome-ai-text");
 
-  // Detect Chrome AI
-  const hasChromeAI =
-    typeof window !== "undefined" && (
-      (window.Summarizer && typeof window.Summarizer.create === "function") ||
-      (window.ai && typeof window.ai.prompt === "function")
-    );
+  // ===== Chrome AI button wiring (Paste only) =====
+const chromeButtons = {
+  paste: document.getElementById("chrome-ai-paste"),
+  url: document.getElementById("chrome-ai-url"),
+  video: document.getElementById("chrome-ai-video"),
+  videourl: document.getElementById("chrome-ai-videourl"),
+};
 
-  if (!hasChromeAI) {
-    console.info("Chrome AI not detected — backend mode only.");
-    return;
-  }
+function attachPasteChromeButton() {
+  const container = chromeButtons.paste;
+  if (!container) return;
 
-  console.info("✅ Chrome AI detected — enabling local summarization mode");
+  // ensure container is empty once
+  container.innerHTML = "";
 
-  // Create Chrome AI Button
   const btn = document.createElement("button");
-  btn.className = "btn btn-warning w-100 fw-semibold";
-  btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
-  btn.onclick = chromeSummarizeText;
-  chromeTextDiv.appendChild(btn);
-
-  // Show the Chrome AI button ONLY when text present
-  const showChromeButtonIfText = () => {
-    if (textInput.value.trim().length > 0) {
-      chromeTextDiv.classList.remove("d-none");
-    } else {
-      chromeTextDiv.classList.add("d-none");
-    }
-  };
-
-  textInput.addEventListener("input", showChromeButtonIfText);
-  inputMethod.addEventListener("change", showChromeButtonIfText);
-
-  // --- AI Helpers
-  async function aiPrompt(prompt, inputObj) {
-    if (window.Summarizer) {
-      const summarizer = await window.Summarizer.create({
-        outputLanguage: "en",
-        expectedInputLanguages: ["en", "bg", "es", "de", "fr", "it", "ja"],
-        sharedContext: "Scientific text cleanup for claim analysis"
-      });
-      return (await summarizer.summarize(prompt)).trim();
-    } else if (window.ai?.prompt) {
-      const res = await window.ai.prompt({ input: prompt });
-      return res?.output ?? res?.text ?? res ?? "";
-    }
-    throw new Error("No supported local AI API found");
-  }
-
-  async function summarizeIfLong(text) {
-    return text.length > 5000
-      ? await aiPrompt("Summarize:\n\n" + text)
-      : text;
-  }
-
-  async function detectLang(text) {
-    const out = await aiPrompt(`Detect language code only:\n${text.slice(0,500)}`);
-    return out.trim().toLowerCase().slice(0, 2) || "en";
-  }
-
-  async function translateIfNeeded(text) {
-    const lang = await detectLang(text);
-    if (lang === "en") return text;
-    return await aiPrompt(`Translate to English only:\n${text}`);
-  }
-
-  async function chromeSummarizeText() {
-    let text = textInput.value.trim();
-    if (!text) return alert("Enter text first");
+  btn.className = "btn btn-outline-warning w-100 fw-semibold";
+  btn.textContent = "🧠 Summarize / Translate (Chrome AI)";
+  btn.onclick = async () => {
+    const textArea = document.getElementById("textInput");
+    let text = textArea.value.trim();
+    if (!text) return alert("Paste some text first.");
 
     btn.disabled = true;
     btn.textContent = "⏳ Processing locally…";
-
     try {
       text = await summarizeIfLong(text);
       text = await translateIfNeeded(text);
-      textInput.value = text.trim();
-      btn.textContent = "✅ Text optimized for analysis";
+      textArea.value = text.trim();
+      btn.textContent = "✅ Text summarized & ready";
     } catch (e) {
-      console.error(e);
-      btn.textContent = "⚠️ Local AI failed — try backend";
+      console.warn("Local summarization failed:", e);
+      btn.textContent = "⚠️ Local summarization failed";
     } finally {
       btn.disabled = false;
     }
+  };
+
+  container.appendChild(btn);
+}
+
+function updateChromeButtonsSlim() {
+  // Hide all Chrome AI button groups
+  Object.values(chromeButtons).forEach((div) => div && div.classList.add("d-none"));
+
+  // Only show for paste mode and only if Chrome AI detected/forced
+  if (hasChromeAI && inputMethod.value === "paste" && chromeButtons.paste) {
+    chromeButtons.paste.classList.remove("d-none");
+  }
+}
+
+attachPasteChromeButton();
+updateChromeButtonsSlim();
+inputMethod.addEventListener("change", updateChromeButtonsSlim);
+document.getElementById("textInput")?.addEventListener("input", () => {
+  if (hasChromeAI && inputMethod.value === "paste") {
+    chromeButtons.paste?.classList.remove("d-none");
   }
 });
 
-  // ===== LOCAL PROCESSING FUNCTIONS =====
+  
+  // ===== Chrome AI detection + info card =====
+const chromeInfo = document.getElementById("chrome-ai-info");
 
-  async function aiPrompt(promptText, inputObj) {
-  // ✅ Priority 1: Chrome Built-in Summarizer API
+// Broad detection: Summarizer API (stable >=138), Prompt API (preview), or legacy window.ai
+const hasChromeAI =
+  (typeof self !== "undefined" && ("Summarizer" in self || "Prompt" in self)) ||
+  (window.ai && typeof window.ai.prompt === "function") ||
+  localStorage.getItem("forceChromeAI") === "1";
+
+// Show the info card and alert only if Chrome AI is detected (or forced)
+if (hasChromeAI) {
+  console.info("✅ Chrome AI detected — enabling local text pre-processing mode.");
+  alert("Chrome AI available — local mode active!");
+  if (chromeInfo) chromeInfo.classList.remove("d-none");
+} else {
+  console.info("Chrome AI not detected — using Flask backend normally.");
+}
+
+// Update the yellow card text based on input method (now text-only guidance)
+function updateInfoText(method) {
+  if (!chromeInfo) return;
+  let text;
+  switch (method) {
+    case "paste":
+      text = "🧠 Chrome will locally summarize and translate your pasted text before analysis.";
+      break;
+    case "url":
+    case "video":
+    case "video-url":
+    case "image":
+      text = "🧠 Chrome can locally refine pasted text. Use the standard flow to extract content, then paste it to optimize locally.";
+      break;
+    default:
+      text = "⚙️ Chrome AI Mode Active — local summarize/translate is available for pasted text.";
+  }
+  chromeInfo.innerHTML = `⚙️ <strong>Chrome AI Mode Active</strong><br>${text}`;
+}
+
+// Call once on load, and whenever the input method changes
+updateInfoText(inputMethod.value);
+inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
+
+
+// ===== Chrome AI text helpers (no URL/video claims) =====
+async function aiPromptTextOnly(plainText) {
+  // 1) Prefer Summarizer API (stable)
   if ("Summarizer" in self) {
     try {
       const availability = await Summarizer.availability();
-
       if (availability === "ready" || availability === "downloadable") {
         const summarizer = await Summarizer.create({
           type: "key-points",
           format: "markdown",
           length: "medium",
-          outputLanguage: "en",
-          expectedInputLanguages: ["en"],
+          outputLanguage: "en",               // <-- fixes the warning
+          expectedInputLanguages: ["en", "bg", "de", "fr", "it", "es", "ja"],
           expectedContextLanguages: ["en"],
           expectedOutputLanguages: ["en"],
           monitor(m) {
-            m.addEventListener("downloadprogress", e =>
-              console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
-            );
+            m.addEventListener("downloadprogress", e => {
+              console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`);
+            });
           }
         });
-
-        console.log("✅ Using Chrome Summarizer API");
-        const content = typeof inputObj === "string"
-          ? inputObj
-          : inputObj?.input || promptText;
-
-        return await summarizer.summarize(content);
+        return await summarizer.summarize(plainText);
       }
     } catch (err) {
-      console.warn("⚠️ Summarizer API failed → fallback", err);
+      console.warn("Summarizer API failed → fallback", err);
     }
   }
 
-  // ✅ Priority 2: Older `window.ai` local API (Canary Dev Pre-137)
+  // 2) Legacy window.ai
   if (window.ai && typeof window.ai.prompt === "function") {
     try {
-      console.log("✅ Using window.ai.prompt");
-      const res = await window.ai.prompt(inputObj ? { input: inputObj, prompt: promptText } : promptText);
-      return res?.output ?? res?.text ?? res ?? "";
+      const res = await window.ai.prompt(plainText);
+      return res?.output ?? res?.text ?? res ?? plainText;
     } catch (err) {
-      console.warn("⚠️ window.ai.prompt failed → fallback", err);
+      console.warn("window.ai.prompt failed → fallback", err);
     }
   }
 
-  // ❌ No local AI → fallback notice
+  // 3) No local AI → passthrough (backend continues normally)
   console.warn("❌ No Chrome AI available — backend will handle this text.");
-
-  // just return text, do NOT break your backend flow
-  return typeof inputObj === "string" ? inputObj : inputObj?.input || promptText;
+  return plainText;
 }
 
+async function summarizeIfLong(text, limit = 5000) {
+  return text.length > limit
+    ? await aiPromptTextOnly(`Summarize for scientific claim analysis:\n\n${text}`)
+    : text;
+}
 
-  // 🧠 Summarize Paste Text
-  async function chromeSummarizeText() {
-    let text = textInput.value.trim();
-    if (!text) return alert("Paste some text first.");
-    const btn = chromeButtons.paste.querySelector("button");
-    btn.disabled = true;
-    btn.textContent = "🧠 Summarizing locally…";
-    try {
-      text = await summarizeIfLong(text);
-      text = await translateIfNeeded(text);
-      textInput.value = text.trim();
-      btn.textContent = "✅ Text summarized & ready";
-    } catch (err) {
-      console.warn("Local summarization failed:", err);
-      btn.textContent = "⚠️ Local summarization failed";
-    } finally {
-      btn.disabled = false;
-    }
-  }
+async function detectLang(text) {
+  const out = await aiPromptTextOnly(`Return only ISO2 code:\n${text.slice(0, 600)}`);
+  return out.trim().toLowerCase().slice(0, 2) || "en";
+}
+
+async function translateIfNeeded(text) {
+  const lang = await detectLang(text);
+  if (lang === "en") return text;
+  return await aiPromptTextOnly(`Translate to English only:\n\n${text}`);
+}
 
  
-  
-
-
   
 </script>
 </body>
