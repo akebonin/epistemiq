@@ -1603,6 +1603,9 @@ const chromeMode = document.getElementById("chromeMode");
   // --- Create always-visible button ---
   chromeBtnContainer.classList.remove("d-none");
   chromeBtnContainer.innerHTML = "";
+  // Show mode toggle inside the card
+  document.getElementById("chrome-ai-mode")?.classList.remove("d-none");
+
 
   const btn = document.createElement("button");
   btn.className = "btn btn-warning w-100 fw-semibold";
