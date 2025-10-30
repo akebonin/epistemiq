@@ -1681,52 +1681,56 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
   // ===== LOCAL PROCESSING FUNCTIONS =====
 
   async function aiPrompt(promptText, inputObj) {
-  try {
-    
-if ('Summarizer' in self) {
-  const avail = await Summarizer.availability();
-  if (avail === 'ready' || avail === 'downloadable') {
+  // ✅ Priority 1: Chrome Built-in Summarizer API
+  if ("Summarizer" in self) {
+    try {
+      const availability = await Summarizer.availability();
 
-    const summarizer = await Summarizer.create({
-      type: 'key-points',
-      format: 'markdown',
-      length: 'medium',
-      outputLanguage: 'en',          // ✅ required
-      expectedInputLanguages: ['en'], // ✅ helps safety
-      expectedContextLanguages: ['en']
-    });
+      if (availability === "ready" || availability === "downloadable") {
+        const summarizer = await Summarizer.create({
+          type: "key-points",
+          format: "markdown",
+          length: "medium",
+          outputLanguage: "en",
+          expectedInputLanguages: ["en"],
+          expectedContextLanguages: ["en"],
+          monitor(m) {
+            m.addEventListener("downloadprogress", e =>
+              console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
+            );
+          }
+        });
 
-    const result = await summarizer.summarize(
-      typeof inputObj === 'string' ? inputObj : inputObj?.input || promptText
-    );
-    return result || '';
+        console.log("✅ Using Chrome Summarizer API");
+        const content = typeof inputObj === "string"
+          ? inputObj
+          : inputObj?.input || promptText;
+
+        return await summarizer.summarize(content);
+      }
+    } catch (err) {
+      console.warn("⚠️ Summarizer API failed → fallback", err);
+    }
   }
+
+  // ✅ Priority 2: Older `window.ai` local API (Canary Dev Pre-137)
+  if (window.ai && typeof window.ai.prompt === "function") {
+    try {
+      console.log("✅ Using window.ai.prompt");
+      const res = await window.ai.prompt(inputObj ? { input: inputObj, prompt: promptText } : promptText);
+      return res?.output ?? res?.text ?? res ?? "";
+    } catch (err) {
+      console.warn("⚠️ window.ai.prompt failed → fallback", err);
+    }
+  }
+
+  // ❌ No local AI → fallback notice
+  console.warn("❌ No Chrome AI available — backend will handle this text.");
+
+  // just return text, do NOT break your backend flow
+  return typeof inputObj === "string" ? inputObj : inputObj?.input || promptText;
 }
 
-
-    if ('Prompt' in self) {
-      const prompt = await Prompt.create();
-      const response = await prompt.prompt({
-        input: typeof inputObj === 'string' ? inputObj : inputObj?.input || '',
-        context: promptText
-      });
-      return response?.output ?? response?.text ?? '';
-    }
-
-    // Old fallback for experimental window.ai
-    if (window.ai && typeof window.ai.prompt === 'function') {
-      const result = await window.ai.prompt(
-        inputObj ? { input: inputObj, prompt: promptText } : promptText
-      );
-      return result?.output ?? result?.text ?? result ?? '';
-    }
-
-    throw new Error('No supported local AI API found');
-  } catch (err) {
-    console.error('Local AI call failed:', err);
-    throw err;
-  }
-}
 
   
   // 🌍 Clean Article (URL)
