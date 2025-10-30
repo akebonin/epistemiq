@@ -31,17 +31,6 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
- <script>
-    window.addEventListener("DOMContentLoaded", () => {
-      const hasAI = typeof window.ai !== "undefined" && typeof window.ai.prompt === "function";
-      if (hasAI) {
-        console.log("✅ Chrome AI detected – running in local mode.");
-        document.body.classList.add("chrome-ai-active");
-      } else {
-        console.log("ℹ️ Chrome AI not available – fallback to Flask backend.");
-      }
-    });
-  </script>
 
   <!-- ✅ Iubenda Cookie Solution -->
   <script type="text/javascript">
@@ -1537,142 +1526,146 @@ console.error('Service Worker registration failed:', error);
 });
 }
 
-// ===== Chrome AI Mode (Text-only) =====
+// ===== Chrome AI (Summarizer API) Hybrid Text Enhancer =====
 
-// 1) Detect Chrome AI
-const chromeInfo = document.getElementById("chrome-ai-info");
-const inputMethod = document.getElementById("inputMethod");
-const textInput = document.getElementById("textInput");
+// Real Chrome AI detection — only proceed if Summarizer API exists
+document.addEventListener("DOMContentLoaded", async () => {
+  const chromeInfo = document.getElementById("chrome-ai-info");
+  const textInput = document.getElementById("textInput");
+  const inputMethod = document.getElementById("inputMethod");
+  const chromeBtnContainer = document.getElementById("chrome-ai-paste");
 
-// Detection must happen BEFORE other references
-const hasChromeAI =
-  (typeof self !== "undefined" && ("Summarizer" in self || "Prompt" in self)) ||
-  (window.ai && typeof window.ai.prompt === "function") ||
-  localStorage.getItem("forceChromeAI") === "1";
+  // Detect Summarizer API (real local Gemini Nano)
+  const hasChromeAI =
+    typeof self !== "undefined" &&
+    "Summarizer" in self &&
+    typeof Summarizer.create === "function";
 
-// 2) UI Banner + Alert
-if (hasChromeAI) {
-  console.info("✅ Chrome AI detected — enabling local text mode.");
-  alert("Chrome AI available — local mode active!");
-  chromeInfo?.classList.remove("d-none");
-} else {
-  console.info("Chrome AI NOT detected — backend only.");
-}
-
-// 3) Yellow card dynamic text
-function updateInfoText(method = inputMethod.value) {
-  if (!chromeInfo) return;
-  const map = {
-    paste: "🧠 Chrome will locally summarize & translate pasted text.",
-    url: "🌐 Fetch article via server, then Chrome can refine pasted text.",
-    video: "🎥 Transcribe via backend first → paste → enhance locally.",
-    "video-url": "🎧 Backend fetch → paste → enhance locally.",
-    image: "🖼️ OCR via backend → paste to refine locally."
-  };
-  chromeInfo.innerHTML =
-    `⚙️ <strong>Chrome AI Mode Active</strong><br>${map[method] || "Local text optimization available."}`;
-}
-
-inputMethod.addEventListener("change", () => updateInfoText());
-updateInfoText();
-
-// 4) Chrome summarizer helpers
-async function aiPromptTextOnly(text) {
-  if ("Summarizer" in self) {
-    try {
-      const availability = await Summarizer.availability();
-      if (availability === "ready" || availability === "downloadable") {
-        const summarizer = await Summarizer.create({
-          type: "key-points",
-          format: "markdown",
-          length: "medium",
-          outputLanguage: "en",
-          expectedInputLanguages: ["en","bg","de","fr","it","es","ja"],
-          monitor(m) {
-            m.addEventListener("downloadprogress", e =>
-              console.log(`📦 Gemini Nano download: ${(e.loaded*100).toFixed(1)}%`)
-            );
-          }
-        });
-        return await summarizer.summarize(text);
-      }
-    } catch (e) { console.warn("Summarizer fail → fallback", e); }
+  // If no Chrome AI → stop here, backend normal flow
+  if (!hasChromeAI) {
+    console.info("Chrome AI not detected — backend mode only.");
+    return;
   }
 
-  if (window.ai?.prompt) {
-    try {
-      const res = await window.ai.prompt(text);
-      return res?.output ?? res?.text ?? res ?? text;
-    } catch (e) { console.warn("window.ai.prompt fail", e); }
+  console.info("✅ Chrome AI detected — local summarizer active");
+  alert("✅ Chrome AI detected — On-device Gemini Nano enabled!");
+
+  // Show yellow info card
+  if (chromeInfo) chromeInfo.classList.remove("d-none");
+
+  function updateInfoCard(mode) {
+    if (!chromeInfo) return;
+
+    let text;
+    switch (mode) {
+      case "paste":
+        text = "🧠 <strong>Gemini Nano</strong> will locally summarize & translate this text before backend analysis.";
+        break;
+      case "url":
+      case "video":
+      case "video-url":
+      case "image":
+        text = "🧠 Gemini Nano can refine text locally.<br> First extract your content normally, then press the local optimize button.";
+        break;
+      default:
+        text = "⚙️ Chrome On-Device AI active — available for pasted/extracted text.";
+    }
+
+    chromeInfo.innerHTML = `⚙️ <strong>Chrome AI Mode Active</strong><br>${text}`;
   }
 
-  console.warn("❌ No local AI — returning original text.");
-  return text;
-}
+  updateInfoCard(inputMethod.value);
+  inputMethod.addEventListener("change", () => updateInfoCard(inputMethod.value));
 
-async function summarizeIfLong(t) {
-  return t.length > 5000
-    ? await aiPromptTextOnly(`Summarize for claim analysis:\n\n${t}`)
-    : t;
-}
-
-async function detectLang(t) {
-  const out = await aiPromptTextOnly(`Return ISO2 only:\n${t.slice(0,500)}`);
-  return out.trim().slice(0,2).toLowerCase() || "en";
-}
-
-async function translateIfNeeded(t) {
-  return (await detectLang(t)) === "en"
-    ? t
-    : await aiPromptTextOnly(`Translate to English only:\n\n${t}`);
-}
-
-// 5) Chrome button (paste only)
-const chromeButtons = {
-  paste: document.getElementById("chrome-ai-paste")
-};
-
-function attachPasteChromeButton() {
-  const c = chromeButtons.paste;
-  if (!c) return;
-  c.innerHTML = "";
-
+  // Create the local AI button
+  chromeBtnContainer.innerHTML = "";
   const btn = document.createElement("button");
-  btn.className = "btn btn-outline-warning w-100 fw-semibold";
-  btn.textContent = "🧠 Summarize / Translate (Chrome AI)";
-  btn.onclick = async () => {
-    let t = textInput.value.trim();
-    if (!t) return alert("Paste text first");
+  btn.className = "btn btn-warning w-100 fw-semibold";
+  btn.textContent = "🧠 Optimize Text with Gemini Nano";
+  chromeBtnContainer.appendChild(btn);
+
+  // Show button only for paste mode AND when text exists
+  function updateButtonVisibility() {
+    if (
+      inputMethod.value === "paste" &&
+      textInput.value.trim().length > 0
+    ) {
+      chromeBtnContainer.classList.remove("d-none");
+    } else {
+      chromeBtnContainer.classList.add("d-none");
+    }
+  }
+  updateButtonVisibility();
+
+  textInput.addEventListener("input", updateButtonVisibility);
+  inputMethod.addEventListener("change", updateButtonVisibility);
+
+  // ===== Summarizer API helpers =====
+  async function aiSummarize(text) {
+    const availability = await Summarizer.availability();
+    if (availability !== "ready" && availability !== "downloadable") {
+      console.warn("Summarizer unavailable");
+      return text;
+    }
+
+    const summarizer = await Summarizer.create({
+      type: "key-points",
+      format: "markdown",
+      length: "medium",
+      outputLanguage: "en",
+      expectedInputLanguages: ["en", "bg", "de", "fr", "it", "es", "ja"],
+      expectedContextLanguages: ["en"],
+      expectedOutputLanguages: ["en"],
+      monitor(m) {
+        m.addEventListener("downloadprogress", e =>
+          console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
+        );
+      }
+    });
+
+    return await summarizer.summarize(text);
+  }
+
+  async function detectLang(text) {
+    const short = text.slice(0, 500);
+    const out = await aiSummarize(`Return only ISO2 language code:\n${short}`);
+    return out.trim().toLowerCase().slice(0, 2) || "en";
+  }
+
+  async function translateIfNeeded(text) {
+    const lang = await detectLang(text);
+    if (lang === "en") return text;
+    return await aiSummarize(`Translate to English only. Keep meaning:\n\n${text}`);
+  }
+
+  async function summarizeIfLong(text) {
+    return text.length > 5000
+      ? await aiSummarize(`Summarize for scientific claim analysis:\n\n${text}`)
+      : text;
+  }
+
+  // Button click processing
+  btn.addEventListener("click", async () => {
+    let text = textInput.value.trim();
+    if (!text) return alert("Paste text first.");
 
     btn.disabled = true;
-    btn.textContent = "⏳ Processing…";
+    btn.textContent = "⏳ Optimizing locally…";
 
     try {
-      t = await summarizeIfLong(t);
-      t = await translateIfNeeded(t);
-      textInput.value = t.trim();
-      btn.textContent = "✅ Ready";
-    } catch(e) {
-      btn.textContent = "⚠️ Local AI failed";
-      console.warn(e);
-    } finally { btn.disabled = false; }
-  };
+      text = await summarizeIfLong(text);
+      text = await translateIfNeeded(text);
+      textInput.value = text.trim();
+      btn.textContent = "✅ Optimized for analysis";
+    } catch (err) {
+      console.error("Chrome AI error:", err);
+      btn.textContent = "⚠️ Local AI failed — try again";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+});
 
-  c.appendChild(btn);
-}
-
-attachPasteChromeButton();
-
-// 6) Reveal only on paste input flow
-function updateChromeButtonsSlim() {
-  chromeButtons.paste?.classList.add("d-none");
-  if (hasChromeAI && inputMethod.value === "paste")
-    chromeButtons.paste?.classList.remove("d-none");
-}
-
-inputMethod.addEventListener("change", updateChromeButtonsSlim);
-textInput.addEventListener("input", updateChromeButtonsSlim);
-updateChromeButtonsSlim();
 
   
 </script>
