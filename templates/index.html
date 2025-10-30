@@ -1682,21 +1682,27 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 
   async function aiPrompt(promptText, inputObj) {
   try {
-    // New Chrome Built-in AI APIs
-    if ('Summarizer' in self) {
-      const avail = await Summarizer.availability();
-      if (avail === 'ready' || avail === 'downloadable') {
-        const summarizer = await Summarizer.create({
-          type: 'key-points',
-          format: 'markdown',
-          length: 'medium'
-        });
-        const result = await summarizer.summarize(
-          typeof inputObj === 'string' ? inputObj : inputObj?.input || promptText
-        );
-        return result || '';
-      }
-    }
+    
+if ('Summarizer' in self) {
+  const avail = await Summarizer.availability();
+  if (avail === 'ready' || avail === 'downloadable') {
+
+    const summarizer = await Summarizer.create({
+      type: 'key-points',
+      format: 'markdown',
+      length: 'medium',
+      outputLanguage: 'en',          // ✅ required
+      expectedInputLanguages: ['en'], // ✅ helps safety
+      expectedContextLanguages: ['en']
+    });
+
+    const result = await summarizer.summarize(
+      typeof inputObj === 'string' ? inputObj : inputObj?.input || promptText
+    );
+    return result || '';
+  }
+}
+
 
     if ('Prompt' in self) {
       const prompt = await Prompt.create();
