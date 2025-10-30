@@ -1592,18 +1592,14 @@ document.addEventListener("DOMContentLoaded", () => {
     videourl: document.getElementById("chrome-ai-videourl"),
   };
 
-  // Dev preview switch (no console needed): ?previewAI=1 to force on, ?previewAI=0 to clear
-const __params = new URLSearchParams(window.location.search);
-if (__params.get('previewAI') === '1') localStorage.setItem('forceChromeAI', '1');
-if (__params.get('previewAI') === '0') localStorage.removeItem('forceChromeAI');
   
   // 🧠 Detect Chrome AI support
  // const hasChromeAI =
  //   typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function";
 
   let hasChromeAI =
-  typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function";
-hasChromeAI = (localStorage.getItem('forceChromeAI') === '1') || hasChromeAI;
+  (typeof self !== "undefined" && ('Summarizer' in self || 'Prompt' in self))
+  || localStorage.getItem('forceChromeAI') === '1';
   
   if (!hasChromeAI) {
     console.info("Chrome AI not detected — using Flask backend normally.");
@@ -1684,6 +1680,49 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 
   // ===== LOCAL PROCESSING FUNCTIONS =====
 
+  async function aiPrompt(promptText, inputObj) {
+  try {
+    // New Chrome Built-in AI APIs
+    if ('Summarizer' in self) {
+      const avail = await Summarizer.availability();
+      if (avail === 'ready' || avail === 'downloadable') {
+        const summarizer = await Summarizer.create({
+          type: 'key-points',
+          format: 'markdown',
+          length: 'medium'
+        });
+        const result = await summarizer.summarize(
+          typeof inputObj === 'string' ? inputObj : inputObj?.input || promptText
+        );
+        return result || '';
+      }
+    }
+
+    if ('Prompt' in self) {
+      const prompt = await Prompt.create();
+      const response = await prompt.prompt({
+        input: typeof inputObj === 'string' ? inputObj : inputObj?.input || '',
+        context: promptText
+      });
+      return response?.output ?? response?.text ?? '';
+    }
+
+    // Old fallback for experimental window.ai
+    if (window.ai && typeof window.ai.prompt === 'function') {
+      const result = await window.ai.prompt(
+        inputObj ? { input: inputObj, prompt: promptText } : promptText
+      );
+      return result?.output ?? result?.text ?? result ?? '';
+    }
+
+    throw new Error('No supported local AI API found');
+  } catch (err) {
+    console.error('Local AI call failed:', err);
+    throw err;
+  }
+}
+
+  
   // 🌍 Clean Article (URL)
   async function chromeCleanArticle() {
     const url = document.getElementById("urlInput").value.trim();
