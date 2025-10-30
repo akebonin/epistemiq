@@ -1565,33 +1565,38 @@ document.addEventListener("DOMContentLoaded", () => {
   chromeBtnContainer.appendChild(btn);
 
   // --- Local AI engine ---
-  async function aiPromptNano(input) {
-    // 1️⃣ Chrome Summarizer API (primary)
-    if ("Summarizer" in self) {
-      try {
-        const availability = await Summarizer.availability();
-        if (availability === "ready" || availability === "downloadable") {
-          const summarizer = await Summarizer.create({
-            type: "key-points",
-            format: "markdown",
-            length: "medium",
-            outputLanguage: "en",
-            expectedInputLanguages: ["en", "es", "ja"],
-            expectedContextLanguages: ["en"],
-            expectedOutputLanguages: ["en"],
-            monitor(m) {
-              m.addEventListener("downloadprogress", e =>
-                console.log(`📦 Gemini Nano: ${(e.loaded * 100).toFixed(1)}%`)
-              );
-            }
-          });
-          console.log("✅ Chrome Nano active");
-          return await summarizer.summarize(input);
-        }
-      } catch (err) {
-        console.warn("⚠️ Summarizer failed → fallback", err);
+async function aiPromptNano(input) {
+  if ("Summarizer" in self) {
+    try {
+      const availability = await Summarizer.availability();
+      if (availability === "ready" || availability === "downloadable") {
+        const summarizer = await Summarizer.create({
+          outputLanguage: "en",
+          type: "key-points",
+          format: "markdown",
+          length: "medium"
+        });
+        console.log("✅ Using Chrome Summarizer API");
+        return await summarizer.summarize(input);
       }
+    } catch (err) {
+      console.warn("⚠️ Summarizer API failed → fallback", err);
     }
+  }
+
+  if (window.ai && typeof window.ai.prompt === "function") {
+    try {
+      const r = await window.ai.prompt(input);
+      return r?.output ?? r?.text ?? r ?? input;
+    } catch (e) {
+      console.warn("⚠️ window.ai.prompt failed → fallback", e);
+    }
+  }
+
+  console.warn("❌ No local AI available");
+  return input;
+}
+
 
     // 2️⃣ Legacy window.ai prompt (older Canary builds)
     if (window.ai && typeof window.ai.prompt === "function") {
