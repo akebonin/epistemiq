@@ -1526,50 +1526,108 @@ console.error('Service Worker registration failed:', error);
 });
 }
 
-// ===== Chrome AI Hybrid Local Text Processor (final, always-on button) =====
+// ===== Chrome AI Local Pre-Processing (Final) =====
 document.addEventListener("DOMContentLoaded", () => {
-  const inputMethod = document.getElementById("inputMethod");
   const textInput = document.getElementById("textInput");
   const chromeBtnContainer = document.getElementById("chrome-ai-text");
   const chromeInfo = document.getElementById("chrome-ai-info");
 
-  // --- Detect real Chrome AI APIs (Summarizer or legacy window.ai) ---
+  // --- Detect real Chrome built-in AI APIs ---
   const hasChromeAI =
-    (typeof self !== "undefined" && ("Summarizer" in self || "Prompt" in self)) ||
+    (typeof self !== "undefined" && "Summarizer" in self) ||
     (window.ai && typeof window.ai.prompt === "function");
 
   if (!hasChromeAI) {
-    console.info("⚙️ Chrome AI not detected — backend mode active.");
+    console.info("ℹ️ Chrome AI not detected. Using backend only.");
     return;
   }
 
-  console.info("✅ Chrome AI detected — enabling local summarization mode.");
+  console.info("✅ Chrome AI detected — local summarization enabled.");
   alert("Chrome AI available — local mode active!");
 
-  // --- Yellow info card explaining what Gemini Nano will do ---
+  // --- Show the yellow info banner ---
   if (chromeInfo) {
     chromeInfo.classList.remove("d-none");
     chromeInfo.innerHTML = `
       ⚙️ <strong>Chrome AI Mode Active</strong><br>
-      🧠 Gemini Nano will locally summarize and translate extracted or pasted text
-      before analysis. This ensures faster preprocessing and full data privacy.
+      🧠 Gemini Nano will locally summarize and translate text before analysis
+      for privacy and faster processing.
     `;
   }
 
-  // --- Create Chrome AI button (always visible & enabled) ---
+  // --- Create always-visible button ---
   chromeBtnContainer.classList.remove("d-none");
-  chromeBtnContainer.innerHTML = ""; // clear container
+  chromeBtnContainer.innerHTML = "";
 
   const btn = document.createElement("button");
   btn.className = "btn btn-warning w-100 fw-semibold";
   btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
   chromeBtnContainer.appendChild(btn);
 
-  // --- Button click handler ---
+  // --- Local AI engine ---
+  async function aiPromptNano(input) {
+    // 1️⃣ Chrome Summarizer API (primary)
+    if ("Summarizer" in self) {
+      try {
+        const availability = await Summarizer.availability();
+        if (availability === "ready" || availability === "downloadable") {
+          const summarizer = await Summarizer.create({
+            type: "key-points",
+            format: "markdown",
+            length: "medium",
+            outputLanguage: "en",
+            expectedInputLanguages: ["en", "es", "ja"],
+            expectedContextLanguages: ["en"],
+            expectedOutputLanguages: ["en"],
+            monitor(m) {
+              m.addEventListener("downloadprogress", e =>
+                console.log(`📦 Gemini Nano: ${(e.loaded * 100).toFixed(1)}%`)
+              );
+            }
+          });
+          console.log("✅ Chrome Nano active");
+          return await summarizer.summarize(input);
+        }
+      } catch (err) {
+        console.warn("⚠️ Summarizer failed → fallback", err);
+      }
+    }
+
+    // 2️⃣ Legacy window.ai prompt (older Canary builds)
+    if (window.ai && typeof window.ai.prompt === "function") {
+      try {
+        const r = await window.ai.prompt(input);
+        return r?.output ?? r?.text ?? r ?? input;
+      } catch (e) {
+        console.warn("⚠️ window.ai fallback failed", e);
+      }
+    }
+
+    console.warn("❌ No local AI available");
+    return input;
+  }
+
+  async function summarizeIfLong(t, limit = 4500) {
+    if (t.length <= limit) return t;
+    return await aiPromptNano(`Summarize for factual/claim analysis:\n\n${t}`);
+  }
+
+  async function detectLang(t) {
+    const out = await aiPromptNano(`Return only ISO2 code:\n${t.slice(0, 500)}`);
+    return out.trim().toLowerCase().slice(0, 2) || "en";
+  }
+
+  async function translateIfNeeded(t) {
+    const lang = await detectLang(t);
+    if (lang === "en") return t;
+    return await aiPromptNano(`Translate to English only:\n\n${t}`);
+  }
+
+  // --- Button action ---
   btn.addEventListener("click", async () => {
     let text = textInput.value.trim();
     if (!text) {
-      alert("No text to process. Please paste or extract content first.");
+      alert("No text present — paste/extract/fetch text first.");
       return;
     }
 
@@ -1579,76 +1637,16 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       text = await summarizeIfLong(text);
       text = await translateIfNeeded(text);
+
       textInput.value = text.trim();
-      btn.textContent = "✅ Text optimized for analysis";
+      btn.textContent = "✅ Processed locally — Ready";
     } catch (err) {
-      console.error("Chrome AI summarization failed:", err);
-      btn.textContent = "⚠️ Local AI failed — try backend";
+      console.error("Chrome AI error:", err);
+      btn.textContent = "⚠️ Local AI failed";
     } finally {
       btn.disabled = false;
     }
   });
-
-  // --- Chrome AI helper functions ---
-  async function aiPromptTextOnly(plainText) {
-    // 1️⃣ Chrome Summarizer API (preferred)
-    if ("Summarizer" in self) {
-      try {
-        const availability = await Summarizer.availability();
-        if (availability === "ready" || availability === "downloadable") {
-          const summarizer = await Summarizer.create({
-  type: "key-points",
-  format: "markdown",
-  length: "medium",
-  outputLanguage: "en",
-  expectedInputLanguages: ["en", "es", "ja"],
-  expectedContextLanguages: ["en"],
-  expectedOutputLanguages: ["en"],
-  monitor(m) {
-    m.addEventListener("downloadprogress", (e) =>
-      console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
-    );
-  },
-});
-
-          console.log("✅ Using Chrome Summarizer API");
-          return await summarizer.summarize(plainText);
-        }
-      } catch (err) {
-        console.warn("Summarizer API failed → fallback", err);
-      }
-    }
-
-    // 2️⃣ Legacy window.ai.prompt (older Canary/Dev)
-    if (window.ai && typeof window.ai.prompt === "function") {
-      try {
-        const res = await window.ai.prompt(plainText);
-        return res?.output ?? res?.text ?? res ?? plainText;
-      } catch (err) {
-        console.warn("window.ai.prompt failed → fallback", err);
-      }
-    }
-
-    console.warn("❌ No Chrome AI available — backend will handle this text.");
-    return plainText;
-  }
-
-  async function summarizeIfLong(text, limit = 5000) {
-    return text.length > limit
-      ? await aiPromptTextOnly(`Summarize for scientific claim analysis:\n\n${text}`)
-      : text;
-  }
-
-  async function detectLang(text) {
-    const out = await aiPromptTextOnly(`Return only ISO2 code:\n${text.slice(0, 600)}`);
-    return out.trim().toLowerCase().slice(0, 2) || "en";
-  }
-
-  async function translateIfNeeded(text) {
-    const lang = await detectLang(text);
-    if (lang === "en") return text;
-    return await aiPromptTextOnly(`Translate to English only:\n\n${text}`);
-  }
 });
 
   
