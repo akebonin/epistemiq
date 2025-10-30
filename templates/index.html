@@ -1735,28 +1735,48 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 
   
   // 🌍 Clean Article (URL)
-  async function chromeCleanArticle() {
-    const url = document.getElementById("urlInput").value.trim();
-    if (!url) return alert("Enter a valid URL first.");
-    const btn = chromeButtons.url.querySelector("button");
-    btn.disabled = true;
-    btn.textContent = "🪄 Cleaning locally…";
-    try {
-      const res = await fetch(url, { mode: "cors" });
-      const html = await res.text();
-      let text = await aiPrompt("Extract readable article text from this HTML:\n\n" + html.slice(0, 150000));
-      text = await summarizeIfLong(text);
-      text = await translateIfNeeded(text);
-      textInput.value = text.trim();
-      btn.textContent = "✅ Cleaned & ready for analysis";
-    } catch (err) {
-      console.warn("Local fetch failed:", err);
-      btn.textContent = "⚠️ Local fetch failed (no server fallback)";
-      alert("CORS blocked this URL. Try another article or paste content directly.");
-    } finally {
-      btn.disabled = false;
-    }
+  // 🌍 Hybrid Mode: Backend fetches article → Chrome AI processes text
+async function chromeCleanArticle() {
+  const url = document.getElementById("urlInput").value.trim();
+  if (!url) return alert("Enter a valid URL first.");
+
+  const btn = chromeButtons.url.querySelector("button");
+  btn.disabled = true;
+  btn.textContent = "🌐 Fetching from server…";
+
+  try {
+    // Step 1: Backend fetches full article text (bypass CORS)
+    const response = await fetch(`${API_BASE}/api/fetch-article`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+      credentials: "include"
+    });
+
+    if (!response.ok) throw new Error("Backend fetch failed");
+    let data = await response.json();
+    let text = data.article_text || "";
+
+    if (!text) throw new Error("No article content found");
+
+    btn.textContent = "🧠 Processing locally…";
+
+    // Step 2: Chrome AI summarization + translation
+    text = await summarizeIfLong(text);
+    text = await translateIfNeeded(text);
+
+    textInput.value = text.trim();
+    btn.textContent = "✅ Ready for analysis (Chrome AI)";
+
+  } catch (err) {
+    console.error("Hybrid article processing failed:", err);
+    alert("Failed to fetch/clean article.\nTry another source or paste text manually.");
+    btn.textContent = "⚠️ Fetch failed";
+  } finally {
+    btn.disabled = false;
   }
+}
+
 
   // 🎥 Transcribe Video or Video URL
   async function chromeTranscribeMedia(sourceType) {
