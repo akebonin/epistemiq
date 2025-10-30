@@ -539,7 +539,8 @@ max-width: none;
 <div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
      style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
   ⚙️ <strong>Chrome AI Mode Active</strong><br>
-  🧠 Gemini Nano will summarize & translate text locally for privacy + speed.
+  🧠 Gemini Nano will locally summarize and translate extracted or pasted text
+      before analysis. This ensures faster preprocessing and full data privacy.
   
   <div class="mt-2" id="chrome-ai-mode">
     <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Local AI Mode</label>
@@ -1588,11 +1589,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Show the yellow info banner ---
   if (chromeInfo) {
     chromeInfo.classList.remove("d-none");
-    chromeInfo.innerHTML = `
-      ⚙️ <strong>Chrome AI Mode Active</strong><br>
-      🧠 Gemini Nano will locally summarize and translate extracted or pasted text
-      before analysis. This ensures faster preprocessing and full data privacy.
-    `;
   }
 
   const chromeModeDiv = document.getElementById("chrome-ai-mode");
