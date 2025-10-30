@@ -1630,7 +1630,7 @@ document.addEventListener("DOMContentLoaded", () => {
 }
 
 // --- Chunked local summarization ---
-async function summarizeIfLong(text, limit = 4000) {
+async function summarizeIfLong(text, limit = 5000) {
   if (text.length <= limit) return await aiPromptNano(text);
 
   console.log("📦 Chunking large input for local model…");
