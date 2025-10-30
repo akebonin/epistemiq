@@ -488,6 +488,22 @@ max-width: none;
   background-color: #ffe9a8 !important;
 }
 
+.textarea-dim { filter: blur(2px); opacity: .6; }
+
+.ai-pulse {
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#000;
+  animation: aip 0.8s infinite alternate ease-in-out;
+}
+
+@keyframes aip {
+  from { opacity:.2; transform:scale(.6); }
+  to   { opacity:1; transform:scale(1); }
+}
+
 
 </style>
 </head>
@@ -1679,31 +1695,30 @@ async function translateIfNeeded(text) {
 }
 
  
-  // --- Button action ---
   btn.addEventListener("click", async () => {
-    let text = textInput.value.trim();
-    if (!text) {
-      alert("No text present — paste/extract/fetch text first.");
-      return;
-    }
+  let text = textInput.value.trim();
+  if (!text) return alert("No text present — paste/extract/fetch first.");
 
-    btn.disabled = true;
-    btn.textContent = `🧠 Processing (${chromeMode.value})…`;
+  btn.disabled = true;
+  textInput.classList.add("textarea-dim");     // ← dim/blur ON
 
-    try {
-      text = await summarizeIfLong(text);
-      text = await translateIfNeeded(text);
+  const original = btn.textContent;
+  btn.innerHTML = `⏳ <span class="ai-pulse"></span> Local processing…`;
 
-      textInput.value = text.trim();
-      btn.textContent = `✅ Ready (${chromeMode.value})`;
-    } catch (err) {
-      console.error("Chrome AI error:", err);
-      btn.textContent = "⚠️ Local AI failed";
-    } finally {
-      btn.disabled = false;
-    }
-  });
+  try {
+    text = await summarizeIfLong(text);
+    text = await translateIfNeeded(text);
+    textInput.value = text.trim();
+    btn.innerHTML = "✅ Ready (Chrome AI)";
+  } catch (err) {
+    console.error("Chrome AI error:", err);
+    btn.innerHTML = "⚠️ Local AI failed — retry";
+  } finally {
+    textInput.classList.remove("textarea-dim"); // ← dim/blur OFF
+    setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 600);
+  }
 });
+
 
 
   
