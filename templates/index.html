@@ -561,14 +561,21 @@ max-width: none;
     </select>
   </div>
 </div>
-<div id="paste-input-group" class="mb-3">
-<label for="textInput" class="form-label">Paste article or post content</label>
-<textarea id="textInput" rows="7" class="form-control" placeholder="Paste content here..."></textarea>
+<div id="paste-input-group" class="mb-3" style="position:relative;">
+  <label for="textInput" class="form-label">Paste article or post content</label>
+
+  <textarea id="textInput" rows="7" class="form-control"
+            placeholder="Paste content here..."></textarea>
+
+  <!-- ✅ Overlay INSIDE paste group -->
   <div id="chrome-ai-overlay" class="chrome-ai-overlay d-none">
-  <div class="chrome-ai-spinner"></div>
+    <div class="chrome-ai-spinner"></div>
+  </div>
+
+  <!-- ✅ Button container ALSO inside -->
+  <div id="chrome-ai-text" class="mt-2 d-none"></div>
 </div>
-</div>  
- <div id="chrome-ai-text" class="mt-2 d-none"></div> 
+
 <div id="url-input-group" class="mb-3 d-none">
 <label for="urlInput" class="form-label">Enter article URL</label>
 <div class="input-group">
