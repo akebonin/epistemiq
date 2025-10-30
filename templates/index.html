@@ -1694,6 +1694,7 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
           outputLanguage: "en",
           expectedInputLanguages: ["en"],
           expectedContextLanguages: ["en"],
+          expectedOutputLanguages: ["en"],
           monitor(m) {
             m.addEventListener("downloadprogress", e =>
               console.log(`📦 Gemini Nano download: ${(e.loaded * 100).toFixed(1)}%`)
