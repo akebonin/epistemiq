@@ -1526,29 +1526,24 @@ console.error('Service Worker registration failed:', error);
 });
 }
 
-// ===== Chrome AI (Summarizer API) Hybrid Text Enhancer =====
-
-// Real Chrome AI detection — only proceed if Summarizer API exists
-document.addEventListener("DOMContentLoaded", async () => {
-  const chromeInfo = document.getElementById("chrome-ai-info");
+// ===== Chrome AI Summarize/Translate Processor =====
+document.addEventListener("DOMContentLoaded", () => {
   const textInput = document.getElementById("textInput");
-  const inputMethod = document.getElementById("inputMethod");
+  const chromeInfo = document.getElementById("chrome-ai-info");
   const chromeBtnContainer = document.getElementById("chrome-ai-text");
 
-  // Detect Summarizer API (real local Gemini Nano)
+  // Detect real Chrome AI
   const hasChromeAI =
-    typeof self !== "undefined" &&
-    "Summarizer" in self &&
-    typeof Summarizer.create === "function";
+    ("Summarizer" in self) ||
+    (window.ai && typeof window.ai.prompt === "function");
 
-  // If no Chrome AI → stop here, backend normal flow
   if (!hasChromeAI) {
-    console.info("Chrome AI not detected — backend mode only.");
+    console.info("ℹ️ No Chrome AI detected — backend mode");
     return;
   }
 
-  console.info("✅ Chrome AI detected — local summarizer active");
-  alert("✅ Chrome AI detected — On-device Gemini Nano enabled!");
+  console.info("✅ Chrome AI detected — local text mode enabled");
+  alert("Chrome AI available — local text optimization active!");
 
   // Show yellow info card
   if (chromeInfo) chromeInfo.classList.remove("d-none");
@@ -1577,28 +1572,46 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateInfoCard(inputMethod.value);
   inputMethod.addEventListener("change", () => updateInfoCard(inputMethod.value));
 
-  // Create the local AI button
-  chromeBtnContainer.innerHTML = "";
+  // Create button
   const btn = document.createElement("button");
   btn.className = "btn btn-warning w-100 fw-semibold";
-  btn.textContent = "🧠 Optimize Text with Gemini Nano";
+  btn.textContent = "🧠 Optimize Text (Chrome AI)";
+
+  btn.onclick = async () => {
+    let text = textInput.value.trim();
+    if (!text) return alert("There is no text to optimize.");
+
+    btn.disabled = true;
+    btn.textContent = "⏳ Optimizing with Gemini Nano…";
+
+    try {
+      text = await summarizeIfLong(text);
+      text = await translateIfNeeded(text);
+      textInput.value = text.trim();
+      btn.textContent = "✅ Optimized";
+      setTimeout(() => btn.textContent = "🧠 Optimize Text (Chrome AI)", 1200);
+    } catch (e) {
+      console.warn("Chrome AI failed:", e);
+      btn.textContent = "⚠️ Failed — Try Again";
+      setTimeout(() => btn.textContent = "🧠 Optimize Text (Chrome AI)", 1200);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  // Insert button always
+  chromeBtnContainer.classList.remove("d-none");
+  chromeBtnContainer.innerHTML = "";
   chromeBtnContainer.appendChild(btn);
 
-  // Show button only for paste mode AND when text exists
-  function updateButtonVisibility() {
-    if (
-      inputMethod.value === "paste" &&
-      textInput.value.trim().length > 0
-    ) {
-      chromeBtnContainer.classList.remove("d-none");
-    } else {
-      chromeBtnContainer.classList.add("d-none");
-    }
-  }
-  updateButtonVisibility();
+  // Disable button if no text exists
+  const updateButtonState = () => {
+    btn.disabled = !textInput.value.trim();
+  };
 
-  textInput.addEventListener("input", updateButtonVisibility);
-  inputMethod.addEventListener("change", updateButtonVisibility);
+  textInput.addEventListener("input", updateButtonState);
+  updateButtonState();
+});
 
   // ===== Summarizer API helpers =====
   async function aiSummarize(text) {
