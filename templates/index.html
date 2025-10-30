@@ -1460,43 +1460,44 @@ processImageBtn.addEventListener('click', processImage);
 processVideoBtn.addEventListener('click', processVideo);
 transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
 
-fetchArticleBtn.addEventListener('click', async () => {
-let url = urlInput.value.trim();
-if (!url) {
-alert('Please enter a valid URL.');
-return;
-}
-if (!url.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
-alert('Invalid URL format. Please use a valid URL starting with http:// or https://.');
-return;
-}
-toggleLoading(fetchArticleBtn, true, 'Fetching...');
-try {
-const response = await fetch(`${API_BASE}/api/extract-article`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ url: url }),
-});
-const data = await response.json();
-if (!response.ok) {
-throw new Error(data.error || 'Failed to fetch article.');
-}
-if (!data.article_text || typeof data.article_text !== 'string') {
-alert('No content was extracted. Please paste the text manually.');
-return;
-}
-textInput.value = data.article_text;
-inputMethodSelect.value = 'paste';
-inputMethodSelect.dispatchEvent(new Event('change'));
-alert('Article content has been fetched and pasted into the text area.');
-} catch (error) {
-console.error('Fetch error:', error);
-alert(`Error fetching article: ${error.message}`);
-} finally {
-toggleLoading(fetchArticleBtn, false);
-}
+fetchArticleBtn.addEventListener("click", async () => {
+  const url = urlInput.value.trim();
+  if (!url) {
+    alert("Please enter a URL");
+    return;
+  }
+
+  fetchArticleBtn.disabled = true;
+  fetchArticleBtn.querySelector(".spinner-border").classList.remove("d-none");
+
+  try {
+    const response = await fetch("/api/fetch-article", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.content) {
+      alert("Failed to fetch article");
+      return;
+    }
+
+    // ✅ Raw HTML returned — paste into textarea
+    textInput.value = data.content;
+
+    alert("Article fetched. Now click 'Run Analysis'");
+  } catch (e) {
+    console.error("Error fetching article:", e);
+    alert("Error fetching article. Check console.");
+  } finally {
+    fetchArticleBtn.disabled = false;
+    fetchArticleBtn.querySelector(".spinner-border").classList.add("d-none");
+  }
 });
 
+  
 analysisForm.addEventListener('submit', async (e) => {
 e.preventDefault();
 const articleText = textInput.value.trim();
