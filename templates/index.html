@@ -538,6 +538,15 @@ max-width: none;
   ⚙️ <strong>Chrome AI Mode Active</strong><br>
   Local processing will run directly in your browser for faster, private pre-analysis.
 </div>
+  <div id="chrome-ai-mode" class="mt-2 d-none">
+  <label class="form-label fw-semibold">Local AI Optimization Mode</label>
+  <select id="chromeMode" class="form-select form-select-sm">
+    <option value="accurate">🎯 Accurate (default)</option>
+    <option value="balanced">⚖️ Balanced</option>
+    <option value="fast">🏎️ Fast</option>
+  </select>
+</div>
+
 </div>
 <div id="paste-input-group" class="mb-3">
 <label for="textInput" class="form-label">Paste article or post content</label>
@@ -545,7 +554,6 @@ max-width: none;
 <div id="chrome-ai-overlay">
   <div class="chrome-ai-spinner"></div>
 </div>
-  
 <div id="chrome-ai-text" class="mt-2 d-none"></div>
 </div>
 <div id="url-input-group" class="mb-3 d-none">
@@ -1585,6 +1593,12 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
+  const chromeModeDiv = document.getElementById("chrome-ai-mode");
+if (chromeModeDiv) chromeModeDiv.classList.remove("d-none");
+
+const chromeMode = document.getElementById("chromeMode");
+
+  
   // --- Create always-visible button ---
   chromeBtnContainer.classList.remove("d-none");
   chromeBtnContainer.innerHTML = "";
@@ -1629,34 +1643,50 @@ document.addEventListener("DOMContentLoaded", () => {
   throw new Error("No local AI available");
 }
 
-// --- Chunked local summarization ---
 async function summarizeIfLong(text, limit = 5000) {
+  const mode = chromeMode?.value || "accurate";
+
+  // FAST MODE — single shot, no chunking
+  if (mode === "fast") {
+    console.log("⚡ FAST mode: single-shot Nano");
+    return await aiPromptNano(text);
+  }
+
+  // BALANCED — try single pass first, fallback to chunk
+  if (mode === "balanced") {
+    console.log("⚖️ BALANCED mode: trying single shot");
+    try {
+      return await aiPromptNano(text);
+    } catch (err) {
+      console.warn("Single-shot failed, chunking…", err);
+      // fall through to accurate logic below
+    }
+  }
+
+  // 🎯 ACCURATE MODE (default) — always chunk + combine
   if (text.length <= limit) return await aiPromptNano(text);
 
-  console.log("📦 Chunking large input for local model…");
+  console.log("📦 Chunking in Accurate mode");
 
-  // Break text into ~limit chunks
   const parts = [];
   for (let i = 0; i < text.length; i += limit) {
     parts.push(text.slice(i, i + limit));
   }
 
-  const summaries = [];
+  const results = [];
   for (const part of parts) {
     try {
-      summaries.push(await aiPromptNano(`Summarize clearly:\n\n${part}`));
+      results.push(await aiPromptNano(`Summarize clearly:\n\n${part}`));
     } catch (err) {
-      console.warn("Chunk summarize failed:", err);
+      console.warn("Chunk failed:", err);
     }
   }
 
-  const combined = summaries.join("\n\n");
-
-  // Final pass to condense result
   return await aiPromptNano(
-    `Condense the following text into a clean English summary for scientific analysis:\n\n${combined}`
+    `Condense the following text into a clean English summary for scientific analysis:\n\n${results.join("\n\n")}`
   );
 }
+
 
 // --- Language detect & translate ---
 async function detectLang(text) {
@@ -1682,7 +1712,7 @@ async function translateIfNeeded(text) {
     }
 
     btn.disabled = true;
-    btn.textContent = "⏳ Processing locally…";
+    btn.textContent = `🧠 Processing (${chromeMode.value})…`;
     showOverlay(true);
 
     try {
@@ -1690,7 +1720,7 @@ async function translateIfNeeded(text) {
       text = await translateIfNeeded(text);
 
       textInput.value = text.trim();
-      btn.textContent = "✅ Processed locally — Ready";
+      btn.textContent = `✅ Ready (${chromeMode.value})`;
     } catch (err) {
       console.error("Chrome AI error:", err);
       btn.textContent = "⚠️ Local AI failed";
