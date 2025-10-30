@@ -528,7 +528,7 @@ max-width: none;
 <div id="paste-input-group" class="mb-3">
 <label for="textInput" class="form-label">Paste article or post content</label>
 <textarea id="textInput" rows="7" class="form-control" placeholder="Paste content here..."></textarea>
-<div id="chrome-ai-paste" class="chrome-ai-btn d-none mt-2"></div>
+<div id="chrome-ai-text" class="mt-2 d-none"></div>
 </div>
 <div id="url-input-group" class="mb-3 d-none">
 <label for="urlInput" class="form-label">Enter article URL</label>
@@ -538,7 +538,6 @@ max-width: none;
 <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
 Fetch Article
 </button>
-<div id="chrome-ai-url" class="chrome-ai-btn d-none mt-2"></div>
 </div>
 </div>
 <div id="image-input-group" class="mb-3 d-none">
@@ -573,7 +572,6 @@ Choose Video
 <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
 Transcribe Video
 </button>
-<div id="chrome-ai-video" class="chrome-ai-btn d-none mt-2"></div>
 </div>
 <div id="video-url-input-group" class="mb-3 d-none">
 <label for="videoUrlInput" class="form-label">Enter Video URL</label>
@@ -583,7 +581,6 @@ Transcribe Video
 <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
 Transcribe Video
 </button>
-<div id="chrome-ai-videourl" class="chrome-ai-btn d-none mt-2"></div>
 </div>
 </div>
 <div class="mb-4">
@@ -1540,112 +1537,98 @@ console.error('Service Worker registration failed:', error);
 });
 }
 
-// ===== Chrome AI Hybrid Local/Server Pre-Processing Module =====
+// ===== Chrome AI Hybrid Local Text Processor =====
 document.addEventListener("DOMContentLoaded", () => {
   const inputMethod = document.getElementById("inputMethod");
   const textInput = document.getElementById("textInput");
-  const chromeInfo = document.getElementById("chrome-ai-info");
-  const btnProcessImage = document.getElementById("process-image-btn");
+  const chromeTextDiv = document.getElementById("chrome-ai-text");
 
+  // Detect Chrome AI
+  const hasChromeAI =
+    typeof window !== "undefined" && (
+      (window.Summarizer && typeof window.Summarizer.create === "function") ||
+      (window.ai && typeof window.ai.prompt === "function")
+    );
 
-  // Existing Flask action buttons
-  const btnFetchArticle = document.getElementById("fetch-article-btn");
-  const btnProcessVideo = document.getElementById("process-video-btn");
-  const btnTranscribeVideoUrl = document.getElementById("transcribe-video-url-btn");
-
-  // Chrome AI button placeholders (created earlier)
-  const chromeButtons = {
-    paste: document.getElementById("chrome-ai-paste"),
-    url: document.getElementById("chrome-ai-url"),
-    video: document.getElementById("chrome-ai-video"),
-    videourl: document.getElementById("chrome-ai-videourl"),
-  };
-
-  
-  // 🧠 Detect Chrome AI support
- // const hasChromeAI =
- //   typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function";
-
-  let hasChromeAI =
-  (typeof self !== "undefined" && ('Summarizer' in self || 'Prompt' in self))
-  || localStorage.getItem('forceChromeAI') === '1';
-  
   if (!hasChromeAI) {
-    console.info("Chrome AI not detected — using Flask backend normally.");
-    // Show all Flask buttons for normal use
-    [btnFetchArticle, btnProcessVideo, btnTranscribeVideoUrl].forEach((btn) => btn?.classList.remove("d-none"));
+    console.info("Chrome AI not detected — backend mode only.");
     return;
   }
 
-  // Chrome AI detected — enable local mode
-console.info("✅ Chrome AI detected — enabling local-only mode.");
-// alert("Chrome AI available — local mode active!"); // optional, keep or remove
-if (chromeInfo) {
-  chromeInfo.classList.remove("d-none");
-}
-updateInfoText(inputMethod.value);
+  console.info("✅ Chrome AI detected — enabling local summarization mode");
 
-  
-  // Chrome AI detected — enable local mode
-  console.info("✅ Chrome AI detected — enabling local-only mode.");
-  alert("Chrome AI available — local mode active!");
+  // Create Chrome AI Button
+  const btn = document.createElement("button");
+  btn.className = "btn btn-warning w-100 fw-semibold";
+  btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
+  btn.onclick = chromeSummarizeText;
+  chromeTextDiv.appendChild(btn);
 
-  // Hide Flask buttons except for the image extraction (OCR)
-  [btnFetchArticle, btnProcessVideo, btnTranscribeVideoUrl].forEach((btn) => {
-    if (btn) btn.classList.add("d-none");
-  });
+  // Show the Chrome AI button ONLY when text present
+  const showChromeButtonIfText = () => {
+    if (textInput.value.trim().length > 0) {
+      chromeTextDiv.classList.remove("d-none");
+    } else {
+      chromeTextDiv.classList.add("d-none");
+    }
+  };
 
-// Change text based on selected input type
-function updateInfoText(method) {
-  if (!hasChromeAI) return;
-  let text = "";
-  switch (method) {
-    case "paste":
-      text = "🧠 Chrome AI will summarize and translate your pasted text locally before analysis.";
-      break;
-    case "url":
-      text = "📰 Chrome AI will fetch and clean the article locally, summarizing and translating it before analysis.";
-      break;
-    case "video":
-      text = "🎙️ Chrome AI will transcribe your uploaded video and prepare a concise summary before analysis.";
-      break;
-    case "video-url":
-      text = "🎧 Chrome AI will attempt to transcribe and summarize your video link locally before analysis.";
-      break;
-    case "image":
-      text = "🖼️ Image extraction runs via the Flask backend (OCR). Chrome AI does not process images yet.";
-      break;
-    default:
-      text = "⚙️ Chrome AI Mode Active — your inputs will be processed locally when possible.";
-  }
-  chromeInfo.innerHTML = `⚙️ <strong>Chrome AI Mode Active</strong><br>${text}`;
-}
+  textInput.addEventListener("input", showChromeButtonIfText);
+  inputMethod.addEventListener("change", showChromeButtonIfText);
 
-inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
-
-  // ===== HELPER FUNCTIONS =====
+  // --- AI Helpers
   async function aiPrompt(prompt, inputObj) {
-    const res = await window.ai.prompt(inputObj ? { input: inputObj, prompt } : prompt);
-    return res?.output ?? res?.text ?? res ?? "";
+    if (window.Summarizer) {
+      const summarizer = await window.Summarizer.create({
+        outputLanguage: "en",
+        expectedInputLanguages: ["en", "bg", "es", "de", "fr", "it", "ja"],
+        sharedContext: "Scientific text cleanup for claim analysis"
+      });
+      return (await summarizer.summarize(prompt)).trim();
+    } else if (window.ai?.prompt) {
+      const res = await window.ai.prompt({ input: prompt });
+      return res?.output ?? res?.text ?? res ?? "";
+    }
+    throw new Error("No supported local AI API found");
   }
 
-  async function summarizeIfLong(text, limit = 5000) {
-    if (text.length <= limit) return text;
-    return await aiPrompt(`Summarize this text in about 300 words:\n\n${text}`);
+  async function summarizeIfLong(text) {
+    return text.length > 5000
+      ? await aiPrompt("Summarize:\n\n" + text)
+      : text;
   }
 
   async function detectLang(text) {
-    const out = await aiPrompt(
-      `Detect ISO2 language code (output only code):\n\n${text.slice(0, 800)}`
-    );
+    const out = await aiPrompt(`Detect language code only:\n${text.slice(0,500)}`);
     return out.trim().toLowerCase().slice(0, 2) || "en";
   }
 
   async function translateIfNeeded(text) {
     const lang = await detectLang(text);
     if (lang === "en") return text;
-    return await aiPrompt(`Translate to English:\n\n${text}`);
+    return await aiPrompt(`Translate to English only:\n${text}`);
   }
+
+  async function chromeSummarizeText() {
+    let text = textInput.value.trim();
+    if (!text) return alert("Enter text first");
+
+    btn.disabled = true;
+    btn.textContent = "⏳ Processing locally…";
+
+    try {
+      text = await summarizeIfLong(text);
+      text = await translateIfNeeded(text);
+      textInput.value = text.trim();
+      btn.textContent = "✅ Text optimized for analysis";
+    } catch (e) {
+      console.error(e);
+      btn.textContent = "⚠️ Local AI failed — try backend";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+});
 
   // ===== LOCAL PROCESSING FUNCTIONS =====
 
@@ -1702,82 +1685,6 @@ inputMethod.addEventListener("change", () => updateInfoText(inputMethod.value));
 }
 
 
-  
-  // 🌍 Clean Article (URL)
-  // 🌍 Hybrid Mode: Backend fetches article → Chrome AI processes text
-async function chromeCleanArticle() {
-  const url = document.getElementById("urlInput").value.trim();
-  if (!url) return alert("Enter a valid URL first.");
-
-  const btn = chromeButtons.url.querySelector("button");
-  btn.disabled = true;
-  btn.textContent = "🌐 Fetching from server…";
-
-  try {
-    // Step 1: Backend fetches full article text (bypass CORS)
-    const response = await fetch(`${API_BASE}/api/fetch-article`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-      credentials: "include"
-    });
-
-    if (!response.ok) throw new Error("Backend fetch failed");
-    let data = await response.json();
-    let text = data.article_text || "";
-
-    if (!text) throw new Error("No article content found");
-
-    btn.textContent = "🧠 Processing locally…";
-
-    // Step 2: Chrome AI summarization + translation
-    text = await summarizeIfLong(text);
-    text = await translateIfNeeded(text);
-
-    textInput.value = text.trim();
-    btn.textContent = "✅ Ready for analysis (Chrome AI)";
-
-  } catch (err) {
-    console.error("Hybrid article processing failed:", err);
-    alert("Failed to fetch/clean article.\nTry another source or paste text manually.");
-    btn.textContent = "⚠️ Fetch failed";
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-
-  // 🎥 Transcribe Video or Video URL
-  async function chromeTranscribeMedia(sourceType) {
-    const btn = chromeButtons[sourceType].querySelector("button");
-    const fileInput = document.getElementById("videoInput");
-    const urlInput = document.getElementById("videoUrlInput");
-    const file = sourceType === "video" ? fileInput.files?.[0] : urlInput.value.trim();
-    if (!file) return alert("Provide a video or URL first.");
-    btn.disabled = true;
-    btn.textContent = "🎙️ Transcribing locally…";
-    try {
-      let text;
-      if (sourceType === "video") {
-        text = await aiPrompt("Transcribe this video:", { audio: file });
-      } else {
-        const res = await fetch(file, { mode: "cors" });
-        const blob = await res.blob();
-        text = await aiPrompt("Transcribe this audio/video URL:", { audio: blob });
-      }
-      text = await summarizeIfLong(text);
-      text = await translateIfNeeded(text);
-      textInput.value = text.trim();
-      btn.textContent = "✅ Transcript ready";
-    } catch (err) {
-      console.warn("Local transcription failed:", err);
-      btn.textContent = "⚠️ Local transcription failed";
-      alert("This video cannot be fetched locally (CORS or format issue).");
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
   // 🧠 Summarize Paste Text
   async function chromeSummarizeText() {
     let text = textInput.value.trim();
@@ -1798,52 +1705,8 @@ async function chromeCleanArticle() {
     }
   }
 
-  // ===== INITIALIZE BUTTONS =====
-  for (const [key, container] of Object.entries(chromeButtons)) {
-    if (!container) continue;
-    const button = document.createElement("button");
-    button.className = "btn btn-outline-warning w-100 fw-semibold";
-    container.appendChild(button);
-  }
-
-  // ===== DYNAMIC UI LOGIC =====
-  function updateChromeButtons() {
-    const method = inputMethod.value;
-    // Hide all Chrome AI button groups
-    Object.values(chromeButtons).forEach((div) => div.classList.add("d-none"));
-
-    switch (method) {
-      case "paste":
-        chromeButtons.paste.classList.remove("d-none");
-        chromeButtons.paste.querySelector("button").textContent = "🧠 Summarize / Translate (Chrome AI)";
-        chromeButtons.paste.querySelector("button").onclick = chromeSummarizeText;
-        break;
-      case "url":
-        chromeButtons.url.classList.remove("d-none");
-        chromeButtons.url.querySelector("button").textContent = "📰 Clean Article (Chrome AI)";
-        chromeButtons.url.querySelector("button").onclick = chromeCleanArticle;
-        break;
-      case "video":
-        chromeButtons.video.classList.remove("d-none");
-        chromeButtons.video.querySelector("button").textContent = "🎙️ Transcribe Video (Chrome AI)";
-        chromeButtons.video.querySelector("button").onclick = () => chromeTranscribeMedia("video");
-        break;
-      case "video-url":
-        chromeButtons.videourl.classList.remove("d-none");
-        chromeButtons.videourl.querySelector("button").textContent = "🎧 Transcribe Video URL (Chrome AI)";
-        chromeButtons.videourl.querySelector("button").onclick = () => chromeTranscribeMedia("videourl");
-        break;
-      case "image":
-        // keep the IMAGE Flask button visible
-        if (btnProcessImage) btnProcessImage.classList.remove("d-none");
-        break;
-    }
-  }
-
-  inputMethod.addEventListener("change", updateChromeButtons);
-  updateChromeButtons();
-});
-
+ 
+  
 
 
   
