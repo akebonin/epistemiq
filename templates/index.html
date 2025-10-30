@@ -1555,117 +1555,144 @@ console.error('Service Worker registration failed:', error);
 });
 }
 
-// ===== Chrome AI Local Pre-Processing w/ Spinner =====
+// ===== Chrome AI Local Pre-Processing (Final) =====
 document.addEventListener("DOMContentLoaded", () => {
   const textInput = document.getElementById("textInput");
   const chromeBtnContainer = document.getElementById("chrome-ai-text");
   const chromeInfo = document.getElementById("chrome-ai-info");
   const overlay = document.getElementById("chrome-ai-overlay");
 
+  // --- Detect real Chrome built-in AI APIs ---
   const hasChromeAI =
     (typeof self !== "undefined" && "Summarizer" in self) ||
     (window.ai && typeof window.ai.prompt === "function");
 
   if (!hasChromeAI) {
-    console.info("ℹ️ Chrome AI not detected. Backend only.");
+    console.info("ℹ️ Chrome AI not detected. Using backend only.");
     return;
   }
 
-  console.info("✅ Chrome AI detected — local mode enabled");
+  console.info("✅ Chrome AI detected — local summarization enabled.");
   alert("Chrome AI available — local mode active!");
 
+  // --- Show the yellow info banner ---
   if (chromeInfo) {
     chromeInfo.classList.remove("d-none");
     chromeInfo.innerHTML = `
       ⚙️ <strong>Chrome AI Mode Active</strong><br>
-      🧠 Gemini Nano will locally summarize and translate extracted or pasted text before analysis. This ensures faster preprocessing and full data privacy.
+      🧠 Gemini Nano will locally summarize and translate extracted or pasted text
+      before analysis. This ensures faster preprocessing and full data privacy.
     `;
   }
 
+  // --- Create always-visible button ---
   chromeBtnContainer.classList.remove("d-none");
   chromeBtnContainer.innerHTML = "";
 
   const btn = document.createElement("button");
   btn.className = "btn btn-warning w-100 fw-semibold";
-  btn.textContent = "🧠 Local Summarize / Translate";
+  btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
   chromeBtnContainer.appendChild(btn);
 
   function showOverlay(state) {
     overlay.style.display = state ? "flex" : "none";
   }
 
+
   async function aiPromptNano(text) {
-    if ("Summarizer" in self) {
-      try {
-        const summarizer = await Summarizer.create({
-          type: "key-points",
-          format: "markdown",
-          length: "medium",
-          outputLanguage: "en",
-          expectedInputLanguages: ["en", "de", "bg", "es", "fr", "it", "ja"],
-          expectedOutputLanguages: ["en"]
-        });
-        return await summarizer.summarize(text);
-      } catch (e) {
-        console.warn("Summarizer API failed → fallback", e);
-      }
+  // 1) Summarizer API
+  if ("Summarizer" in self) {
+    try {
+      const summarizer = await Summarizer.create({
+        outputLanguage: "en",
+        type: "key-points",
+        format: "markdown",
+        length: "medium"
+      });
+      return await summarizer.summarize(text);
+    } catch (err) {
+      console.warn("Summarizer API failed → fallback", err);
     }
-
-    if (window.ai && typeof window.ai.prompt === "function") {
-      try {
-        const r = await window.ai.prompt(text);
-        return r?.output ?? r?.text ?? String(r ?? "");
-      } catch (err) {
-        console.warn("window.ai failed → fallback", err);
-      }
-    }
-
-    throw new Error("No local AI available");
   }
 
-  async function summarizeIfLong(text, limit = 4000) {
-    if (text.length <= limit) return await aiPromptNano(text);
-
-    console.log("📦 Chunking...");
-    const parts = [];
-    for (let i = 0; i < text.length; i += limit) {
-      parts.push(text.slice(i, i + limit));
+  // 2) Legacy window.ai
+  if (window.ai && typeof window.ai.prompt === "function") {
+    try {
+      const r = await window.ai.prompt(text);
+      return r?.output ?? r?.text ?? String(r ?? "");
+    } catch (err) {
+      console.warn("window.ai.prompt failed → fallback", err);
     }
+  }
 
-    const chunks = [];
-    for (const part of parts) {
-      chunks.push(await aiPromptNano(`Summarize clearly:\n${part}`));
+  console.warn("❌ No local AI available");
+  throw new Error("No local AI available");
+}
+
+// --- Chunked local summarization ---
+async function summarizeIfLong(text, limit = 4000) {
+  if (text.length <= limit) return await aiPromptNano(text);
+
+  console.log("📦 Chunking large input for local model…");
+
+  // Break text into ~limit chunks
+  const parts = [];
+  for (let i = 0; i < text.length; i += limit) {
+    parts.push(text.slice(i, i + limit));
+  }
+
+  const summaries = [];
+  for (const part of parts) {
+    try {
+      summaries.push(await aiPromptNano(`Summarize clearly:\n\n${part}`));
+    } catch (err) {
+      console.warn("Chunk summarize failed:", err);
     }
-
-    return await aiPromptNano(`Condense:\n${chunks.join("\n")}`);
   }
 
-  async function detectLang(text) {
-    const out = await aiPromptNano(`Return ISO2 only:\n${text.slice(0,600)}`);
-    return out.trim().toLowerCase().slice(0,2) || "en";
-  }
+  const combined = summaries.join("\n\n");
 
-  async function translateIfNeeded(text) {
-    const lang = await detectLang(text);
-    if (lang === "en") return text;
-    return await aiPromptNano(`Translate to English:\n${text}`);
-  }
+  // Final pass to condense result
+  return await aiPromptNano(
+    `Condense the following text into a clean English summary for scientific analysis:\n\n${combined}`
+  );
+}
 
+// --- Language detect & translate ---
+async function detectLang(text) {
+  const out = await aiPromptNano(
+    `Return only ISO2 code for language:\n${text.slice(0, 600)}`
+  );
+  return out.trim().toLowerCase().slice(0, 2) || "en";
+}
+
+async function translateIfNeeded(text) {
+  const lang = await detectLang(text);
+  if (lang === "en") return text;
+  return await aiPromptNano(`Translate to English only:\n${text}`);
+}
+
+ 
+  // --- Button action ---
   btn.addEventListener("click", async () => {
     let text = textInput.value.trim();
-    if (!text) return alert("Paste or extract text first.");
+    if (!text) {
+      alert("No text present — paste/extract/fetch text first.");
+      return;
+    }
 
     btn.disabled = true;
-    btn.textContent = "⏳ Local Processing…";
+    btn.textContent = "⏳ Processing locally…";
     showOverlay(true);
 
     try {
       text = await summarizeIfLong(text);
       text = await translateIfNeeded(text);
+
       textInput.value = text.trim();
-      btn.textContent = "✅ Optimized Locally — Ready";
+      btn.textContent = "✅ Processed locally — Ready";
     } catch (err) {
-      console.error("Nano failure:", err);
+      console.error("Chrome AI error:", err);
       btn.textContent = "⚠️ Local AI failed";
     } finally {
       btn.disabled = false;
