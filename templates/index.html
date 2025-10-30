@@ -525,19 +525,22 @@ max-width: none;
   </div>
 <form id="analysis-form">
 <div class="mb-3">
-<label for="inputMethod" class="form-label">Input method</label>
-<select id="inputMethod" class="form-select">
-<option value="paste">Paste Text</option>
-<option value="url">Provide URL</option>
-<option value="image">Upload Image</option>
-<option value="video">Upload Video</option>
-<option value="video-url">Video URL</option>
-</select>
+  <label for="inputMethod" class="form-label">Input method</label>
+  <select id="inputMethod" class="form-select">
+    <option value="paste">Paste Text</option>
+    <option value="url">Provide URL</option>
+    <option value="image">Upload Image</option>
+    <option value="video">Upload Video</option>
+    <option value="video-url">Video URL</option>
+  </select>
+</div>
+
+<!-- ✅ Chrome AI info card goes **here** -->
 <div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
      style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
   ⚙️ <strong>Chrome AI Mode Active</strong><br>
   🧠 Gemini Nano will summarize & translate text locally for privacy + speed.
-
+  
   <div class="mt-2" id="chrome-ai-mode">
     <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Local AI Mode</label>
     <select id="chromeMode" class="form-select form-select-sm">
@@ -546,8 +549,6 @@ max-width: none;
       <option value="fast">🏎️ Fast</option>
     </select>
   </div>
-</div>
-
 </div>
 <div id="paste-input-group" class="mb-3">
 <label for="textInput" class="form-label">Paste article or post content</label>
