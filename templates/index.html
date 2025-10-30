@@ -1564,69 +1564,53 @@ document.addEventListener("DOMContentLoaded", () => {
   btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
   chromeBtnContainer.appendChild(btn);
 
-  // --- Local AI engine ---
-async function aiPromptNano(input) {
+ // --- Chrome Nano helper (no top-level await anywhere) ---
+async function aiPromptNano(text) {
+  // 1) Summarizer API (stable 138+)
   if ("Summarizer" in self) {
     try {
-      const availability = await Summarizer.availability();
-      if (availability === "ready" || availability === "downloadable") {
-        const summarizer = await Summarizer.create({
-          outputLanguage: "en",
-          type: "key-points",
-          format: "markdown",
-          length: "medium"
-        });
-        console.log("✅ Using Chrome Summarizer API");
-        return await summarizer.summarize(input);
-      }
+      const summarizer = await Summarizer.create({
+        outputLanguage: "en",   // <- required to avoid the warning
+        type: "key-points",
+        format: "markdown",
+        length: "medium"
+      });
+      return await summarizer.summarize(text);
     } catch (err) {
-      console.warn("⚠️ Summarizer API failed → fallback", err);
+      console.warn("Summarizer API failed → fallback", err);
     }
   }
 
+  // 2) Legacy window.ai (older Canary/Dev preview)
   if (window.ai && typeof window.ai.prompt === "function") {
     try {
-      const r = await window.ai.prompt(input);
-      return r?.output ?? r?.text ?? r ?? input;
-    } catch (e) {
-      console.warn("⚠️ window.ai.prompt failed → fallback", e);
+      const r = await window.ai.prompt(text);   // <- now safely inside async fn
+      return r?.output ?? r?.text ?? String(r ?? "");
+    } catch (err) {
+      console.warn("window.ai.prompt failed → fallback", err);
     }
   }
 
+  // 3) No local AI available
   console.warn("❌ No local AI available");
-  return input;
+  throw new Error("No local AI available");
 }
 
+// Optional small utilities that call the helper
+async function summarizeIfLong(t, limit = 5000) {
+  return t.length > limit ? await aiPromptNano(`Summarize for scientific claim analysis:\n\n${t}`) : t;
+}
 
-    // 2️⃣ Legacy window.ai prompt (older Canary builds)
-    if (window.ai && typeof window.ai.prompt === "function") {
-      try {
-        const r = await window.ai.prompt(input);
-        return r?.output ?? r?.text ?? r ?? input;
-      } catch (e) {
-        console.warn("⚠️ window.ai fallback failed", e);
-      }
-    }
+async function detectLang(t) {
+  const out = await aiPromptNano(`Return only ISO2 language code:\n${t.slice(0, 600)}`);
+  return out.trim().toLowerCase().slice(0, 2) || "en";
+}
 
-    console.warn("❌ No local AI available");
-    return input;
-  }
-
-  async function summarizeIfLong(t, limit = 4500) {
-    if (t.length <= limit) return t;
-    return await aiPromptNano(`Summarize for factual/claim analysis:\n\n${t}`);
-  }
-
-  async function detectLang(t) {
-    const out = await aiPromptNano(`Return only ISO2 code:\n${t.slice(0, 500)}`);
-    return out.trim().toLowerCase().slice(0, 2) || "en";
-  }
-
-  async function translateIfNeeded(t) {
-    const lang = await detectLang(t);
-    if (lang === "en") return t;
-    return await aiPromptNano(`Translate to English only:\n\n${t}`);
-  }
+async function translateIfNeeded(t) {
+  const lang = await detectLang(t);
+  if (lang === "en") return t;
+  return await aiPromptNano(`Translate to English only:\n\n${t}`);
+}
 
   // --- Button action ---
   btn.addEventListener("click", async () => {
