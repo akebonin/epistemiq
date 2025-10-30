@@ -1657,26 +1657,7 @@ document.addEventListener("DOMContentLoaded", () => {
       : text;
   }
 
-  // Button click processing
-  btn.addEventListener("click", async () => {
-    let text = textInput.value.trim();
-    if (!text) return alert("Paste text first.");
-
-    btn.disabled = true;
-    btn.textContent = "⏳ Optimizing locally…";
-
-    try {
-      text = await summarizeIfLong(text);
-      text = await translateIfNeeded(text);
-      textInput.value = text.trim();
-      btn.textContent = "✅ Optimized for analysis";
-    } catch (err) {
-      console.error("Chrome AI error:", err);
-      btn.textContent = "⚠️ Local AI failed — try again";
-    } finally {
-      btn.disabled = false;
-    }
-  });
+ 
 });
 
 
