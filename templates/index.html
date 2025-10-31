@@ -987,60 +987,35 @@ async function transcribeWithChromeAI(audioBlob) {
 // If fetch isn't globally bound (Safari/ESM edge case)
 if (!globalThis.fetch) globalThis.fetch = fetch;
 
-// WASM Whisper fallback (Transformers.js ESM, HF CDN safe)
+// ✅ WASM Whisper fallback — correct Xenova config for browser
 async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("🎧 Loading Whisper (Transformers.js ESM)…");
+  console.log("🎧 Loading Whisper (Transformers.js ESM)...");
 
-  if (!window.__tf || !window.__tf.pipeline) {
-    throw new Error("Transformers.js not initialized");
-  }
+  if (!window.__tf) throw new Error("Transformers not initialized yet");
 
-  // ✅ Force WASM + correct path
+  // ✅ Correct WASM env for Xenova in browser
   window.__tf_env = {
     BACKEND: "onnx",
-    WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/",
+    WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/"
   };
 
-  // ✅ Model ID only — NO full URL!
-  const modelId = "Xenova/whisper-tiny.en";
-
-  // ✅ Load model only once
+  // ✅ Load once and cache pipeline
   if (!window.__tf_asr) {
-    console.log("⏳ Initializing Whisper pipeline…");
-
+    console.log("⏳ Initializing Whisper model...");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      modelId,
-      {
-        revision: "main",
-        quantized: true,
-        use_audio_chunking: true,
-        onnx_wasm: true,
-
-        // ✅ use CDN mirror instead of huggingface.co web frontend
-        model_file_name: "model.onnx",
-        config_file_name: "config.json",
-        tokenizer_file_name: "tokenizer.json",
-        feature_extractor_file_name: "preprocessor_config.json",
-
-        // ✅ HuggingFace mirrored CDN
-        remoteURL: (file) =>
-          `https://huggingface.co/${modelId}/resolve/main/${file}`,
-      }
+      "Xenova/whisper-tiny.en"  // <-- proper ID, no resolve/main, no double URL
     );
-
-    console.log("✅ Whisper tiny model ready");
+    console.log("✅ Whisper ready");
   }
 
-  console.log("⏳ Running WASM inference…");
-
+  console.log("⏳ Transcribing...");
   const { text } = await window.__tf_asr(audioBlob, {
-    chunk_length_s: 30,
-    stride_length_s: 5,
+    chunk_length_s: 20,
+    stride_length_s: 5
   });
 
-  if (!text?.trim()) throw new Error("WASM returned empty transcript.");
-
+  if (!text?.trim()) throw new Error("WASM returned empty transcript");
   return text.trim();
 }
 
