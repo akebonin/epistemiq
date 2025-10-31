@@ -1150,11 +1150,11 @@ async function transcribeVideoUrl() {
     }
 
     // ❌ No captions? Fall back to audio extraction prompt
-    alert("Only retrieving captions available on free tier. No captions found. Upload the video instead.");
+    alert("No captions found. Upload the video instead.");
 
   } catch (e) {
     console.error(e);
-    alert("Only retrieving captions available on free tier. No captions found. Upload the video instead.");
+    alert("No captions retrieved. Upload the video instead.");
   } finally {
     toggleLoading(transcribeVideoUrlBtn, false);
   }
