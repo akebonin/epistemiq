@@ -31,7 +31,8 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
-<!-- ✅ Transformers WASM setup -->
+
+  <!-- ✅ Transformers WASM config -->
 <script>
   window.TRANSFORMERS_CONFIG = {
     wasmPath: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/",
@@ -39,9 +40,10 @@
   };
 </script>
 
-<!-- ✅ Load UMD build (not ESM) -->
+<!-- ✅ FORCE UMD non-module build -->
 <script
-  src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js"
+  type="text/javascript"
+  src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.js"
   crossorigin="anonymous"
 ></script>
 
@@ -49,7 +51,6 @@
   (async () => {
     if (!window.transformers) {
       console.error("❌ Transformers library failed to load — retrying...");
-      // retry once (slow networks / cold edge CDN)
       await new Promise(r => setTimeout(r, 500));
     }
 
