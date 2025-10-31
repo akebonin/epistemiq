@@ -31,8 +31,7 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/whisper-web@latest/dist/whisper-web.min.js"></script>
-
+ <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
   
   <!-- ✅ Iubenda Cookie Solution -->
   <script type="text/javascript">
@@ -733,6 +732,26 @@ function b64ToBlob(b64, mime) {
     return new Blob([byteArray], { type: mime });
 }
 
+async function transcribeWithTransformersWASM(audioBlob) {
+  console.log("🎧 Loading Whisper (Transformers.js)...");
+  // Ensure backend is ready (downloads model weights on first run)
+  await window.transformers.ready();
+
+  // Choose a light model for speed; upgrade later if needed
+  const pipeline = await window.transformers.pipeline(
+    "automatic-speech-recognition",
+    "Xenova/whisper-tiny.en"     // change to "whisper-small" later if needed
+  );
+
+  const { text } = await pipeline(audioBlob, {
+    chunk_length_s: 30,          // safe default for longer clips
+    stride_length_s: 5,
+  });
+
+  if (!text || !text.trim()) throw new Error("WASM returned empty transcript");
+  return text.trim();
+}
+  
 async function transcribeWithWhisperWASM(audioBlob) {
     console.log("🎧 Loading Whisper WASM...");
 
@@ -1025,6 +1044,35 @@ toggleLoading(processImageBtn, false);
 }
 }
 
+async function transcribeWithChromeAI(audioBlob) {
+  // Only proceed if Prompt API is actually present
+  const hasPrompt = !!(window.ai && typeof window.ai.prompt === "function");
+  if (!hasPrompt) {
+    throw new Error("Chrome Prompt API not available on this browser.");
+  }
+
+  // Read the audio as ArrayBuffer (Prompt API expects binary)
+  const audioBuf = await new Response(audioBlob).arrayBuffer();
+
+  // New multimodal Prompt API format (Early Preview)
+  const input = {
+    messages: [{
+      role: "user",
+      content: [
+        { type: "input_audio", data: audioBuf, mime_type: "audio/wav" },
+        { type: "text", text: "Transcribe this audio clearly into English text." }
+      ]
+    }]
+  };
+
+  // Call the local model (if available)
+  const result = await window.ai.prompt(input);
+  const text = (result && (result.output_text ?? result.text ?? result)) || "";
+
+  if (!text.trim()) throw new Error("Chrome AI returned empty transcript.");
+  return text.trim();
+}
+ 
 async function processVideo() {
     if (!currentVideoFile) {
         alert('Please select a video first.');
@@ -1051,67 +1099,43 @@ async function processVideo() {
         console.log("✅ Audio received from backend");
         const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
 
-        // ✅ Chrome AI detection (YOUR app’s logic)
-        const hasChromeAI =
-            (typeof self !== "undefined" && "Summarizer" in self) ||
-            (typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function");
+        // STEP 2 — CHROME AI PATH (safe gated)
+const hasPromptAPI = !!(window.ai && typeof window.ai.prompt === "function");
+if (hasPromptAPI) {
+  console.log("🔥 Chrome AI detected — transcribing audio locally");
+  try {
+    toggleLoading(processVideoBtn, true, 'Chrome AI transcribing...');
+    const transcript = await transcribeWithChromeAI(audioBlob);
 
-        if (hasChromeAI) {
-            console.log("🔥 Chrome AI detected — transcribing audio locally");
-            toggleLoading(processVideoBtn, true, 'Chrome AI transcribing...');
+    textInput.value = transcript;
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+    alert("✅ Video transcribed with Chrome AI");
+    toggleLoading(processVideoBtn, false);
+    return; // done
+  } catch (err) {
+    console.warn("⚠️ Chrome AI failed, trying fallback:", err);
+    // fall through to fallback below
+  } finally {
+    toggleLoading(processVideoBtn, false);
+  }
+}
 
-            const reader = new FileReader();
-            reader.onload = async function () {
-                try {
-                    const base64Audio = reader.result.split(',')[1];
+ // STEP 3 — FALLBACK PATHS
+console.log("⚙️ Using WASM/Cloud fallback transcription");
+try {
+  toggleLoading(processVideoBtn, true, 'Transcribing (WASM)...');
+  const transcript = await transcribeWithTransformersWASM(audioBlob);
 
-                    const prompt = "Transcribe this audio clearly. Return only text.";
-
-                   const aiResponse = await window.ai.prompt({
-  messages: [
-    {
-      role: "user",
-      content: [
-        { type: "input_audio", audio: base64Audio, mime_type: "audio/wav" },
-        { type: "text", text: "Transcribe the audio clearly into English text." }
-      ]
-    }
-  ]
-});
-
-const transcript = aiResponse?.output_text?.trim();
-if (!transcript) throw new Error("Chrome AI returned empty transcript");
-
-textInput.value = transcript;
-inputMethodSelect.value = 'paste';
-inputMethodSelect.dispatchEvent(new Event('change'));
-
-alert("✅ Video transcribed with Chrome AI");
-return;
-
-
-                } catch (err) {
-                    console.warn("⚠️ Chrome AI failed, trying fallback:", err);
-                    await fallbackTranscription(audioBlob);
-                } finally {
-                    toggleLoading(processVideoBtn, false);
-                }
-            };
-
-            // ✅ Must use readAsDataURL for Nano multimodal prompt
-            reader.readAsDataURL(audioBlob);
-            return;
-        }
-
-        // ✅ No Chrome AI → WASM/cloud fallback
-        await fallbackTranscription(audioBlob);
-
-    } catch (e) {
-        console.error(e);
-        alert(`Error: ${e.message}`);
-    } finally {
-        toggleLoading(processVideoBtn, false);
-    }
+  textInput.value = transcript;
+  inputMethodSelect.value = 'paste';
+  inputMethodSelect.dispatchEvent(new Event('change'));
+  alert("✅ Video transcribed (WASM)");
+} catch (wasmErr) {
+  console.error("WASM Whisper failed:", wasmErr);
+  alert("Transcription failed. Try a shorter/lighter clip or Chrome Canary with Prompt API enabled.");
+} finally {
+  toggleLoading(processVideoBtn, false);
 }
 
   
