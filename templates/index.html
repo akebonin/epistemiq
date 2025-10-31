@@ -1022,24 +1022,34 @@ async function transcribeWithChromeAI(audioBlob) {
   return text.trim();
 }
 
-// ✅ WASM Whisper fallback
+// ✅ WASM Whisper fallback – ESM version
 async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("🎧 Loading Whisper (Transformers.js)...");
-  await window.transformers.ready();
+  console.log("🎧 Loading Whisper (Transformers.js ESM)...");
 
-  const pipeline = await window.transformers.pipeline(
-    "automatic-speech-recognition",
-    "Xenova/whisper-tiny.en"
-  );
+  if (!window.__tf || !window.__tf.pipeline) {
+    throw new Error("Transformers not initialized yet");
+  }
 
-  const { text } = await pipeline(audioBlob, {
+  // Lazy load pipeline once
+  if (!window.__tf_asr) {
+    console.log("⏳ Initializing Whisper pipeline...");
+    window.__tf_asr = await window.__tf.pipeline(
+      "automatic-speech-recognition",
+      "Xenova/whisper-tiny.en"
+    );
+    console.log("✅ Whisper model ready");
+  }
+
+  console.log("⏳ Running WASM inference...");
+  const { text } = await window.__tf_asr(audioBlob, {
     chunk_length_s: 30,
     stride_length_s: 5
   });
 
-  if (!text?.trim()) throw new Error("WASM returned empty transcript.");
+  if (!text?.trim()) throw new Error("WASM returned empty transcript");
   return text.trim();
 }
+
 
 // ✅ Main video handler (fixed)
 async function processVideo() {
