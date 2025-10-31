@@ -1687,42 +1687,66 @@ fetchArticleBtn.addEventListener('click', async () => {
 
   
 analysisForm.addEventListener('submit', async (e) => {
-e.preventDefault();
-const articleText = textInput.value.trim();
-if (!articleText) {
-alert('Article text is empty. Please paste content or use one of the input methods.');
-return;
-}
-toggleLoading(runAnalysisBtn, true, 'Analyzing...');
-resultsContainer.innerHTML = '';
-generatedReports = [];
-try {
-const response = await fetch(`${API_BASE}/api/analyze`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-credentials: "include",  
-body: JSON.stringify({
-text: articleText,
-mode: promptModeSelect.value,
-usePapers: usePapersToggle.checked
-}),
-});
-const data = await response.json();
-analysisId = data.analysis_id;   
-if (!response.ok) {
-const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
-throw new Error(errorMessage);
-}
-if (data.claims.length === 0) {
-resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
-toggleLoading(runAnalysisBtn, false);
-return;
-}
-displayClaimsStructure(data.claims);
-} catch (error) {
-resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
-toggleLoading(runAnalysisBtn, false);
-}
+  e.preventDefault();
+
+  const articleText = (textInput.value || '').trim();
+  if (!articleText) {
+    alert('Article text is empty. Please paste content or use one of the input methods.');
+    return;
+  }
+
+  toggleLoading(runAnalysisBtn, true, 'Analyzing...');
+  resultsContainer.innerHTML = '';
+  generatedReports = [];
+
+  try {
+    // Stable client-side hash (hex)
+    const enc = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', enc.encode(articleText));
+    const textHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    const res = await fetch(`${API_BASE}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: articleText,
+        text_hash: textHash,
+        mode: promptModeSelect.value,
+        usePapers: !!usePapersToggle?.checked
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      // Show OpenRouter rate-limit and other backend errors cleanly
+      const msg = (data && (data.error || data.message)) || `Failed: ${res.status}`;
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+
+    // Persist analysis session id used by all follow-ups (details, reports, pdf, etc.)
+    analysisId = data.analysis_id;
+
+    if (!Array.isArray(data.claims) || data.claims.length === 0) {
+      resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
+      return;
+    }
+
+    // Your existing renderer
+    displayClaimsStructure(data.claims);
+
+    if (data.cached) {
+      console.log('✅ Loaded from cache (no LLM call).');
+      // Optional toast:
+      // alert('Loaded from cache');
+    }
+
+  } catch (err) {
+    console.error(err);
+    resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${escapeHTML(err.message || String(err))}</div>`;
+  } finally {
+    toggleLoading(runAnalysisBtn, false);
+  }
 });
 
 downloadPdfBtn.addEventListener('click', openReportSelectionModal);
