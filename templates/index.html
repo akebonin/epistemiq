@@ -32,24 +32,9 @@
   </script>
 
 
- <!-- Transformers.js (ESM) global config -->
-<script>
-  // Configure WASM asset path BEFORE importing the module
-  window.__TRANSFORMERS_WASM__ = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/";
-</script>
-
-<!-- Load ESM and expose to window -->
-<script type="module">
-  import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0";
-
-  // Point ONNX runtime to CDN WASM files
-  env.backends.onnx.wasm.wasmPaths = window.__TRANSFORMERS_WASM__;
-  // Caching & remote models
-  env.allowLocalModels = false;
-  env.useBrowserCache = true;
-
-  // Expose to the rest of your (non-module) code
-  window.__tf = { pipeline, env, ready: async () => {} };
+ <script type="module">
+  import * as xenova from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js";
+  window.__tf = xenova;
   console.log("✅ Transformers ESM loaded");
 </script>
 
@@ -1002,45 +987,60 @@ async function transcribeWithChromeAI(audioBlob) {
 // If fetch isn't globally bound (Safari/ESM edge case)
 if (!globalThis.fetch) globalThis.fetch = fetch;
 
-// Whisper WASM fallback (Transformers.js ESM)
+// WASM Whisper fallback (Transformers.js ESM, HF CDN safe)
 async function transcribeWithTransformersWASM(audioBlob) {
   console.log("🎧 Loading Whisper (Transformers.js ESM)…");
 
   if (!window.__tf || !window.__tf.pipeline) {
-    throw new Error("Transformers not initialized yet");
+    throw new Error("Transformers.js not initialized");
   }
 
-  // ✅ Ensure ONNX WASM path
+  // ✅ Force WASM + correct path
   window.__tf_env = {
     BACKEND: "onnx",
     WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/",
   };
 
-  // ✅ Fix CORS + URL double-prefix issue
-  const MODEL_URL = "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main";
+  // ✅ Model ID only — NO full URL!
+  const modelId = "Xenova/whisper-tiny.en";
 
+  // ✅ Load model only once
   if (!window.__tf_asr) {
     console.log("⏳ Initializing Whisper pipeline…");
+
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      MODEL_URL,
+      modelId,
       {
         revision: "main",
         quantized: true,
         use_audio_chunking: true,
         onnx_wasm: true,
+
+        // ✅ use CDN mirror instead of huggingface.co web frontend
+        model_file_name: "model.onnx",
+        config_file_name: "config.json",
+        tokenizer_file_name: "tokenizer.json",
+        feature_extractor_file_name: "preprocessor_config.json",
+
+        // ✅ HuggingFace mirrored CDN
+        remoteURL: (file) =>
+          `https://huggingface.co/${modelId}/resolve/main/${file}`,
       }
     );
-    console.log("✅ Whisper model ready");
+
+    console.log("✅ Whisper tiny model ready");
   }
 
   console.log("⏳ Running WASM inference…");
+
   const { text } = await window.__tf_asr(audioBlob, {
     chunk_length_s: 30,
     stride_length_s: 5,
   });
 
-  if (!text?.trim()) throw new Error("WASM returned empty transcript");
+  if (!text?.trim()) throw new Error("WASM returned empty transcript.");
+
   return text.trim();
 }
 
