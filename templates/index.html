@@ -1088,58 +1088,48 @@ async function processVideo() {
 }
   
 async function transcribeVideoUrl() {
-  const videoUrl = videoUrlInput.value.trim();
-  if (!videoUrl) {
-    alert('Please enter a video URL');
+  const url = videoUrlInput.value.trim();
+  if (!url) return alert("Enter a video URL");
+
+  // ✅ YouTube ID test
+  const ytMatch = url.match(/(?:youtu\.be\/|v=)([\w-]+)/);
+  if (!ytMatch) {
+    alert("URL transcription only available for YouTube in demo. Please upload the video instead.");
     return;
   }
 
-  if (!videoUrl.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
-    alert('Invalid URL format. Please use a valid http(s):// link.');
-    return;
-  }
-
-  toggleLoading(transcribeVideoUrlBtn, true, 'Downloading video...');
+  const videoId = ytMatch[1];
+  toggleLoading(transcribeVideoUrlBtn, true, "Fetching captions...");
 
   try {
-    // Step 1 — Download video to browser as Blob
-    const fetchResp = await fetch(videoUrl);
-    if (!fetchResp.ok) throw new Error("Could not download video from URL");
-    const videoBlob = await fetchResp.blob();
-    if (!videoBlob.size) throw new Error("Downloaded video file is empty");
+    // ✅ Try to fetch YouTube captions (English)
+    const captionsUrl =
+      `https://cors.isomorphic-git.org/https://video.google.com/timedtext?lang=en&v=${videoId}`;
 
-    console.log("✅ Video downloaded from URL, sending to backend...");
+    const resp = await fetch(captionsUrl);
 
-    // Step 2 — Send to your existing /api/extract-audio pipeline
-    const formData = new FormData();
-    formData.append("file", videoBlob, "video_from_url.mp4");
+    if (resp.ok) {
+      const xml = await resp.text();
+      const text = xml
+        .replace(/<[^>]+>/g, " ") // strip XML tags
+        .replace(/\s+/g, " ")
+        .trim();
 
-    toggleLoading(transcribeVideoUrlBtn, true, 'Extracting audio...');
+      if (text.length > 10) {
+        textInput.value = text;
+        inputMethodSelect.value = "paste";
+        inputMethodSelect.dispatchEvent(new Event("change"));
+        alert("✅ Captions imported");
+        return;
+      }
+    }
 
-    const audioResp = await fetch(`${API_BASE}/api/extract-audio`, {
-      method: "POST",
-      body: formData
-    });
+    // ❌ No captions? Fall back to audio extraction prompt
+    alert("No captions found. Please upload the video file for transcription.");
 
-    if (!audioResp.ok) throw new Error(await audioResp.text());
-    const audioBlob = await audioResp.blob();
-    if (!audioBlob.size) throw new Error("Audio extraction returned empty file");
-
-    console.log("✅ Audio received from backend, starting transcription...");
-
-    // Step 3 — Local transcription same as file method
-    toggleLoading(transcribeVideoUrlBtn, true, 'Transcribing locally...');
-    const transcript = await transcribeWithTransformersWASM(audioBlob);
-
-    textInput.value = transcript;
-    inputMethodSelect.value = 'paste';
-    inputMethodSelect.dispatchEvent(new Event('change'));
-    
-    alert("✅ Video URL transcribed successfully!");
-
-  } catch (error) {
-    console.error(error);
-    alert(`URL transcription failed: ${error.message}`);
+  } catch (e) {
+    console.error(e);
+    alert("Error retrieving captions. Upload the video instead.");
   } finally {
     toggleLoading(transcribeVideoUrlBtn, false);
   }
