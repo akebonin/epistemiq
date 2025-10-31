@@ -718,13 +718,6 @@ let currentImageFile = null;
 let currentVideoFile = null;
 
 
-function stripHtml(html) {
-  let doc = new DOMParser().parseFromString(html, 'text/html');
-  return doc.body.textContent || "";
-}
-
- 
-
 // Track all reports that the user generated (from cache or new) in this session
 const reportSessionMap = new Map();
 
@@ -1467,43 +1460,65 @@ processImageBtn.addEventListener('click', processImage);
 processVideoBtn.addEventListener('click', processVideo);
 transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
 
-fetchArticleBtn.addEventListener("click", async () => {
-  const url = urlInput.value.trim();
+fetchArticleBtn.addEventListener('click', async () => {
+  let url = urlInput.value.trim();
   if (!url) {
-    alert("Please enter a URL");
+    alert('Please enter a valid URL.');
     return;
   }
 
-  fetchArticleBtn.disabled = true;
-  fetchArticleBtn.querySelector(".spinner-border").classList.remove("d-none");
+  if (!url.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+    alert('Invalid URL format. Please use http:// or https://.');
+    return;
+  }
+
+  toggleLoading(fetchArticleBtn, true, 'Fetching...');
 
   try {
-    const response = await fetch("/api/fetch-article", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch(`/api/fetch-article`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
 
     const data = await response.json();
 
-    if (!response.ok || !data.content) {
-      alert("Failed to fetch article");
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch article.');
+    }
+
+    if (!data.content || typeof data.content !== 'string') {
+      alert('No readable content extracted. Try paste manually.');
       return;
     }
 
-    // ✅ Raw HTML returned — paste into textarea
-    textInput.value = stripHtml(data.content);
-inputMethodSelect.value = 'paste';
-inputMethodSelect.dispatchEvent(new Event('change'));
+    // ✅ Convert HTML → plain text (keeps paragraphs)
+    const cleaned = (function stripHtml(html) {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const paragraphs = doc.body.querySelectorAll("p, br");
+      if (paragraphs.length) {
+        return Array.from(paragraphs)
+          .map(el => (el.tagName === "BR" ? "\n" : el.textContent || ""))
+          .join("\n")
+          .trim();
+      }
+      return (doc.body.textContent || "").trim();
+    })(data.content);
 
+    // ✅ Insert into textarea
+    textInput.value = cleaned;
 
-    
-  } catch (e) {
-    console.error("Error fetching article:", e);
-    alert("Error fetching article. Check console.");
+    // ✅ Switch UI to paste mode
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+
+    alert('Article text has been fetched and pasted.');
+
+  } catch (error) {
+    console.error('Fetch error:', error);
+    alert(`Error fetching article: ${error.message}`);
   } finally {
-    fetchArticleBtn.disabled = false;
-    fetchArticleBtn.querySelector(".spinner-border").classList.add("d-none");
+    toggleLoading(fetchArticleBtn, false);
   }
 });
 
