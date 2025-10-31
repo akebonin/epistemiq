@@ -992,17 +992,15 @@ async function transcribeWithTransformersWASM(audioBlob) {
 
   if (!window.__tf) throw new Error("Transformers not initialized yet");
 
-  // ✅ Set WASM env BEFORE pipeline load
-  globalThis.env = {
-    BACKEND: "onnx",
-    WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/"
-  };
+  // ✅ Correctly set WASM paths (THIS is the real fix)
+  window.__tf.env.backends.onnx.wasm.wasmPaths = 
+    "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/";
 
   if (!window.__tf_asr) {
     console.log("⏳ Initializing Whisper pipeline...");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en" // ✅ DO NOT PUT HF URL HERE
+      "Xenova/whisper-tiny.en"
     );
     console.log("✅ Whisper model ready");
   }
@@ -1010,10 +1008,12 @@ async function transcribeWithTransformersWASM(audioBlob) {
   console.log("🎤 Running WASM inference...");
   const { text } = await window.__tf_asr(audioBlob, {
     chunk_length_s: 30,
-    stride_length_s: 5
+    stride_length_s: 5,
   });
 
-  if (!text?.trim()) throw new Error("WASM returned empty transcript");
+  if (!text?.trim())
+    throw new Error("WASM returned empty transcript");
+
   return text.trim();
 }
 
