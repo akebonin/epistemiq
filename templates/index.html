@@ -999,31 +999,42 @@ async function transcribeWithChromeAI(audioBlob) {
 }
 
 
-if (!window.globalThis.fetch) {
-  window.globalThis.fetch = fetch;
-}
+// If fetch isn't globally bound (Safari/ESM edge case)
+if (!globalThis.fetch) globalThis.fetch = fetch;
 
+// Whisper WASM fallback (Transformers.js ESM)
 async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("🎧 Loading Whisper (Transformers.js ESM)...");
+  console.log("🎧 Loading Whisper (Transformers.js ESM)…");
 
-  if (!window.__tf) throw new Error("Transformers not initialized yet");
+  if (!window.__tf || !window.__tf.pipeline) {
+    throw new Error("Transformers not initialized yet");
+  }
 
-  // Configure WASM path
+  // ✅ Ensure ONNX WASM path
   window.__tf_env = {
     BACKEND: "onnx",
-    WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/"
+    WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/",
   };
 
+  // ✅ Fix CORS + URL double-prefix issue
+  const MODEL_URL = "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main";
+
   if (!window.__tf_asr) {
-    console.log("⏳ Initializing Whisper pipeline...");
+    console.log("⏳ Initializing Whisper pipeline…");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main"
+      MODEL_URL,
+      {
+        revision: "main",
+        quantized: true,
+        use_audio_chunking: true,
+        onnx_wasm: true,
+      }
     );
     console.log("✅ Whisper model ready");
   }
 
-  console.log("⏳ Running WASM inference...");
+  console.log("⏳ Running WASM inference…");
   const { text } = await window.__tf_asr(audioBlob, {
     chunk_length_s: 30,
     stride_length_s: 5,
@@ -1032,7 +1043,6 @@ async function transcribeWithTransformersWASM(audioBlob) {
   if (!text?.trim()) throw new Error("WASM returned empty transcript");
   return text.trim();
 }
-
 
 // ✅ Main video handler (fixed)
 async function processVideo() {
