@@ -1067,27 +1067,28 @@ async function processVideo() {
 
                     const prompt = "Transcribe this audio clearly. Return only text.";
 
-                    const aiResponse = await ai.prompt({
-                        messages: [
-                            {
-                                role: "user",
-                                content: [
-                                    { type: "input_audio", audio: base64Audio, mime_type: "audio/wav" },
-                                    { type: "text", text: prompt }
-                                ]
-                            }
-                        ]
-                    });
+                   const aiResponse = await window.ai.prompt({
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "input_audio", audio: base64Audio, mime_type: "audio/wav" },
+        { type: "text", text: "Transcribe the audio clearly into English text." }
+      ]
+    }
+  ]
+});
 
-                    const transcript = aiResponse?.output_text?.trim();
-                    if (!transcript) throw new Error("Chrome AI returned empty transcript");
+const transcript = aiResponse?.output_text?.trim();
+if (!transcript) throw new Error("Chrome AI returned empty transcript");
 
-                    textInput.value = transcript;
-                    inputMethodSelect.value = 'paste';
-                    inputMethodSelect.dispatchEvent(new Event('change'));
+textInput.value = transcript;
+inputMethodSelect.value = 'paste';
+inputMethodSelect.dispatchEvent(new Event('change'));
 
-                    alert("✅ Video transcribed with Chrome AI");
-                    return;
+alert("✅ Video transcribed with Chrome AI");
+return;
+
 
                 } catch (err) {
                     console.warn("⚠️ Chrome AI failed, trying fallback:", err);
