@@ -754,30 +754,6 @@ function b64ToBlob(b64, mime) {
     const byteArray = new Uint8Array(byteNums);
     return new Blob([byteArray], { type: mime });
 }
-
-async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("🎧 Loading Whisper (Transformers.js ESM)...");
-  if (!window.__tf || !window.__tf.pipeline) {
-    throw new Error("Transformers ESM not loaded");
-  }
-
-  // Build the pipeline once and cache it on window to avoid re-loading
-  if (!window.__tf_asr) {
-    window.__tf_asr = await window.__tf.pipeline(
-      "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en"
-    );
-    console.log("✅ Whisper pipeline ready");
-  }
-
-  const { text } = await window.__tf_asr(audioBlob, {
-    chunk_length_s: 30,
-    stride_length_s: 5,
-  });
-
-  if (!text || !text.trim()) throw new Error("WASM returned empty transcript.");
-  return text.trim();
-}
   
 // Track all reports that the user generated (from cache or new) in this session
 const reportSessionMap = new Map();
