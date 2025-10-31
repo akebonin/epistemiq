@@ -1088,36 +1088,63 @@ async function processVideo() {
 }
   
 async function transcribeVideoUrl() {
-const videoUrl = videoUrlInput.value.trim();
-if (!videoUrl) {
-alert('Please enter a video URL');
-return;
+  const videoUrl = videoUrlInput.value.trim();
+  if (!videoUrl) {
+    alert('Please enter a video URL');
+    return;
+  }
+
+  if (!videoUrl.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+    alert('Invalid URL format. Please use a valid http(s):// link.');
+    return;
+  }
+
+  toggleLoading(transcribeVideoUrlBtn, true, 'Downloading video...');
+
+  try {
+    // Step 1 — Download video to browser as Blob
+    const fetchResp = await fetch(videoUrl);
+    if (!fetchResp.ok) throw new Error("Could not download video from URL");
+    const videoBlob = await fetchResp.blob();
+    if (!videoBlob.size) throw new Error("Downloaded video file is empty");
+
+    console.log("✅ Video downloaded from URL, sending to backend...");
+
+    // Step 2 — Send to your existing /api/extract-audio pipeline
+    const formData = new FormData();
+    formData.append("file", videoBlob, "video_from_url.mp4");
+
+    toggleLoading(transcribeVideoUrlBtn, true, 'Extracting audio...');
+
+    const audioResp = await fetch(`${API_BASE}/api/extract-audio`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!audioResp.ok) throw new Error(await audioResp.text());
+    const audioBlob = await audioResp.blob();
+    if (!audioBlob.size) throw new Error("Audio extraction returned empty file");
+
+    console.log("✅ Audio received from backend, starting transcription...");
+
+    // Step 3 — Local transcription same as file method
+    toggleLoading(transcribeVideoUrlBtn, true, 'Transcribing locally...');
+    const transcript = await transcribeWithTransformersWASM(audioBlob);
+
+    textInput.value = transcript;
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+    
+    alert("✅ Video URL transcribed successfully!");
+
+  } catch (error) {
+    console.error(error);
+    alert(`URL transcription failed: ${error.message}`);
+  } finally {
+    toggleLoading(transcribeVideoUrlBtn, false);
+  }
 }
-if (!videoUrl.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
-alert('Invalid URL format. Please use a valid URL starting with http:// or https://.');
-return;
-}
-toggleLoading(transcribeVideoUrlBtn, true, 'Transcribing...');
-try {
-const response = await fetch(`${API_BASE}/api/transcribe-video-url`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ video_url: videoUrl })
-});
-const data = await response.json();
-if (!response.ok) {
-throw new Error(data.error || 'Failed to transcribe video URL');
-}
-textInput.value = data.transcription;
-inputMethodSelect.value = 'paste';
-inputMethodSelect.dispatchEvent(new Event('change'));
-alert(`Video URL transcription note: ${data.note}`);
-} catch (error) {
-alert(`Error transcribing video URL: ${error.message}`);
-} finally {
-toggleLoading(transcribeVideoUrlBtn, false);
-}
-}
+
 
 function displayClaimsStructure(claims) {
     claims.forEach((claimText, index) => {
