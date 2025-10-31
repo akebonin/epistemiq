@@ -31,7 +31,9 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
+  <script src="https://cdn.jsdelivr.net/npm/whisper-web@latest/dist/whisper-web.min.js"></script>
 
+  
   <!-- ✅ Iubenda Cookie Solution -->
   <script type="text/javascript">
     var _iub = _iub || [];
@@ -1032,7 +1034,7 @@ async function processVideo() {
     toggleLoading(processVideoBtn, true, 'Extracting audio...');
 
     try {
-        // STEP 1 — send video to backend to get WAV audio
+        // STEP 1 — Extract audio via backend
         const formData = new FormData();
         formData.append('file', currentVideoFile);
 
@@ -1047,56 +1049,60 @@ async function processVideo() {
         }
 
         console.log("✅ Audio received from backend");
-
-        // Convert base64 → blob
         const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
 
-        // STEP 2 — CHROME AI PATH
+        // ✅ Chrome AI detection (YOUR app’s logic)
         const hasChromeAI =
             (typeof self !== "undefined" && "Summarizer" in self) ||
-            (window.ai && typeof window.ai.prompt === "function");
+            (typeof window !== "undefined" && window.ai && typeof window.ai.prompt === "function");
 
         if (hasChromeAI) {
             console.log("🔥 Chrome AI detected — transcribing audio locally");
-
             toggleLoading(processVideoBtn, true, 'Chrome AI transcribing...');
 
             const reader = new FileReader();
             reader.onload = async function () {
                 try {
-                    const audioArrayBuffer = reader.result;
-                    const aiInput = {
+                    const base64Audio = reader.result.split(',')[1];
+
+                    const prompt = "Transcribe this audio clearly. Return only text.";
+
+                    const aiResponse = await ai.prompt({
                         messages: [
-                            { role: "user", content: [
-                                { type: "input_audio", data: audioArrayBuffer },
-                                { type: "text", text: "Transcribe the audio clearly into English text." }
-                            ]}
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "input_audio", audio: base64Audio, mime_type: "audio/wav" },
+                                    { type: "text", text: prompt }
+                                ]
+                            }
                         ]
-                    };
+                    });
 
-                    const aiResponse = await window.ai.prompt(aiInput);
-                    const transcript = aiResponse?.output_text || aiResponse || "";
-
-                    if (!transcript.trim()) throw new Error("Chrome AI returned no transcript");
+                    const transcript = aiResponse?.output_text?.trim();
+                    if (!transcript) throw new Error("Chrome AI returned empty transcript");
 
                     textInput.value = transcript;
                     inputMethodSelect.value = 'paste';
                     inputMethodSelect.dispatchEvent(new Event('change'));
 
                     alert("✅ Video transcribed with Chrome AI");
+                    return;
+
                 } catch (err) {
-                    console.error("Chrome AI failed, going to fallback:", err);
+                    console.warn("⚠️ Chrome AI failed, trying fallback:", err);
                     await fallbackTranscription(audioBlob);
                 } finally {
                     toggleLoading(processVideoBtn, false);
                 }
             };
 
-            reader.readAsArrayBuffer(audioBlob);
+            // ✅ Must use readAsDataURL for Nano multimodal prompt
+            reader.readAsDataURL(audioBlob);
             return;
         }
 
-        // STEP 3 — FALLBACK PATHS
+        // ✅ No Chrome AI → WASM/cloud fallback
         await fallbackTranscription(audioBlob);
 
     } catch (e) {
