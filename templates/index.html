@@ -31,7 +31,7 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
- <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js"></script>
   
   <!-- ✅ Iubenda Cookie Solution -->
   <script type="text/javascript">
@@ -1044,17 +1044,14 @@ toggleLoading(processImageBtn, false);
 }
 }
 
+<script>
+// ✅ Chrome AI transcription helper
 async function transcribeWithChromeAI(audioBlob) {
-  // Only proceed if Prompt API is actually present
   const hasPrompt = !!(window.ai && typeof window.ai.prompt === "function");
-  if (!hasPrompt) {
-    throw new Error("Chrome Prompt API not available on this browser.");
-  }
+  if (!hasPrompt) throw new Error("Chrome Prompt API not available.");
 
-  // Read the audio as ArrayBuffer (Prompt API expects binary)
   const audioBuf = await new Response(audioBlob).arrayBuffer();
 
-  // New multimodal Prompt API format (Early Preview)
   const input = {
     messages: [{
       role: "user",
@@ -1065,78 +1062,93 @@ async function transcribeWithChromeAI(audioBlob) {
     }]
   };
 
-  // Call the local model (if available)
   const result = await window.ai.prompt(input);
-  const text = (result && (result.output_text ?? result.text ?? result)) || "";
-
+  const text = (result?.output_text ?? result?.text ?? result) || "";
   if (!text.trim()) throw new Error("Chrome AI returned empty transcript.");
   return text.trim();
 }
- 
+
+// ✅ WASM Whisper fallback
+async function transcribeWithTransformersWASM(audioBlob) {
+  console.log("🎧 Loading Whisper (Transformers.js)...");
+  await window.transformers.ready();
+
+  const pipeline = await window.transformers.pipeline(
+    "automatic-speech-recognition",
+    "Xenova/whisper-tiny.en"
+  );
+
+  const { text } = await pipeline(audioBlob, {
+    chunk_length_s: 30,
+    stride_length_s: 5
+  });
+
+  if (!text?.trim()) throw new Error("WASM returned empty transcript.");
+  return text.trim();
+}
+
+// ✅ Main video handler (fixed)
 async function processVideo() {
-    if (!currentVideoFile) {
-        alert('Please select a video first.');
-        return;
+  if (!currentVideoFile) {
+    alert("Please select a video first.");
+    return;
+  }
+
+  toggleLoading(processVideoBtn, true, "Extracting audio...");
+
+  try {
+    // Extract audio via backend
+    const formData = new FormData();
+    formData.append("file", currentVideoFile);
+
+    const res = await fetch(`${API_BASE}/api/extract-audio`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.audio_base64) {
+      throw new Error(data.error || "Failed to extract audio");
     }
 
-    toggleLoading(processVideoBtn, true, 'Extracting audio...');
+    console.log("✅ Audio received from backend");
+    const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
 
-    try {
-        // STEP 1 — Extract audio via backend
-        const formData = new FormData();
-        formData.append('file', currentVideoFile);
+    // ✅ Chrome AI path
+    const hasPromptAPI = !!(window.ai && typeof window.ai.prompt === "function");
+    if (hasPromptAPI) {
+      try {
+        toggleLoading(processVideoBtn, true, "Chrome AI transcribing...");
+        const transcript = await transcribeWithChromeAI(audioBlob);
 
-        const response = await fetch(`${API_BASE}/api/extract-audio`, {
-            method: 'POST',
-            body: formData
-        });
+        textInput.value = transcript;
+        inputMethodSelect.value = "paste";
+        inputMethodSelect.dispatchEvent(new Event("change"));
+        alert("✅ Video transcribed with Chrome AI");
+        return;
+      } catch (err) {
+        console.warn("⚠️ Chrome AI failed, falling back:", err);
+      }
+    }
 
-        const data = await response.json();
-        if (!response.ok || !data.audio_base64) {
-            throw new Error(data.error || 'Failed to extract audio');
-        }
-
-        console.log("✅ Audio received from backend");
-        const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
-
-        // STEP 2 — CHROME AI PATH (safe gated)
-const hasPromptAPI = !!(window.ai && typeof window.ai.prompt === "function");
-if (hasPromptAPI) {
-  console.log("🔥 Chrome AI detected — transcribing audio locally");
-  try {
-    toggleLoading(processVideoBtn, true, 'Chrome AI transcribing...');
-    const transcript = await transcribeWithChromeAI(audioBlob);
+    // ✅ WASM fallback
+    console.log("⚙️ Using WASM fallback transcription");
+    toggleLoading(processVideoBtn, true, "Transcribing (WASM)...");
+    const transcript = await transcribeWithTransformersWASM(audioBlob);
 
     textInput.value = transcript;
-    inputMethodSelect.value = 'paste';
-    inputMethodSelect.dispatchEvent(new Event('change'));
-    alert("✅ Video transcribed with Chrome AI");
-    toggleLoading(processVideoBtn, false);
-    return; // done
-  } catch (err) {
-    console.warn("⚠️ Chrome AI failed, trying fallback:", err);
-    // fall through to fallback below
+    inputMethodSelect.value = "paste";
+    inputMethodSelect.dispatchEvent(new Event("change"));
+    alert("✅ Video transcribed (WASM)");
+    
+  } catch (e) {
+    console.error(e);
+    alert(`Error: ${e.message}`);
   } finally {
     toggleLoading(processVideoBtn, false);
   }
 }
-
- // STEP 3 — FALLBACK PATHS
-console.log("⚙️ Using WASM/Cloud fallback transcription");
-try {
-  toggleLoading(processVideoBtn, true, 'Transcribing (WASM)...');
-  const transcript = await transcribeWithTransformersWASM(audioBlob);
-
-  textInput.value = transcript;
-  inputMethodSelect.value = 'paste';
-  inputMethodSelect.dispatchEvent(new Event('change'));
-  alert("✅ Video transcribed (WASM)");
-} catch (wasmErr) {
-  console.error("WASM Whisper failed:", wasmErr);
-  alert("Transcription failed. Try a shorter/lighter clip or Chrome Canary with Prompt API enabled.");
-} finally {
-  toggleLoading(processVideoBtn, false);
-}
+</script>
 
   
 async function transcribeVideoUrl() {
