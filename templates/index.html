@@ -1034,7 +1034,7 @@ async function processVideo() {
 
   try {
     // 1. Extract audio → get 16kHz WAV blob
-    const response = await fetch('/api/extract-audio', {
+    const response = await fetch(`${API_BASE}/api/extract-audio`, {
       method: 'POST',
       body: formData
     });
