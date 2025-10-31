@@ -998,6 +998,11 @@ async function transcribeWithChromeAI(audioBlob) {
   return text.trim();
 }
 
+
+if (!window.globalThis.fetch) {
+  window.globalThis.fetch = fetch;
+}
+
 async function transcribeWithTransformersWASM(audioBlob) {
   console.log("🎧 Loading Whisper (Transformers.js ESM)...");
 
@@ -1013,7 +1018,7 @@ async function transcribeWithTransformersWASM(audioBlob) {
     console.log("⏳ Initializing Whisper pipeline...");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/model.json"
+      "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main"
     );
     console.log("✅ Whisper model ready");
   }
