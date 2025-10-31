@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="description" content="Epistemiq – Verify scientific and factual claims using hybrid AI." />
+  <!-- ✅ Favicon and app icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/logo.png">
+  <link rel="apple-touch-icon" href="/static/icons/logo.png">
+  <link rel="shortcut icon" href="/static/icons/logo.png">
+  <meta name="theme-color" content="#0d6efd">
+  
+  <title>Epistemiq – AI Claims Verification</title>
+
+  <!-- ✅ Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+        crossorigin="anonymous" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+  <!-- ✅ Custom Styles -->
+  <!-- <link rel="stylesheet" href="templates/static/styles.css" /> -->
+
+  <!-- ✅ Google Tag Manager / Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-H5SNSXX9K0');  
+  </script>
+
+
+ <script type="module">
+  import * as xenova from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js";
+  window.__tf = xenova;
+  console.log("✅ Transformers ESM loaded");
+</script>
+
+
+
+  
+  <!-- ✅ Iubenda Cookie Solution -->
+  <script type="text/javascript">
+    var _iub = _iub || [];
+    _iub.csConfiguration = {
+      "lang":"en",
+      "siteId":4149829,  /* ← replace with your Iubenda site ID */
+      "cookiePolicyId":82404675,
+      "banner":{ "position":"bottom","acceptButtonDisplay":true }
+    };
+  </script>
+  <script async src="https://cdn.iubenda.com/cs/iubenda_cs.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+body {
+background-color: #f8f9fa;
+color: #212529;
+font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+.container {
+max-width: 900px;
+padding-top: 20px;
+padding-bottom: 50px;
+}
+.control-card, .claim-card {
+background-color: #ffffff;
+padding: 2.5rem;
+border-radius: 15px;
+margin-bottom: 25px;
+box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+border: 1px solid #e0e0e0;
+}
+.form-label {
+font-weight: 600;
+color: #343a40;
+margin-bottom: 8px;
+}
+.form-control, .form-select {
+border-radius: 8px;
+padding: 0.75rem 1rem;
+border: 1px solid #ced4da;
+}
+.form-control:focus, .form-select:focus {
+border-color: #86b7fe;
+box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.btn-primary {
+background-color: #0d6efd;
+border-color: #0d6efd;
+font-weight: 600;
+padding: 0.8rem 1.5rem;
+border-radius: 8px;
+transition: background-color 0.2s, border-color 0.2s;
+}
+.btn-primary:hover {
+background-color: #0b5ed7;
+border-color: #0a58ca;
+}
+.btn-secondary {
+background-color: #6c757d;
+border-color: #6c757d;
+color: #fff;
+font-weight: 500;
+border-radius: 8px;
+}
+.btn-secondary:hover {
+background-color: #5c636a;
+border-color: #565e64;
+}
+.btn-success {
+background-color: #28a745;
+border-color: #28a745;
+font-weight: 600;
+padding: 0.8rem 1.5rem;
+border-radius: 8px;
+transition: background-color 0.2s, border-color 0.2s;
+}
+.btn-success:hover {
+background-color: #218838;
+border-color: #1e7e34;
+}
+.btn-info {
+background-color: #0dcaf0;
+border-color: #0dcaf0;
+}
+.spinner-border {
+width: 1.2rem;
+height: 1.2rem;
+margin-right: 8px;
+}
+.claim-card h5 {
+font-weight: 700;
+color: #0d6efd;
+margin-bottom: 1rem;
+font-size: 1.5rem;
+}
+.claim-card p {
+font-size: 1.05rem;
+line-height: 1.6;
+}
+.verdict-box, .report-box {
+background-color: #e9ecef;
+padding: 18px;
+border-radius: 10px;
+border: 1px solid #dee2e6;
+white-space: pre-wrap;
+font-family: 'Roboto Mono', 'Courier New', monospace;
+font-size: 0.95rem;
+line-height: 1.5;
+color: #343a40;
+overflow-wrap: break-word;
+}
+.report-box {
+background-color: #e8f5ff;
+border-color: #cce7ff;
+margin-top: 15px;
+}
+.report-placeholder {
+min-height: 50px;
+padding-left: 15px;
+}
+.question-list li {
+background-color: #f8f9fa;
+border-color: #e9ecef;
+margin-bottom: 10px;
+border-radius: 8px;
+padding: 15px 20px;
+display: flex;
+flex-direction: column;
+align-items: flex-start;
+justify-content: space-between;
+flex-wrap: wrap;
+}
+.question-list li span {
+flex-grow: 1;
+margin-right: 15px;
+font-size: 1rem;
+line-height: 1.5;
+margin-bottom: 10px;
+width: 100%;
+}
+.question-list li button {
+flex-shrink: 0;
+margin-top: 5px;
+}
+.source-list li {
+word-break: break-all;
+margin-bottom: 5px;
+font-size: 0.9rem;
+}
+.source-list a {
+color: #0d6efd;
+text-decoration: none;
+}
+.source-list a:hover {
+text-decoration: underline;
+}
+.footer {
+margin-top: 5rem;
+padding: 2rem 0;
+border-top: 1px solid #dee2e6;
+font-size: 0.9rem;
+color: #6c757d;
+}
+.alert-danger {
+background-color: #f8d7da;
+color: #721c24;
+border-color: #f5c6cb;
+}
+.alert-info {
+background-color: #d1ecf1;
+color: #0c5460;
+border-color: #bee5eb;
+}
+.d-grid button {
+height: 55px;
+}
+.form-check-input.form-switch {
+width: 3em;
+height: 1.5em;
+margin-left: 0.5em;
+vertical-align: middle;
+background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%280, 0, 0, 0.25%29'/%3e%3c/svg%3e");
+background-position: left center;
+border-radius: 1.5em;
+transition: background-position .15s ease-in-out;
+}
+.form-check-input.form-switch:checked {
+background-position: right center;
+background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+.form-check-input.form-switch:focus {
+box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.form-check-label {
+vertical-align: middle;
+margin-left: 0.5rem;
+}
+.report-checkbox {
+margin-right: 8px;
+}
+.pdf-selection-section {
+background-color: #e8f5e8;
+padding: 1.5rem;
+border-radius: 10px;
+margin-bottom: 20px;
+border: 1px solid #c3e6c3;
+}
+.pdf-selection-list {
+max-height: 300px;
+overflow-y: auto;
+margin-top: 15px;
+}
+.file-upload-group {
+border: 2px dashed #dee2e6;
+border-radius: 8px;
+padding: 2rem;
+text-align: center;
+background-color: #f8f9fa;
+transition: all 0.3s ease;
+}
+.file-upload-group:hover {
+border-color: #0d6efd;
+background-color: #e7f1ff;
+}
+.file-upload-group.dragover {
+border-color: #0d6efd;
+background-color: #d4e6ff;
+}
+.upload-icon {
+font-size: 3rem;
+color: #6c757d;
+margin-bottom: 1rem;
+}
+.file-input-hidden {
+display: none;
+}
+.preview-image {
+max-width: 100%;
+max-height: 200px;
+margin-top: 1rem;
+border-radius: 8px;
+}
+.table {
+width: 100%;
+margin: 10px 0;
+}
+.table-bordered {
+border: 1px solid #dee2e6;
+}
+.table-sm {
+font-size: 0.9rem;
+}
+/* Modal styles for report selection */
+.report-selection-list {
+max-height: 400px;
+overflow-y: auto;
+border: 1px solid #dee2e6;
+border-radius: 8px;
+padding: 15px;
+}
+.report-selection-item {
+padding: 10px;
+border-bottom: 1px solid #f8f9fa;
+}
+.report-selection-item:last-child {
+border-bottom: none;
+}
+/* Compact view for inline reports */
+.compact-report {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #e8f5ff;
+    font-size: 0.9rem;
+}
+/* Custom Modal Styles (Vanilla) */
+.custom-modal {
+display: none;
+position: fixed;
+z-index: 1050;
+left: 0;
+top: 0;
+width: 100%;
+height: 100%;
+overflow: hidden;
+outline: 0;
+}
+.custom-modal-overlay {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background: rgba(0, 0, 0, 0.5);
+z-index: 1040;
+}
+.custom-modal-dialog {
+position: fixed;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+z-index: 1050;
+width: 90%;
+max-width: 1200px;
+margin: auto;
+animation: custom-modal-animatetop 0.4s;
+}
+@keyframes custom-modal-animatetop {
+from {top: -300px; opacity: 0;}
+to {top: 50%; opacity: 1;}
+}
+.custom-modal-content {
+background-color: #e8f5ff;
+border: 1px solid #cce7ff;
+border-radius: 0.3rem;
+box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.5);
+position: relative;
+display: flex;
+flex-direction: column;
+width: 100%;
+pointer-events: auto;
+background-clip: padding-box;
+outline: 0;
+}
+.custom-modal-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 1rem;
+border-bottom: 1px solid #cce7ff;
+border-top-left-radius: 0.3rem;
+border-top-right-radius: 0.3rem;
+background-color: #ffffff;
+}
+.custom-modal-title {
+margin-bottom: 0;
+line-height: 1.5;
+font-size: 1.25rem;
+}
+.custom-close-btn {
+padding: 1rem;
+margin: -1rem -1rem -1rem auto;
+background-color: transparent;
+border: 0;
+font-size: 1.5rem;
+font-weight: 700;
+line-height: 1;
+color: #000;
+text-shadow: 0 1px 0 #fff;
+opacity: 0.5;
+cursor: pointer;
+}
+.custom-close-btn:hover {
+color: #000;
+text-decoration: none;
+opacity: 0.75;
+}
+.custom-modal-body {
+position: relative;
+flex: 1 1 auto;
+padding: 1rem;
+background-color: #ffffff;
+}
+.custom-modal-footer {
+display: flex;
+flex-wrap: wrap;
+align-items: center;
+justify-content: flex-end;
+padding: 0.75rem;
+border-top: 1px solid #cce7ff;
+border-bottom-right-radius: 0.3rem;
+border-bottom-left-radius: 0.3rem;
+gap: 0.5rem;
+background-color: #ffffff;
+}
+.custom-btn {
+display: inline-block;
+font-weight: 400;
+color: #212529;
+text-align: center;
+vertical-align: middle;
+cursor: pointer;
+user-select: none;
+background-color: transparent;
+border: 1px solid transparent;
+padding: 0.375rem 0.75rem;
+font-size: 1rem;
+line-height: 1.5;
+border-radius: 0.25rem;
+transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+margin: 0 0.25rem;
+}
+.custom-btn-secondary {
+color: #fff;
+background-color: #6c757d;
+border-color: #6c757d;
+}
+.custom-btn-secondary:hover {
+background-color: #5a6268;
+border-color: #545b62;
+}
+.custom-btn-outline-primary {
+color: #007bff;
+border-color: #007bff;
+}
+.custom-btn-outline-primary:hover {
+color: #fff;
+background-color: #007bff;
+border-color: #007bff;
+}
+.body-no-scroll {
+overflow: hidden;
+}
+@media (max-width: 576px) {
+.custom-modal-dialog {
+width: 95%;
+max-width: none;
+}
+}
+
+.logo-wrapper {
+  text-align: center;
+}
+
+.logo-wrapper img {
+  width: 100px; /* Increase size */
+  height: 100px;
+  border-radius: 15px; /* Rounded corners */
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+
+.logo-wrapper .tagline {
+  font-size: 1rem;
+  color: #0A0F2C;
+  font-weight: 600;
+  margin: 0;
+}
+
+#chrome-ai-info {
+  box-shadow: 0 0 10px rgba(255, 230, 100, 0.4);
+  border-radius: 8px;
+}
+
+.chrome-ai-btn button {
+  background-color: #fff9e6 !important;
+  border-color: #ffe8b3 !important;
+  color: #5c4a00 !important;
+}
+.chrome-ai-btn button:hover {
+  background-color: #ffe9a8 !important;
+}
+
+.textarea-dim { filter: blur(2px); opacity: .6; }
+
+.ai-pulse {
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#000;
+  animation: aip 0.8s infinite alternate ease-in-out;
+}
+
+@keyframes aip {
+  from { opacity:.2; transform:scale(.6); }
+  to   { opacity:1; transform:scale(1); }
+}
+
+.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+  
+</style>
+</head>
+<body>
+<div class="container">
+<div class="control-card">
+    <div class="logo-wrapper mb-4">
+    <img src="https://raw.githubusercontent.com/akebonin/epistemiq/refs/heads/main/templates/static/icons/logo.png" alt="epistemiq logo">
+    <p class="tagline">Your Compass in the Epistemic Fog</p>
+  </div>
+<form id="analysis-form">
+<div class="mb-3">
+  <label for="inputMethod" class="form-label">Input method</label>
+  <select id="inputMethod" class="form-select">
+    <option value="paste">Paste Text</option>
+    <option value="url">Provide URL</option>
+    <option value="image">Upload Image</option>
+    <option value="video">Upload Video</option>
+    <option value="video-url">Video URL</option>
+  </select>
+</div>
+
+<!-- ✅ Chrome AI info card goes **here** -->
+<div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
+     style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
+  ⚙️ <strong>Chrome AI Mode Active</strong><br>
+  🧠 Gemini Nano will locally summarize and translate extracted or pasted text
+      before analysis. This ensures faster preprocessing and full data privacy.
+  
+  <div class="mt-2" id="chrome-ai-mode">
+    <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Local AI Mode</label>
+    <select id="chromeMode" class="form-select form-select-sm">
+      <option value="accurate">🎯 Accurate (default)</option>
+      <option value="balanced">⚖️ Balanced</option>
+      <option value="fast">🏎️ Fast</option>
+    </select>
+  </div>
+</div>
+<div id="paste-input-group" class="mb-3" style="position:relative;">
+  <label for="textInput" class="form-label">Paste article or post content</label>
+
+  <textarea id="textInput" rows="7" class="form-control"
+            placeholder="Paste content here..."></textarea>
+
+  <div id="chrome-ai-text" class="mt-2 d-none"></div>
+</div>
+
+<div id="url-input-group" class="mb-3 d-none">
+<label for="urlInput" class="form-label">Enter article URL</label>
+<div class="input-group">
+<input id="urlInput" type="text" class="form-control" placeholder="https://example.com">
+<button id="fetch-article-btn" class="btn btn-secondary" type="button">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Fetch Article
+</button>
+</div>
+</div>
+<div id="image-input-group" class="mb-3 d-none">
+<label class="form-label">Upload Image with Text</label>
+<div class="file-upload-group" id="image-upload-area">
+<div class="upload-icon">🖼️</div>
+<h5>Drop image here or click to browse</h5>
+<p class="text-muted">Supports JPG, PNG, GIF (Max 10MB)</p>
+<input type="file" id="imageInput" class="file-input-hidden" accept="image/*">
+<button type="button" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">
+Choose Image
+</button>
+<div id="image-preview" class="mt-3"></div>
+</div>
+<button id="process-image-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Extract Text from Image
+</button>
+</div>
+<div id="video-input-group" class="mb-3 d-none">
+<label class="form-label">Upload Video</label>
+<div class="file-upload-group" id="video-upload-area">
+<div class="upload-icon">📹</div>
+<h5>Drop video here or click to browse</h5>
+<p class="text-muted">Supports MP4, AVI, MOV (Max 50MB)</p>
+<input type="file" id="videoInput" class="file-input-hidden" accept="video/*">
+<button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoInput').click()">
+Choose Video
+</button>
+</div>
+<button id="process-video-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Transcribe Video
+</button>
+</div>
+<div id="video-url-input-group" class="mb-3 d-none">
+<label for="videoUrlInput" class="form-label">Enter Video URL</label>
+<div class="input-group">
+<input id="videoUrlInput" type="text" class="form-control" placeholder="https://youtube.com/watch?v=... or https://vimeo.com/...">
+<button id="transcribe-video-url-btn" class="btn btn-secondary" type="button">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Transcribe Video
+</button>
+</div>
+</div>
+<div class="mb-4">
+<label for="promptMode" class="form-label">Analysis focus</label>
+<select id="promptMode" class="form-select">
+<option>General Analysis of Testable Claims</option>
+<option>Specific Focus on Scientific Claims</option>
+<option>Technology-Focused Extraction</option>
+</select>
+</div>
+<div class="mb-4 form-check form-switch">
+<input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
+<label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + CORE + PubMed data</label>
+</div>
+<div class="d-grid">
+<button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Run Analysis
+</button>
+</div>
+</form>
+</div>
+<div id="results-container"></div>
+<!-- Always visible download button -->
+<div id="pdf-download-section" class="text-center mt-5">
+<button id="download-pdf-btn" class="btn btn-success btn-lg">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Download Analysis Report (PDF)
+</button>
+</div>
+<footer class="text-center text-muted footer">
+From murk to clarity — powered by Epistemiq.
+</footer>
+</div>
+<!-- Report Selection Modal -->
+<div class="modal fade" id="reportSelectionModal" tabindex="-1" aria-labelledby="reportSelectionModalLabel" aria-hidden="true">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+<div class="modal-header">
+<h5 class="modal-title" id="reportSelectionModalLabel">Select Reports for PDF</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+<div class="mb-3">
+<button id="select-all-reports-modal" class="btn btn-outline-primary btn-sm">Select All</button>
+<button id="deselect-all-reports-modal" class="btn btn-outline-secondary btn-sm">Deselect All</button>
+</div>
+<div id="report-selection-list" class="report-selection-list">
+<!-- Dynamic content will be inserted here -->
+</div>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+<button id="generate-pdf-from-modal" class="btn btn-success">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Generate PDF
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Research Report Modal (Vanilla Implementation) -->
+<div id="researchReportModal" class="custom-modal" aria-hidden="true">
+<div class="custom-modal-overlay" id="custom-modal-overlay"></div>
+<div class="custom-modal-dialog">
+<div class="custom-modal-content">
+<div class="custom-modal-header">
+<h5 class="custom-modal-title" id="researchReportModalLabel">Research Report</h5>
+<button type="button" class="custom-close-btn" aria-label="Close">&times;</button>
+</div>
+<div class="custom-modal-body">
+<div id="modal-report-content" class="report-box" style="max-height: 70vh; overflow-y: auto; padding: 1rem; line-height: 1.6; font-size: 1rem;">
+<!-- Report content will be inserted here -->
+</div>
+</div>
+<div class="custom-modal-footer">
+<button type="button" class="custom-btn custom-btn-secondary custom-close-btn">Close</button>
+<button id="copy-report-btn" class="custom-btn custom-btn-outline-primary">Copy to Clipboard</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+const inputMethodSelect = document.getElementById('inputMethod');
+const pasteInputGroup = document.getElementById('paste-input-group');
+const urlInputGroup = document.getElementById('url-input-group');
+const imageInputGroup = document.getElementById('image-input-group');
+const videoInputGroup = document.getElementById('video-input-group');
+const videoUrlInputGroup = document.getElementById('video-url-input-group');
+const textInput = document.getElementById('textInput');
+const urlInput = document.getElementById('urlInput');
+const imageInput = document.getElementById('imageInput');
+const videoInput = document.getElementById('videoInput');
+const videoUrlInput = document.getElementById('videoUrlInput');
+const fetchArticleBtn = document.getElementById('fetch-article-btn');
+const processImageBtn = document.getElementById('process-image-btn');
+const processVideoBtn = document.getElementById('process-video-btn');
+const transcribeVideoUrlBtn = document.getElementById('transcribe-video-url-btn');
+const analysisForm = document.getElementById('analysis-form');
+const runAnalysisBtn = document.getElementById('run-analysis-btn');
+const resultsContainer = document.getElementById('results-container');
+const pdfDownloadSection = document.getElementById('pdf-download-section');
+const downloadPdfBtn = document.getElementById('download-pdf-btn');
+const promptModeSelect = document.getElementById('promptMode');
+const usePapersToggle = document.getElementById('usePapersToggle');
+const imageUploadArea = document.getElementById('image-upload-area');
+const videoUploadArea = document.getElementById('video-upload-area');
+const imagePreview = document.getElementById('image-preview');
+const API_BASE = "https://epistemiq.pythonanywhere.com";
+let analysisId = null;
+let generatedReports = [];
+let currentImageFile = null;
+let currentVideoFile = null;
+
+
+function b64ToBlob(b64, mime) {
+    const byteChars = atob(b64);
+    const byteNums = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNums);
+    return new Blob([byteArray], { type: mime });
+}
+  
+// Track all reports that the user generated (from cache or new) in this session
+const reportSessionMap = new Map();
+
+function sessionKey(c, q) { 
+  return `${c}-${q}`; 
+}
+
+// ✅ Register a report as “generated” this session
+function markReportGenerated(claimIdx, questionIdx) {
+  const claimTextEl = document.querySelector(`#claim-${claimIdx} .claim-text`);
+  const claimText = claimTextEl ? claimTextEl.textContent : `Claim ${claimIdx + 1}`;
+
+  // Extract question text (for modal display)
+  const qLi = document.querySelector(`#report-claim-${claimIdx}-${questionIdx}`)?.closest('li');
+  const qSpan = qLi ? qLi.querySelector('span') : null;
+  const questionTextRaw = qSpan ? qSpan.textContent : `Question ${questionIdx + 1}`;
+  const questionText = questionTextRaw.replace(/^Q\d+:\s*/i, '').trim();
+
+  reportSessionMap.set(sessionKey(claimIdx, questionIdx), {
+    claimIdx,
+    questionIdx,
+    claimText,
+    questionText
+  });
+}
+  
+
+// UI/Display Functions
+
+function addCachedIndicator(element, type) {
+    const indicator = document.createElement('span');
+    indicator.className = 'badge bg-secondary ms-2';
+    indicator.textContent = 'Cached';
+    indicator.title = `This ${type} was loaded from cache`;
+    element.appendChild(indicator);
+}
+
+function toggleLoading(button, isLoading, loadingText = '', progress = '') {
+const spinner = button.querySelector('.spinner-border');
+const originalText = button.dataset.originalText || button.textContent.trim();
+if (!button.dataset.originalText) {
+button.dataset.originalText = originalText;
+}
+if (isLoading) {
+button.disabled = true;
+if(spinner) spinner.classList.remove('d-none');
+const progressText = progress ? ` (${progress})` : '';
+const textNode = Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
+if(textNode) textNode.textContent = ` ${loadingText}${progressText}`;
+} else {
+button.disabled = false;
+if(spinner) spinner.classList.add('d-none');
+const textNode = Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
+if(textNode) textNode.textContent = ` ${originalText}`;
+}
+}
+
+function escapeHTML(str) {
+if (typeof str !== 'string') return str;
+return str.replace(/[&<>"']/g, function(match) {
+return {
+'&': '&amp;',
+'<': '&lt;',
+'>': '&gt;',
+'"': '&quot;',
+"'": '&#39;'
+}[match];
+});
+}
+
+function convertMarkdownTablesToHTML(text) {
+const tableRegex = /(\|.*\|\s*\n\|[-:\s|]+\|\s*\n(?:\|.*\|\s*\n)*)/g;
+return text.replace(tableRegex, (tableMatch) => {
+const lines = tableMatch.trim().split('\n').filter(line => line.trim().startsWith('|'));
+if (lines.length < 2) return tableMatch;
+let htmlTable = '<table class="table table-bordered table-sm mt-2 mb-3" style="font-size: 0.9rem;">';
+lines.forEach((line, index) => {
+const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+if (index === 0) {
+htmlTable += '<thead><tr>';
+cells.forEach(cell => {
+htmlTable += `<th style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</th>`;
+});
+htmlTable += '</tr></thead><tbody>';
+} else if (index === 1 && cells.every(cell => cell.replace(/[-:\s]/g, '') === '')) {
+return;
+} else {
+htmlTable += '<tr>';
+cells.forEach(cell => {
+const isHeader = index === 1 && lines[0].replace(/[-:\s|]/g, '') === '';
+if (isHeader) {
+htmlTable += `<th style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</th>`;
+} else {
+htmlTable += `<td style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</td>`;
+}
+});
+htmlTable += '</tr>';
+}
+});
+htmlTable += '</tbody></table>';
+return htmlTable;
+});
+}
+
+function formatTextWithMarkdownAndLinks(text) {
+let normalizedText = text.normalize('NFKD');
+normalizedText = normalizedText.replace(/[–—]/g, '-');
+normalizedText = normalizedText.replace(/[â€"â€"]/g, '-');
+normalizedText = normalizedText.replace(/[â€™]/g, "'");
+normalizedText = normalizedText.replace(/[â€œâ€]/g, '"');
+normalizedText = normalizedText.replace(/[¯]/g, ' ');
+normalizedText = normalizedText.replace(/[­]/g, '');
+normalizedText = normalizedText.replace(/Î²/g, 'beta');
+normalizedText = normalizedText.replace(/Î±/g, 'alpha');
+normalizedText = normalizedText.replace(/Î³/g, 'gamma');
+let formattedText = escapeHTML(normalizedText);
+formattedText = convertMarkdownTablesToHTML(formattedText);
+formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+formattedText = formattedText.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+formattedText = formattedText.replace(/\n/g, '<br>');
+return formattedText;
+}
+
+function setupFileUploadDragAndDrop(uploadArea, fileInput, onFileSelect) {
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+uploadArea.addEventListener(eventName, preventDefaults, false);
+document.body.addEventListener(eventName, preventDefaults, false);
+});
+['dragenter', 'dragover'].forEach(eventName => {
+uploadArea.addEventListener(eventName, highlight, false);
+});
+['dragleave', 'drop'].forEach(eventName => {
+uploadArea.addEventListener(eventName, unhighlight, false);
+});
+uploadArea.addEventListener('drop', handleDrop, false);
+
+function preventDefaults(e) {
+e.preventDefault();
+e.stopPropagation();
+}
+
+function highlight() {
+uploadArea.classList.add('dragover');
+}
+
+function unhighlight() {
+uploadArea.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+const dt = e.dataTransfer;
+const files = dt.files;
+fileInput.files = files;
+onFileSelect(files[0]);
+}
+
+fileInput.addEventListener('change', (e) => {
+if (e.target.files.length > 0) {
+onFileSelect(e.target.files[0]);
+}
+});
+}
+
+function handleImageSelect(file) {
+if (file && file.type.startsWith('image/')) {
+currentImageFile = file;
+processImageBtn.disabled = false;
+const reader = new FileReader();
+reader.onload = (e) => {
+imagePreview.innerHTML = `<img src="${e.target.result}" class="preview-image" alt="Image preview">`;
+};
+reader.readAsDataURL(file);
+} else {
+alert('Please select a valid image file (JPG, PNG, GIF)');
+currentImageFile = null;
+processImageBtn.disabled = true;
+imagePreview.innerHTML = '';
+}
+}
+
+function handleVideoSelect(file) {
+if (file && file.type.startsWith('video/')) {
+currentVideoFile = file;
+processVideoBtn.disabled = false;
+} else {
+alert('Please select a valid video file (MP4, AVI, MOV)');
+currentVideoFile = null;
+processVideoBtn.disabled = true;
+}
+}
+
+async function processImage() {
+if (!currentImageFile) {
+alert('Please select an image first');
+return;
+}
+toggleLoading(processImageBtn, true, 'Processing image...');
+const formData = new FormData();
+formData.append('image', currentImageFile);
+try {
+const response = await fetch(`${API_BASE}/api/process-image`, {
+method: 'POST',
+body: formData
+});
+const data = await response.json();
+if (!response.ok) {
+throw new Error(data.error || 'Failed to process image');
+}
+textInput.value = data.extracted_text;
+inputMethodSelect.value = 'paste';
+inputMethodSelect.dispatchEvent(new Event('change'));
+alert('Text successfully extracted from image! Ready for analysis.');
+} catch (error) {
+alert(`Error processing image: ${error.message}`);
+} finally {
+toggleLoading(processImageBtn, false);
+}
+}
+
+// ✅ Chrome AI transcription helper
+async function transcribeWithChromeAI(audioBlob) {
+  const hasPrompt = !!(window.ai && typeof window.ai.prompt === "function");
+  if (!hasPrompt) throw new Error("Chrome Prompt API not available.");
+
+  const audioBuf = await new Response(audioBlob).arrayBuffer();
+
+  const input = {
+    messages: [{
+      role: "user",
+      content: [
+        { type: "input_audio", data: audioBuf, mime_type: "audio/wav" },
+        { type: "text", text: "Transcribe this audio clearly into English text." }
+      ]
+    }]
+  };
+
+  const result = await window.ai.prompt(input);
+  const text = (result?.output_text ?? result?.text ?? result) || "";
+  if (!text.trim()) throw new Error("Chrome AI returned empty transcript.");
+  return text.trim();
+}
+
+
+// If fetch isn't globally bound (Safari/ESM edge case)
+if (!globalThis.fetch) globalThis.fetch = fetch;
+
+async function transcribeWithTransformersWASM(audioBlob) {
+  console.log("🎧 Loading Whisper (Transformers.js)…");
+
+  if (!window.__tf) throw new Error("Transformers not initialized yet");
+
+  // ✅ Correct WASM file mapping for Xenova
+  window.__tf.env.backends.onnx.wasm.paths = {
+    'ort-wasm.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm.wasm',
+    'ort-wasm-simd.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm-simd.wasm',
+    'ort-wasm-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm-threaded.wasm',
+    'ort-wasm-simd-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm-simd-threaded.wasm'
+  };
+
+  // ✅ Init once
+  if (!window.__tf_asr) {
+    console.log("⏳ Initializing Whisper tiny model…");
+    window.__tf_asr = await window.__tf.pipeline(
+      "automatic-speech-recognition",
+      "Xenova/whisper-tiny.en"
+    );
+    console.log("✅ Whisper pipeline ready");
+  }
+
+  console.log("🎤 Running WASM inference…");
+  
+  const { text } = await window.__tf_asr(audioBlob, {
+    chunk_length_s: 30,
+    stride_length_s: 5
+  });
+
+  if (!text?.trim()) throw new Error("Empty transcript");
+  return text.trim();
+}
+
+
+// ✅ Main video handler (fixed)
+async function processVideo() {
+  if (!currentVideoFile) {
+    alert("Please select a video first.");
+    return;
+  }
+
+  toggleLoading(processVideoBtn, true, "Extracting audio...");
+
+  try {
+    // Extract audio via backend
+    const formData = new FormData();
+    formData.append("file", currentVideoFile);
+
+    const res = await fetch(`${API_BASE}/api/extract-audio`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.audio_base64) {
+      throw new Error(data.error || "Failed to extract audio");
+    }
+
+    console.log("✅ Audio received from backend");
+    const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
+
+    // ✅ Chrome AI path
+    const hasPromptAPI = !!(window.ai && typeof window.ai.prompt === "function");
+    if (hasPromptAPI) {
+      try {
+        toggleLoading(processVideoBtn, true, "Chrome AI transcribing...");
+        const transcript = await transcribeWithChromeAI(audioBlob);
+
+        textInput.value = transcript;
+        inputMethodSelect.value = "paste";
+        inputMethodSelect.dispatchEvent(new Event("change"));
+        alert("✅ Video transcribed with Chrome AI");
+        return;
+      } catch (err) {
+        console.warn("⚠️ Chrome AI failed, falling back:", err);
+      }
+    }
+
+    // ✅ WASM fallback
+    console.log("⚙️ Using WASM fallback transcription");
+    toggleLoading(processVideoBtn, true, "Transcribing (WASM)...");
+    const transcript = await transcribeWithTransformersWASM(audioBlob);
+
+    textInput.value = transcript;
+    inputMethodSelect.value = "paste";
+    inputMethodSelect.dispatchEvent(new Event("change"));
+    alert("✅ Video transcribed (WASM)");
+    
+  } catch (e) {
+    console.error(e);
+    alert(`Error: ${e.message}`);
+  } finally {
+    toggleLoading(processVideoBtn, false);
+  }
+}
+
+  
+async function transcribeVideoUrl() {
+const videoUrl = videoUrlInput.value.trim();
+if (!videoUrl) {
+alert('Please enter a video URL');
+return;
+}
+if (!videoUrl.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+alert('Invalid URL format. Please use a valid URL starting with http:// or https://.');
+return;
+}
+toggleLoading(transcribeVideoUrlBtn, true, 'Transcribing...');
+try {
+const response = await fetch(`${API_BASE}/api/transcribe-video-url`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ video_url: videoUrl })
+});
+const data = await response.json();
+if (!response.ok) {
+throw new Error(data.error || 'Failed to transcribe video URL');
+}
+textInput.value = data.transcription;
+inputMethodSelect.value = 'paste';
+inputMethodSelect.dispatchEvent(new Event('change'));
+alert(`Video URL transcription note: ${data.note}`);
+} catch (error) {
+alert(`Error transcribing video URL: ${error.message}`);
+} finally {
+toggleLoading(transcribeVideoUrlBtn, false);
+}
+}
+
+function displayClaimsStructure(claims) {
+    claims.forEach((claimText, index) => {
+        const claimId = `claim-${index}`;
+        const claimHtml = `
+        <div class="claim-card" id="${claimId}">
+            <h5>Claim ${index + 1}</h5>
+            <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
+            <strong>Model Verdict:</strong>
+            <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
+                <span class="text-muted">Loading model verdict...</span>
+            </div>
+            <strong>Suggested Research Questions:</strong>
+            <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
+                <li class="list-group-item">
+                    <span class="text-muted">Loading questions...</span>
+                </li>
+            </ul>
+            <hr>
+            <strong>External Verification (Semantic Scholar, Crossref, CORE & PubMed):</strong>
+            <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
+                ${usePapersToggle.checked ? '<span class="text-muted">Loading external verification...</span>' : 'External verification is toggled off.'}
+            </div>
+            <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3"></ul>
+        </div>
+        `;
+        resultsContainer.innerHTML += claimHtml;
+    });
+
+    autoLoadClaimDetails(claims);
+    }
+
+async function autoLoadClaimDetails(claims) {
+    const promises = claims.map(async (claim, index) => {
+        const claimId = `claim-${index}`;
+        const verdictContainerId = `model-verdict-${claimId}`;
+        const questionsContainerId = `questions-list-${claimId}`;
+        const externalVerdictContainerId = `external-verdict-${claimId}`;
+        const externalSourcesContainerId = `external-sources-${claimId}`;
+
+        try {
+            // Check if we already have model details
+            const claimElement = document.getElementById(claimId);
+            if (claimElement && claimElement.dataset.hasModelDetails) {
+                // Details already loaded, skip API call
+                console.log(`Using cached model details for claim ${index}`);
+            } else {
+                await getModelDetails(index, verdictContainerId, questionsContainerId, null, true);
+            }
+
+            if (usePapersToggle.checked) {
+                // Check if we already have external verification
+                if (claimElement && claimElement.dataset.hasExternalDetails) {
+                    console.log(`Using cached external verification for claim ${index}`);
+                } else {
+                    await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true);
+                }
+            }
+        } catch (error) {
+            console.error(`Error loading details for claim ${index}:`, error);
+        }
+    });
+
+    for (let i = 0; i < claims.length; i++) {
+        toggleLoading(runAnalysisBtn, true, 'Analyzing', `Claim ${i + 1} of ${claims.length}`);
+        await promises[i];
+    }
+    toggleLoading(runAnalysisBtn, false);
+    }
+
+async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false) {
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const questionsList = document.getElementById(questionsContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Loading details...");
+
+  try {
+    const response = await fetch(`${API_BASE}/api/get-claim-details`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx   // ← fix: use claimIdx, not idx
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || `Failed to get claim details: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
+    verdictContainer.innerHTML = formattedVerdict;
+
+    questionsList.innerHTML = '';
+    if (data.questions && data.questions.length > 0) {
+      data.questions.forEach((q, q_idx) => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item';
+        listItem.innerHTML = `
+          <span class="d-block mb-2"><b>Q${q_idx + 1}:</b> ${escapeHTML(q)}</span>
+          <button class="btn btn-primary btn-sm generate-report-btn"
+            data-claim-idx="${claimIdx}"
+            data-question-idx="${q_idx}"
+            data-report-container-id="report-claim-${claimIdx}-${q_idx}">
+            Generate Report
+          </button>
+          <div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
+        `;
+        questionsList.appendChild(listItem);
+
+        const reportId = `claim-${claimIdx}-question-${q_idx}`;
+        if (!generatedReports.find(r => r.id === reportId)) {
+          generatedReports.push({
+            id: reportId,
+            claimIdx: claimIdx,
+            questionIdx: q_idx,
+            claimText: document.querySelector(`#claim-${claimIdx} .claim-text`).textContent,
+            questionText: q
+          });
+        }
+      });
+    } else {
+      questionsList.innerHTML = '<li class="list-group-item">No research questions generated.</li>';
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${escapeHTML(error.message)}</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
+}
+
+async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false) {
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const sourcesContainer = document.getElementById(sourcesContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Verifying...");
+  verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
+  sourcesContainer.innerHTML = '';
+
+  try {
+    const response = await fetch(`${API_BASE}/api/verify-external`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx   // ← fix: use claimIdx
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `External verification failed: ${response.status}`); // ← fix: backticks already used
+    }
+
+    verdictContainer.innerHTML = formatTextWithMarkdownAndLinks(data.verdict);
+
+    if (data.sources && data.sources.length > 0) {
+      sourcesContainer.innerHTML = data.sources.map(s => {
+        const sourceInfo = s.source ? `[${s.source}]` : '';
+        const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
+        const yearInfo = s.year ? ` (${s.year})` : '';
+        const authorsInfo = s.authors ? ` - ${s.authors}` : '';
+        return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
+      }).join('');
+    } else {
+      sourcesContainer.innerHTML = `<li>No external sources found.</li>`;
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-warning p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    sourcesContainer.innerHTML = `<li>Could not fetch sources.</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
+}
+
+function showReportInModal(reportContent, claimIdx, questionIdx) {
+const modal = document.getElementById('researchReportModal');
+const modalTitle = document.getElementById('researchReportModalLabel');
+const modalContent = document.getElementById('modal-report-content');
+modalTitle.textContent = `Research Report - Claim ${claimIdx + 1}, Question ${questionIdx + 1}`;
+modalContent.innerHTML = formatTextWithMarkdownAndLinks(reportContent);
+modal.style.display = 'block';
+document.body.classList.add('body-no-scroll');
+const copyButton = document.getElementById('copy-report-btn');
+copyButton.onclick = () => {
+navigator.clipboard.writeText(reportContent).then(() => {
+const originalText = copyButton.innerHTML;
+copyButton.innerHTML = '✓ Copied!';
+setTimeout(() => {
+copyButton.innerHTML = originalText;
+}, 2000);
+}).catch(err => {
+console.error('Failed to copy: ', err);
+alert('Failed to copy report to clipboard');
+});
+};
+}
+
+async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
+  const reportContainer = document.getElementById(reportContainerId);
+  reportContainer.innerHTML =
+    '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
+  if (button) { button.disabled = true; button.innerHTML = 'Generating...'; }
+
+  try {
+    const es = new EventSource(
+      `${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}`,
+      { withCredentials: true }
+    );
+
+    reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
+    const reportBox = reportContainer.querySelector('.report-box');
+    let fullContent = '';
+
+    es.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        es.close();
+
+        if (fullContent && fullContent.trim().length > 0) {
+          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+
+          // ✅ View full report button
+          const viewBtn = document.createElement('button');
+          viewBtn.className = 'btn btn-outline-primary btn-sm mt-2';
+          viewBtn.textContent = '📖 View Full Report';
+          viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
+          reportContainer.appendChild(viewBtn);
+
+          // ✅ Register as “generated this session” (cached or streamed)
+          markReportGenerated(claimIdx, questionIdx);
+        } else {
+          reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
+        }
+        return;
+      }
+
+      try {
+        const data = JSON.parse(event.data);
+        if (data.content) {
+          fullContent += data.content;
+          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+        }
+        if (data.error) {
+          reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(data.error)}</strong>`;
+        }
+      } catch {
+        // cached or non-JSON chunk
+        fullContent += event.data;
+        reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      reportContainer.innerHTML = `<div class="alert alert-danger">Stream error or unsupported media type.</div>`;
+    };
+  } catch (error) {
+    console.error('Report generation error:', error);
+    reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
+  } finally {
+    if (button) { button.disabled = false; button.innerHTML = 'Generate Report'; }
+  }
+}
+
+
+// NEW PDF DOWNLOAD FUNCTIONS
+
+async function openReportSelectionModal() {
+  try {
+    if (!analysisId) {
+      alert('No analysis found. Please run an analysis first.');
+      return;
+    }
+
+    toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
+
+    const resp = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`, {
+      credentials: "include"
+    });
+    if (!resp.ok) throw new Error('Failed to load available reports');
+
+    const available = await resp.json(); // [{ id, type, description }, ...]
+
+    // Always include claim summaries (model + external)
+    const summaries = available.filter(r => r.id && r.id.endsWith('-summary'));
+
+    // Only include research reports generated this session
+    const sessionKeys = Array.from(reportSessionMap.keys());
+    const sessionReports = available.filter(r => {
+      if (!r.id || !r.id.includes('question')) return false;
+      const parts = r.id.split('-');
+      if (parts.length !== 4) return false;
+      const c = parseInt(parts[1], 10);
+      const q = parseInt(parts[3], 10);
+      if (Number.isNaN(c) || Number.isNaN(q)) return false;
+      return sessionKeys.includes(`${c}-${q}`);
+    });
+
+    const listForModal = [...summaries, ...sessionReports];
+
+    if (!listForModal || listForModal.length === 0) {
+      alert('No reports or claim summaries found for this analysis.');
+      return;
+    }
+
+    populateReportSelectionModal(listForModal);
+
+    const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
+    modal.show();
+
+  } catch (err) {
+    console.error('Error opening report selection modal:', err);
+    alert(`Error: ${err.message}`);
+  } finally {
+    toggleLoading(downloadPdfBtn, false);
+  }
+}
+
+
+  
+  
+function populateReportSelectionModal(availableReports) {
+const selectionList = document.getElementById('report-selection-list');
+if (!availableReports || availableReports.length === 0) {
+selectionList.innerHTML = '<p class="text-muted">No reports available for download.</p>';
+return;
+}
+let html = '';
+availableReports.forEach((report, index) => {
+html += `
+<div class="report-selection-item">
+<div class="form-check">
+<input class="form-check-input report-selection-checkbox" type="checkbox"
+id="modal-report-${index}" value="${report.id}" checked>
+<label class="form-check-label" for="modal-report-${index}">
+<strong>${report.type}</strong><br>
+<small class="text-muted">${report.description}</small>
+</label>
+</div>
+</div>
+`;
+});
+selectionList.innerHTML = html;
+setupSelectionModalEvents();
+}
+
+function setupSelectionModalEvents() {
+const selectAllBtn = document.getElementById('select-all-reports-modal');
+const deselectAllBtn = document.getElementById('deselect-all-reports-modal');
+const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
+selectAllBtn.replaceWith(selectAllBtn.cloneNode(true));
+deselectAllBtn.replaceWith(deselectAllBtn.cloneNode(true));
+generatePdfBtn.replaceWith(generatePdfBtn.cloneNode(true));
+const freshSelectAllBtn = document.getElementById('select-all-reports-modal');
+const freshDeselectAllBtn = document.getElementById('deselect-all-reports-modal');
+const freshGeneratePdfBtn = document.getElementById('generate-pdf-from-modal');
+freshSelectAllBtn.addEventListener('click', () => {
+document.querySelectorAll('.report-selection-checkbox').forEach(checkbox => {
+checkbox.checked = true;
+});
+});
+freshDeselectAllBtn.addEventListener('click', () => {
+document.querySelectorAll('.report-selection-checkbox').forEach(checkbox => {
+checkbox.checked = false;
+});
+});
+freshGeneratePdfBtn.addEventListener('click', generatePdfFromSelections);
+}
+
+async function generatePdfFromSelections() {
+  const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
+  const checkboxes = document.querySelectorAll('.report-selection-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one report to include in the PDF.');
+    return;
+  }
+  const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
+
+  try {
+    toggleLoading(generatePdfBtn, true, 'Generating PDF...');
+    const response = await fetch(`${API_BASE}/api/export-pdf`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    analysis_id: analysisId,
+    selected_reports: selectedReportIds
+  }),
+  credentials: "include"
+});
+
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to generate PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Epistemiq_AI_Report.pdf';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById('reportSelectionModal'));
+    modal.hide();
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert(`Error generating PDF: ${error.message}`);
+  } finally {
+    toggleLoading(generatePdfBtn, false);
+  }
+}
+
+
+// Modal close functionality
+const researchReportModal = document.getElementById('researchReportModal');
+const closeButtons = researchReportModal.querySelectorAll('.custom-close-btn');
+const overlay = document.getElementById('custom-modal-overlay');
+closeButtons.forEach(btn => {
+btn.addEventListener('click', () => {
+researchReportModal.style.display = 'none';
+document.body.classList.remove('body-no-scroll');
+});
+});
+overlay.addEventListener('click', () => {
+researchReportModal.style.display = 'none';
+document.body.classList.remove('body-no-scroll');
+});
+document.addEventListener('keydown', (e) => {
+if (e.key === 'Escape' && researchReportModal.style.display === 'block') {
+researchReportModal.style.display = 'none';
+document.body.classList.remove('body-no-scroll');
+}
+});
+
+// Event Listeners
+inputMethodSelect.addEventListener('change', (event) => {
+const method = inputMethodSelect.value;
+[pasteInputGroup, urlInputGroup, imageInputGroup, videoInputGroup, videoUrlInputGroup]
+.forEach(el => el.classList.add('d-none'));
+const groupMap = {
+'paste': pasteInputGroup,
+'url': urlInputGroup,
+'image': imageInputGroup,
+'video': videoInputGroup,
+'video-url': videoUrlInputGroup
+};
+if(groupMap[method]) groupMap[method].classList.remove('d-none');
+});
+
+setupFileUploadDragAndDrop(imageUploadArea, imageInput, handleImageSelect);
+setupFileUploadDragAndDrop(videoUploadArea, videoInput, handleVideoSelect);
+processImageBtn.addEventListener('click', processImage);
+processVideoBtn.addEventListener('click', processVideo);
+transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
+
+fetchArticleBtn.addEventListener('click', async () => {
+  let url = urlInput.value.trim();
+  if (!url) {
+    alert('Please enter a valid URL.');
+    return;
+  }
+
+  if (!url.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+    alert('Invalid URL format. Please use http:// or https://.');
+    return;
+  }
+
+  toggleLoading(fetchArticleBtn, true, 'Fetching...');
+
+  try {
+    const response = await fetch(`/api/fetch-article`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch article.');
+    }
+
+    if (!data.content || typeof data.content !== 'string') {
+      alert('No readable content extracted. Try paste manually.');
+      return;
+    }
+
+    // ✅ Convert HTML → plain text (keeps paragraphs)
+    const cleaned = (function stripHtml(html) {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const paragraphs = doc.body.querySelectorAll("p, br");
+      if (paragraphs.length) {
+        return Array.from(paragraphs)
+          .map(el => (el.tagName === "BR" ? "\n" : el.textContent || ""))
+          .join("\n")
+          .trim();
+      }
+      return (doc.body.textContent || "").trim();
+    })(data.content);
+
+    // ✅ Insert into textarea
+    textInput.value = cleaned;
+
+    // ✅ Switch UI to paste mode
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+
+    alert('Article text has been fetched and pasted.');
+
+  } catch (error) {
+    console.error('Fetch error:', error);
+    alert(`Error fetching article: ${error.message}`);
+  } finally {
+    toggleLoading(fetchArticleBtn, false);
+  }
+});
+
+  
+analysisForm.addEventListener('submit', async (e) => {
+e.preventDefault();
+const articleText = textInput.value.trim();
+if (!articleText) {
+alert('Article text is empty. Please paste content or use one of the input methods.');
+return;
+}
+toggleLoading(runAnalysisBtn, true, 'Analyzing...');
+resultsContainer.innerHTML = '';
+generatedReports = [];
+try {
+const response = await fetch(`${API_BASE}/api/analyze`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+text: articleText,
+mode: promptModeSelect.value,
+usePapers: usePapersToggle.checked
+}),
+});
+const data = await response.json();
+analysisId = data.analysis_id;   
+if (!response.ok) {
+const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
+throw new Error(errorMessage);
+}
+if (data.claims.length === 0) {
+resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
+toggleLoading(runAnalysisBtn, false);
+return;
+}
+displayClaimsStructure(data.claims);
+} catch (error) {
+resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
+toggleLoading(runAnalysisBtn, false);
+}
+});
+
+downloadPdfBtn.addEventListener('click', openReportSelectionModal);
+
+resultsContainer.addEventListener('click', async (e) => {
+const targetBtn = e.target.closest('.generate-report-btn');
+if (targetBtn) {
+const { claimIdx, questionIdx, reportContainerId } = targetBtn.dataset;
+generateReport(parseInt(claimIdx), parseInt(questionIdx), reportContainerId, targetBtn);
+}
+});
+});
+
+if ('serviceWorker' in navigator) {
+window.addEventListener('load', () => {
+navigator.serviceWorker.register('/static/service-worker.js')
+.then(registration => {
+console.log('Service Worker registered:', registration);
+})
+.catch(error => {
+console.error('Service Worker registration failed:', error);
+});
+});
+}
+
+// ===== Chrome AI Local Pre-Processing (Final) =====
+document.addEventListener("DOMContentLoaded", () => {
+  const textInput = document.getElementById("textInput");
+  const chromeBtnContainer = document.getElementById("chrome-ai-text");
+  const chromeInfo = document.getElementById("chrome-ai-info");
+
+  // --- Detect real Chrome built-in AI APIs ---
+  const hasChromeAI =
+    (typeof self !== "undefined" && "Summarizer" in self) ||
+    (window.ai && typeof window.ai.prompt === "function");
+
+  if (!hasChromeAI) {
+    console.info("ℹ️ Chrome AI not detected. Using backend only.");
+    return;
+  }
+
+  console.info("✅ Chrome AI detected — local summarization enabled.");
+  alert("Chrome AI available — local mode active!");
+
+  // --- Show the yellow info banner ---
+  if (chromeInfo) {
+    chromeInfo.classList.remove("d-none");
+  }
+
+  const chromeModeDiv = document.getElementById("chrome-ai-mode");
+if (chromeModeDiv) chromeModeDiv.classList.remove("d-none");
+
+const chromeMode = document.getElementById("chromeMode");
+
+  
+  // --- Create always-visible button ---
+  chromeBtnContainer.classList.remove("d-none");
+  chromeBtnContainer.innerHTML = "";
+  // Show mode toggle inside the card
+  document.getElementById("chrome-ai-mode")?.classList.remove("d-none");
+
+
+  const btn = document.createElement("button");
+  btn.className = "btn btn-warning w-100 fw-semibold";
+  btn.textContent = "🧠 Summarize / Translate with Gemini Nano";
+  chromeBtnContainer.appendChild(btn);
+
+  function showOverlay(state) {
+    overlay.style.display = state ? "flex" : "none";
+  }
+
+
+  async function aiPromptNano(text) {
+  // 1) Summarizer API
+  if ("Summarizer" in self) {
+    try {
+      const summarizer = await Summarizer.create({
+        outputLanguage: "en",
+        type: "key-points",
+        format: "markdown",
+        length: "medium"
+      });
+      return await summarizer.summarize(text);
+    } catch (err) {
+      console.warn("Summarizer API failed → fallback", err);
+    }
+  }
+
+  // 2) Legacy window.ai
+  if (window.ai && typeof window.ai.prompt === "function") {
+    try {
+      const r = await window.ai.prompt(text);
+      return r?.output ?? r?.text ?? String(r ?? "");
+    } catch (err) {
+      console.warn("window.ai.prompt failed → fallback", err);
+    }
+  }
+
+  console.warn("❌ No local AI available");
+  throw new Error("No local AI available");
+}
+
+async function summarizeIfLong(text, limit = 5000) {
+  const mode = chromeMode?.value || "accurate";
+
+  // FAST MODE — single shot, no chunking
+  if (mode === "fast") {
+    console.log("⚡ FAST mode: single-shot Nano");
+    return await aiPromptNano(text);
+  }
+
+  // BALANCED — try single pass first, fallback to chunk
+  if (mode === "balanced") {
+    console.log("⚖️ BALANCED mode: trying single shot");
+    try {
+      return await aiPromptNano(text);
+    } catch (err) {
+      console.warn("Single-shot failed, chunking…", err);
+      // fall through to accurate logic below
+    }
+  }
+
+  // 🎯 ACCURATE MODE (default) — always chunk + combine
+  if (text.length <= limit) return await aiPromptNano(text);
+
+  console.log("📦 Chunking in Accurate mode");
+
+  const parts = [];
+  for (let i = 0; i < text.length; i += limit) {
+    parts.push(text.slice(i, i + limit));
+  }
+
+  const results = [];
+  for (const part of parts) {
+    try {
+      results.push(await aiPromptNano(`Summarize clearly:\n\n${part}`));
+    } catch (err) {
+      console.warn("Chunk failed:", err);
+    }
+  }
+
+  return await aiPromptNano(
+    `Condense the following text into a clean English summary for scientific analysis:\n\n${results.join("\n\n")}`
+  );
+}
+
+
+// --- Language detect & translate ---
+async function detectLang(text) {
+  const out = await aiPromptNano(
+    `Return only ISO2 code for language:\n${text.slice(0, 600)}`
+  );
+  return out.trim().toLowerCase().slice(0, 2) || "en";
+}
+
+async function translateIfNeeded(text) {
+  const lang = await detectLang(text);
+  if (lang === "en") return text;
+  return await aiPromptNano(`Translate to English only:\n${text}`);
+}
+
+ 
+  btn.addEventListener("click", async () => {
+  let text = textInput.value.trim();
+  if (!text) return alert("No text present — paste/extract/fetch first.");
+
+  btn.disabled = true;
+  textInput.classList.add("textarea-dim");     // ← dim/blur ON
+
+  const original = btn.textContent;
+  btn.innerHTML = `⏳ <span class="ai-pulse"></span> Local processing…`;
+
+  try {
+    text = await summarizeIfLong(text);
+    text = await translateIfNeeded(text);
+    textInput.value = text.trim();
+    btn.innerHTML = "✅ Ready (Chrome AI)";
+  } catch (err) {
+    console.error("Chrome AI error:", err);
+    btn.innerHTML = "⚠️ Local AI failed — retry";
+  } finally {
+    textInput.classList.remove("textarea-dim"); // ← dim/blur OFF
+    setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 600);
+  }
+});
+});
+  
+</script>
+</body>
+</html>
