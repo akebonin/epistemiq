@@ -987,31 +987,29 @@ async function transcribeWithChromeAI(audioBlob) {
 // If fetch isn't globally bound (Safari/ESM edge case)
 if (!globalThis.fetch) globalThis.fetch = fetch;
 
-// ✅ WASM Whisper fallback — correct Xenova config for browser
 async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("🎧 Loading Whisper (Transformers.js ESM)...");
+  console.log("🎧 Loading Whisper (Transformers.js WASM)…");
 
   if (!window.__tf) throw new Error("Transformers not initialized yet");
 
-  // ✅ Correct WASM env for Xenova in browser
-  window.__tf_env = {
+  // ✅ Set WASM env BEFORE pipeline load
+  globalThis.env = {
     BACKEND: "onnx",
     WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/"
   };
 
-  // ✅ Load once and cache pipeline
   if (!window.__tf_asr) {
-    console.log("⏳ Initializing Whisper model...");
+    console.log("⏳ Initializing Whisper pipeline...");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en"  // <-- proper ID, no resolve/main, no double URL
+      "Xenova/whisper-tiny.en" // ✅ DO NOT PUT HF URL HERE
     );
-    console.log("✅ Whisper ready");
+    console.log("✅ Whisper model ready");
   }
 
-  console.log("⏳ Transcribing...");
+  console.log("🎤 Running WASM inference...");
   const { text } = await window.__tf_asr(audioBlob, {
-    chunk_length_s: 20,
+    chunk_length_s: 30,
     stride_length_s: 5
   });
 
