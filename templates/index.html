@@ -31,7 +31,36 @@
     gtag('config', 'G-H5SNSXX9K0');  
   </script>
 
-<script src="https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js"></script>
+<!-- ✅ CONFIGURE Transformers before loading -->
+<script>
+  window.TRANSFORMERS_CONFIG = {
+    wasmPath: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/",
+    useBrowserCache: true,
+  };
+</script>
+
+<!-- ✅ Load UMD + defer execution until ready -->
+<script 
+  src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js"
+  defer
+></script>
+
+<script>
+  // ✅ Guarantee WASM engine is available before your handlers run
+  window.addEventListener("load", async () => {
+    if (!window.transformers) {
+      console.error("❌ Transformers library failed to load");
+      return;
+    }
+    try {
+      await window.transformers.ready();
+      console.log("✅ Transformers.js ready");
+    } catch (err) {
+      console.error("❌ WASM init error", err);
+    }
+  });
+</script>
+
   
   <!-- ✅ Iubenda Cookie Solution -->
   <script type="text/javascript">
