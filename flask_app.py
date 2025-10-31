@@ -1237,59 +1237,146 @@ def extract_article():
         logging.error(f"Error in extract_article endpoint: {e}")
         return jsonify({"error": f"Failed to fetch article: {str(e)}"}), 400
 
+# --- /api/analyze : deterministic per-text caching without breaking the rest ---
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
-    """API endpoint to extract claims ONLY with normalized storage."""
-    data = request.json
-    text = data.get("text")
-    mode = data.get("mode")
+    """
+    Hash -> check cache -> return cached claims+analysis_id
+    Miss -> call OpenRouter -> save claims -> store cache -> return
+    """
+    data = request.json or {}
+    text = (data.get("text") or "").strip()
+    mode = data.get("mode") or "General Analysis of Testable Claims"
+    # Frontend may send a precomputed hash; we still compute server-side as fallback
+    text_hash = data.get("text_hash")
 
+    if not text:
+        return jsonify({"error": "No text"}), 400
 
-    if not text or not mode:
-        return jsonify({"error": "Missing text or analysis mode."}), 400
+    # Fallback compute hash server-side
+    try:
+        if not text_hash:
+            text_hash = sha256_str(text)
+    except Exception as e:
+        return jsonify({"error": f"Hashing failed: {e}"}), 400
 
-    # Create new analysis
-    analysis_id = new_analysis_id()
     conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
     c = conn.cursor()
-    c.execute("INSERT INTO analyses (analysis_id, mode) VALUES (?, ?)", (analysis_id, mode))
-    conn.commit()
-    conn.close()
 
-    extraction_prompt = extraction_templates[mode].format(text=text)
+    # Lightweight, migration-free cache table (auto-creates if missing).
+    # It *only* maps text_hash -> (claims_json, analysis_id).
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS text_claims_cache (
+            text_hash   TEXT PRIMARY KEY,
+            claims_json TEXT,
+            analysis_id TEXT,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
+    # 1) Check strong cache by text_hash first
+    c.execute("SELECT claims_json, analysis_id FROM text_claims_cache WHERE text_hash=?", (text_hash,))
+    row = c.fetchone()
+    if row and row[0]:
+        try:
+            import json as _json
+            cached_claims = _json.loads(row[0])
+        except Exception:
+            cached_claims = []
+
+        if cached_claims:
+            # Return exactly the analysis_id we stored when we first ran the LLM
+            cached_analysis_id = row[1] or new_analysis_id()
+            conn.close()
+            return jsonify({
+                "analysis_id": cached_analysis_id,
+                "claims": [{"ordinal": i, "text": s} for i, s in enumerate(cached_claims)],
+                "cached": True
+            })
+
+    # 2) Legacy soft-hint: if text exists in pasted_texts but we never populated the strong cache,
+    #    we *could* reuse old logic. If that table exists, this is harmless; if not, it’s skipped.
     try:
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pasted_texts'")
+        if c.fetchone():
+            c.execute("SELECT 1 FROM pasted_texts WHERE text_hash=?", (text_hash,))
+            if c.fetchone():
+                # No reliable way to map to the *correct* analysis without schema,
+                # so we deliberately avoid the old 'last_accessed' lottery.
+                pass
+    except Exception:
+        pass
+
+    # 3) MISS -> call LLM to extract claims
+    try:
+        extraction_prompt = extraction_templates.get(
+            mode, extraction_templates["General Analysis of Testable Claims"]
+        ).format(text=text)
+
         res = call_openrouter(extraction_prompt)
-        raw_claims = res.json()["choices"][0]["message"]["content"]
+        res.raise_for_status()
+        raw = res.json()["choices"][0]["message"]["content"]
 
-        if "No explicit claims found" in raw_claims or not raw_claims.strip():
-            return jsonify({"claims": []})
+        # Your existing parsing util
+        claims = parse_claims_from_response(raw) or []
 
-        claims_list = []
-        for line in raw_claims.splitlines():
-            stripped_line = line.strip()
-            if stripped_line and stripped_line[0].isdigit():
-                content_start = 0
-                while content_start < len(stripped_line) and (stripped_line[content_start].isdigit() or stripped_line[content_start] in ['.', ' ']):
-                    content_start += 1
-                if content_start < len(stripped_line):
-                    claims_list.append(stripped_line[content_start:].strip())
-            elif stripped_line:
-                claims_list.append(stripped_line)
+        if not claims:
+            # Store negative cache? (Optional: skip to allow future retries)
+            conn.close()
+            return jsonify({"claims": [], "analysis_id": new_analysis_id()})
 
-        claims_list = [c for c in claims_list if len(c) > 10 and not c.lower().startswith(("output:", "text:", "no explicit claims found"))]
+        # 4) Persist original text (legacy table; ignore if missing)
+        try:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS pasted_texts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    text_hash TEXT UNIQUE,
+                    text_content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            c.execute("INSERT OR IGNORE INTO pasted_texts (text_hash, text_content) VALUES (?, ?)", (text_hash, text))
+        except Exception:
+            # Non-fatal
+            pass
 
-        # Save claims to database
-        save_claims_for_analysis(analysis_id, claims_list)
+        # 5) Create analysis + save claims (your existing helpers)
+        analysis_id = new_analysis_id()
+        c.execute("INSERT INTO analyses (analysis_id, mode) VALUES (?, ?)", (analysis_id, mode))
+        save_claims_for_analysis(analysis_id, claims)
+
+        # 6) Update strong cache for this text
+        import json as _json
+        c.execute("""
+            INSERT INTO text_claims_cache (text_hash, claims_json, analysis_id, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(text_hash) DO UPDATE SET
+                claims_json=excluded.claims_json,
+                analysis_id=excluded.analysis_id,
+                updated_at=CURRENT_TIMESTAMP
+        """, (text_hash, _json.dumps(claims), analysis_id))
+
+        conn.commit()
+        conn.close()
 
         return jsonify({
-            "claims": claims_list,
-            "analysis_id": analysis_id
+            "analysis_id": analysis_id,
+            "claims": [{"ordinal": i, "text": s} for i, s in enumerate(claims)],
+            "cached": False
         })
 
+    except requests.HTTPError as http_err:
+        # Surface OpenRouter 429 clearly
+        try:
+            payload = res.json()
+        except Exception:
+            payload = {"error": str(http_err)}
+        conn.close()
+        return jsonify({"error": f"API Error {res.status_code}: {payload}"}), res.status_code
     except Exception as e:
-        logging.error(f"Failed to extract claims: {e}")
-        return jsonify({"error": f"Failed to extract claims: {str(e)}"}), 500
+        conn.close()
+        return jsonify({"error": f"Failed to extract claims: {e}"}), 500
+
 
 @app.route("/api/get-claim-details", methods=["POST"])
 def get_claim_details():
