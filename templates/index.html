@@ -1114,29 +1114,47 @@ async function processVideo() {
   
 async function transcribeVideoUrl() {
   const url = videoUrlInput.value.trim();
-  if (!url) return alert("Enter URL");
+  if (!url) return alert("Enter a video URL");
 
-  toggleLoading(transcribeVideoUrlBtn, true, "Processing video...");
+  // ✅ YouTube ID test
+  const ytMatch = url.match(/(?:youtu\.be\/|v=)([\w-]+)/);
+  if (!ytMatch) {
+    alert("URL transcription not available for YouTube on free tier. Please upload the video instead.");
+    return;
+  }
+
+  const videoId = ytMatch[1];
+  toggleLoading(transcribeVideoUrlBtn, true, "Fetching captions...");
 
   try {
-    const res = await fetch(`${API_BASE}/api/extract-audio-url`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ video_url: url })
-    });
+    // ✅ Try to fetch YouTube captions (English)
+    const captionsUrl =
+      `https://cors.isomorphic-git.org/https://video.google.com/timedtext?lang=en&v=${videoId}`;
 
-    if (!res.ok) throw new Error(await res.text());
-    
-    const wavBlob = await res.blob();
-    const text = await transcribeWithTransformersWASM(wavBlob);
+    const resp = await fetch(captionsUrl);
 
-    textInput.value = text;
-    inputMethodSelect.value = "paste";
-    inputMethodSelect.dispatchEvent(new Event("change"));
+    if (resp.ok) {
+      const xml = await resp.text();
+      const text = xml
+        .replace(/<[^>]+>/g, " ") // strip XML tags
+        .replace(/\s+/g, " ")
+        .trim();
 
-    alert("✅ Video URL transcribed!");
+      if (text.length > 10) {
+        textInput.value = text;
+        inputMethodSelect.value = "paste";
+        inputMethodSelect.dispatchEvent(new Event("change"));
+        alert("✅ Captions imported");
+        return;
+      }
+    }
+
+    // ❌ No captions? Fall back to audio extraction prompt
+    alert("Only retrieving captions available on free tier. No captions found. Upload the video instead.");
+
   } catch (e) {
-    alert(`Error: ${e.message}`);
+    console.error(e);
+    alert("Only retrieving captions available on free tier. No captions found. Upload the video instead.");
   } finally {
     toggleLoading(transcribeVideoUrlBtn, false);
   }
