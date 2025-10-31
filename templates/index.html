@@ -1042,7 +1042,8 @@ async function transcribeWithTransformersWASM(audioBlob) {
 }
 
   
-// ✅ Main video handler (fixed)
+
+// ✅ Main video handler with Chrome AI first + Whisper fallback
 async function processVideo() {
   const file = document.getElementById('videoInput').files[0];
   if (!file) return;
@@ -1054,7 +1055,7 @@ async function processVideo() {
   formData.append('file', file);
 
   try {
-    // 1. Extract audio → get 16kHz WAV blob
+    // 1️⃣ Extract audio as 16 kHz WAV
     const response = await fetch(`${API_BASE}/api/extract-audio`, {
       method: 'POST',
       body: formData
@@ -1068,11 +1069,34 @@ async function processVideo() {
     const audioBlob = await response.blob();
     if (audioBlob.size === 0) throw new Error("Empty audio file");
 
-    // 2. Transcribe locally
-    toggleLoading(btn, true, 'Transcribing locally...');
-    const transcript = await transcribeWithTransformersWASM(audioBlob);
+    // 2️⃣ Try Chrome AI transcription first
+    let transcript = "";
+    const chromeAvailable = window.ai && typeof window.ai.prompt === "function";
 
-    // 3. Success
+    if (chromeAvailable) {
+      console.log("🎤 Using Chrome Built-in AI for transcription...");
+      toggleLoading(btn, true, 'Transcribing with Chrome AI...');
+
+      try {
+        transcript = await transcribeWithChromeAI(audioBlob);
+        console.log("✅ Chrome AI transcription success");
+      } catch (err) {
+        console.warn("⚠️ Chrome AI failed, falling back to Whisper:", err);
+      }
+    } else {
+      console.warn("❌ Chrome AI not available — using Whisper");
+    }
+
+    // 3️⃣ Whisper fallback if Chrome AI unavailable or failed
+    if (!transcript) {
+      console.log("🤖 Running Whisper WASM fallback");
+      toggleLoading(btn, true, 'Transcribing locally...');
+      transcript = await transcribeWithTransformersWASM(audioBlob);
+    }
+
+    if (!transcript.trim()) throw new Error("No transcript produced");
+
+    // 4️⃣ Populate UI
     document.getElementById('textInput').value = transcript;
     inputMethodSelect.value = 'paste';
     inputMethodSelect.dispatchEvent(new Event('change'));
@@ -1081,11 +1105,12 @@ async function processVideo() {
 
   } catch (err) {
     console.error("Transcription failed:", err);
-    alert('Error: ' + err.message);
+    alert('Error: ' + (err.message || err));
   } finally {
     toggleLoading(btn, false);
   }
 }
+
   
 async function transcribeVideoUrl() {
   const url = videoUrlInput.value.trim();
