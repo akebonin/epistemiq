@@ -1034,9 +1034,12 @@ async function processVideo() {
   formData.append('file', file);
 
   try {
-    // Step 1: Get WAV from backend
-    const response = await fetch('/api/extract-audio', {
-      method: 'POST',
+    // Extract audio via backend
+    const formData = new FormData();
+    formData.append("file", currentVideoFile);
+
+    const res = await fetch(`${API_BASE}/api/extract-audio`, {
+      method: "POST",
       body: formData
     });
 
