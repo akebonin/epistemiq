@@ -718,6 +718,64 @@ let currentImageFile = null;
 let currentVideoFile = null;
 
 
+function b64ToBlob(b64, mime) {
+    const byteChars = atob(b64);
+    const byteNums = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNums);
+    return new Blob([byteArray], { type: mime });
+}
+
+async function fallbackTranscription(audioBlob) {
+    console.log("⚙️ Using WASM/Cloud fallback transcription");
+
+    toggleLoading(processVideoBtn, true, 'Transcribing...');
+
+    // WASM whisper fallback first (if you have it)
+    if (typeof transcribeWithWhisperWASM === "function") {
+        try {
+            const transcript = await transcribeWithWhisperWASM(audioBlob);
+            textInput.value = transcript;
+            inputMethodSelect.value = 'paste';
+            inputMethodSelect.dispatchEvent(new Event('change'));
+            alert("✅ Transcribed with Whisper WASM");
+            return;
+        } catch (err) {
+            console.warn("WASM Whisper failed:", err);
+        }
+    }
+
+    // then OpenAI API fallback
+    if (window.OPENAI_API_KEY) {
+        try {
+            const form = new FormData();
+            form.append("file", audioBlob, "audio.wav");
+            form.append("model", "whisper-1");
+
+            const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${window.OPENAI_API_KEY}` },
+                body: form
+            });
+
+            const json = await response.json();
+            const transcript = json.text || "";
+
+            textInput.value = transcript;
+            inputMethodSelect.value = 'paste';
+            inputMethodSelect.dispatchEvent(new Event('change'));
+            alert("✅ Transcribed with OpenAI Whisper API");
+            return;
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    alert("❌ No transcription method available.");
+}
+
+
+
 // Track all reports that the user generated (from cache or new) in this session
 const reportSessionMap = new Map();
 
@@ -939,33 +997,90 @@ toggleLoading(processImageBtn, false);
 }
 
 async function processVideo() {
-if (!currentVideoFile) {
-alert('Please select a video first');
-return;
-}
-toggleLoading(processVideoBtn, true, 'Processing video...');
-const formData = new FormData();
-formData.append('video', currentVideoFile);
-try {
-const response = await fetch(`${API_BASE}/api/process-video`, {
-method: 'POST',
-body: formData
-});
-const data = await response.json();
-if (!response.ok) {
-throw new Error(data.error || 'Failed to process video');
-}
-textInput.value = data.transcription;
-inputMethodSelect.value = 'paste';
-inputMethodSelect.dispatchEvent(new Event('change'));
-alert(`Video processing note: ${data.note}`);
-} catch (error) {
-alert(`Error processing video: ${error.message}`);
-} finally {
-toggleLoading(processVideoBtn, false);
-}
+    if (!currentVideoFile) {
+        alert('Please select a video first.');
+        return;
+    }
+
+    toggleLoading(processVideoBtn, true, 'Extracting audio...');
+
+    try {
+        // STEP 1 — send video to backend to get WAV audio
+        const formData = new FormData();
+        formData.append('file', currentVideoFile);
+
+        const response = await fetch(`${API_BASE}/api/extract-audio`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.audio_base64) {
+            throw new Error(data.error || 'Failed to extract audio');
+        }
+
+        console.log("✅ Audio received from backend");
+
+        // Convert base64 → blob
+        const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
+
+        // STEP 2 — CHROME AI PATH
+        const hasChromeAI =
+            (typeof self !== "undefined" && "Summarizer" in self) ||
+            (window.ai && typeof window.ai.prompt === "function");
+
+        if (hasChromeAI) {
+            console.log("🔥 Chrome AI detected — transcribing audio locally");
+
+            toggleLoading(processVideoBtn, true, 'Chrome AI transcribing...');
+
+            const reader = new FileReader();
+            reader.onload = async function () {
+                try {
+                    const audioArrayBuffer = reader.result;
+                    const aiInput = {
+                        messages: [
+                            { role: "user", content: [
+                                { type: "input_audio", data: audioArrayBuffer },
+                                { type: "text", text: "Transcribe the audio clearly into English text." }
+                            ]}
+                        ]
+                    };
+
+                    const aiResponse = await window.ai.prompt(aiInput);
+                    const transcript = aiResponse?.output_text || aiResponse || "";
+
+                    if (!transcript.trim()) throw new Error("Chrome AI returned no transcript");
+
+                    textInput.value = transcript;
+                    inputMethodSelect.value = 'paste';
+                    inputMethodSelect.dispatchEvent(new Event('change'));
+
+                    alert("✅ Video transcribed with Chrome AI");
+                } catch (err) {
+                    console.error("Chrome AI failed, going to fallback:", err);
+                    await fallbackTranscription(audioBlob);
+                } finally {
+                    toggleLoading(processVideoBtn, false);
+                }
+            };
+
+            reader.readAsArrayBuffer(audioBlob);
+            return;
+        }
+
+        // STEP 3 — FALLBACK PATHS
+        await fallbackTranscription(audioBlob);
+
+    } catch (e) {
+        console.error(e);
+        alert(`Error: ${e.message}`);
+    } finally {
+        toggleLoading(processVideoBtn, false);
+    }
 }
 
+  
 async function transcribeVideoUrl() {
 const videoUrl = videoUrlInput.value.trim();
 if (!videoUrl) {
