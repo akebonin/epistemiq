@@ -22,10 +22,13 @@ import base64
 from PIL import Image
 import pytesseract
 from moviepy.editor import VideoFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 import yt_dlp
 import unicodedata
 import hashlib
 from flask_cors import CORS, cross_origin
+import tempfile
+import subprocess
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1553,6 +1556,82 @@ def process_video():
     except Exception as e:
         logging.error(f"Error in process_video endpoint: {e}")
         return jsonify({"error": f"Failed to process video: {str(e)}"}), 500
+
+
+MAX_VIDEO_SIZE_MB = 50
+
+@app.route("/api/extract-audio", methods=["POST"])
+def extract_audio():
+    if 'file' not in request.files:
+        return "No file", 400
+
+    file = request.files['file']
+    input_path = f"/tmp/input_{uuid.uuid4().hex}"
+    output_path = f"/tmp/output_{uuid.uuid4().hex}.wav"
+    file.save(input_path)
+
+    # ✅ Force 16 kHz mono WAV with SOXR
+    cmd = [
+        "ffmpeg",
+        "-y",                     # overwrite
+        "-i", input_path,         # input video
+        "-vn",                    # strip video
+        "-ac", "1",               # mono
+        "-ar", "16000",           # 16kHz request
+        "-af", "aresample=resampler=soxr",  # ✅ force high-quality resample
+        "-c:a", "pcm_s16le",      # signed 16-bit PCM
+        "-f", "wav",              # WAV file
+        output_path
+    ]
+
+    try:
+        print("FFMPEG CMD:", " ".join(cmd))
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+        # ✅ Verify sample rate
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a:0",
+                "-show_entries", "stream=sample_rate",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                output_path
+            ],
+            capture_output=True, text=True
+        )
+
+        sample_rate = probe.stdout.strip()
+        print("✔️ Extracted audio sample rate:", sample_rate)
+
+        if sample_rate != "16000":
+            print("❌ Unexpected sample rate, forcing failure")
+            return f"Error: output audio is {sample_rate} Hz, expected 16000 Hz", 500
+
+        # ✅ Return raw WAV bytes to frontend
+        with open(output_path, "rb") as f:
+            wav_data = f.read()
+
+        return Response(
+            wav_data,
+            mimetype="audio/wav",
+            headers={"Content-Disposition": "attachment; filename=audio.wav"}
+        )
+
+    except subprocess.CalledProcessError as e:
+        print("FFmpeg stderr:", e.stderr)
+        return f"FFmpeg error: {e.stderr}", 500
+    except Exception as e:
+        print("Server error:", str(e))
+        return f"Error: {str(e)}", 500
+    finally:
+        # ✅ Always clean temp files
+        for p in [input_path, output_path]:
+            try:
+                if os.path.exists(p):
+                    os.unlink(p)
+            except:
+                pass
+
 
 @app.route("/api/transcribe-video-url", methods=["POST"])
 def transcribe_video_url():
