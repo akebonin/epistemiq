@@ -1040,13 +1040,17 @@ async function processVideo() {
       body: formData
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(err || 'Failed to extract audio');
-    }
+   if (!response.ok) {
+  const text = await response.text();
+  throw new Error(text || 'Failed to extract audio');
+}
 
-    const audioBlob = await response.blob();
-    if (audioBlob.size === 0) throw new Error("Empty audio file received");
+// CORRECT: Get as blob, not json
+const audioBlob = await response.blob();
+
+if (audioBlob.size === 0) {
+  throw new Error("Received empty audio file");
+}
 
     // Step 2: Decode WAV robustly
     const arrayBuffer = await audioBlob.arrayBuffer();
