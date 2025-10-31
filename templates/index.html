@@ -997,30 +997,51 @@ async function transcribeWithTransformersWASM(audioBlob) {
   }
 
   const arrayBuffer = await audioBlob.arrayBuffer();
-  const audioContext = new AudioContext();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-  if (audioBuffer.sampleRate !== 16000) {
-    throw new Error(`Got ${audioBuffer.sampleRate}Hz — ffmpeg failed`);
-  }
-
-  const channelData = audioBuffer.getChannelData(0);
-  const maxAmp = Math.max(...channelData.map(Math.abs));
-  if (maxAmp < 1e-4) throw new Error("Silent audio");
-
-  console.log(`Transcribing ${audioBuffer.duration.toFixed(1)}s...`);
-
-  const output = await window.__tf_asr(channelData, {
-    chunk_length_s: 30,
-    stride_length_s: 5,
-    language: "en"
+  // ✅ Force AudioContext to NOT upsample
+  // Safari/Chrome will default to 48k, so we override
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+    sampleRate: 16000
   });
 
-  const text = output.text?.trim();
-  if (!text) throw new Error("Empty transcript");
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-  return text;
+  // ✅ Manually downsample to 16k buffer Whisper expects
+  const input = audioBuffer.getChannelData(0);
+  const sr = audioBuffer.sampleRate;
+
+  if (sr !== 16000) {
+    console.warn(`Browser decoded at ${sr}Hz, resampling to 16k...`);
+
+    const ratio = sr / 16000;
+    const resampled = new Float32Array(Math.round(input.length / ratio));
+
+    for (let i = 0; i < resampled.length; i++) {
+      resampled[i] = input[Math.round(i * ratio)] || 0;
+    }
+
+    return runWhisper(resampled);
+  }
+
+  return runWhisper(input);
+
+  async function runWhisper(float32Audio) {
+    console.log("Transcribing via Whisper WASM…");
+
+    const output = await window.__tf_asr(float32Audio, {
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      language: "en"
+    });
+
+    const text = output.text?.trim();
+    if (!text) throw new Error("Empty transcript");
+
+    return text;
+  }
 }
+
+  
 // ✅ Main video handler (fixed)
 async function processVideo() {
   const file = document.getElementById('videoInput').files[0];
