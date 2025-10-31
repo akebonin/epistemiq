@@ -32,41 +32,27 @@
   </script>
 
 
-  <!-- ✅ Transformers WASM config -->
+ <!-- Transformers.js (ESM) global config -->
 <script>
-  window.TRANSFORMERS_CONFIG = {
-    wasmPath: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/",
-    useBrowserCache: true,
-  };
+  // Configure WASM asset path BEFORE importing the module
+  window.__TRANSFORMERS_WASM__ = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/";
 </script>
 
-<!-- ✅ FORCE UMD non-module build -->
-<script
-  type="text/javascript"
-  src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.js"
-  crossorigin="anonymous"
-></script>
+<!-- Load ESM and expose to window -->
+<script type="module">
+  import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0";
 
-<script>
-  (async () => {
-    if (!window.transformers) {
-      console.error("❌ Transformers library failed to load — retrying...");
-      await new Promise(r => setTimeout(r, 500));
-    }
+  // Point ONNX runtime to CDN WASM files
+  env.backends.onnx.wasm.wasmPaths = window.__TRANSFORMERS_WASM__;
+  // Caching & remote models
+  env.allowLocalModels = false;
+  env.useBrowserCache = true;
 
-    if (!window.transformers) {
-      console.error("❌ Transformers still not available. Check CDN or CSP.");
-      return;
-    }
-
-    try {
-      await window.transformers.ready();
-      console.log("✅ Transformers.js ready");
-    } catch (err) {
-      console.error("❌ WASM init error:", err);
-    }
-  })();
+  // Expose to the rest of your (non-module) code
+  window.__tf = { pipeline, env, ready: async () => {} };
+  console.log("✅ Transformers ESM loaded");
 </script>
+
 
 
   
@@ -770,34 +756,29 @@ function b64ToBlob(b64, mime) {
 }
 
 async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("🎧 Loading Whisper (Transformers.js)...");
-
-  // ensure library loaded
-  if (typeof transformers === "undefined") {
-    throw new Error("Transformers.js not loaded");
+  console.log("🎧 Loading Whisper (Transformers.js ESM)...");
+  if (!window.__tf || !window.__tf.pipeline) {
+    throw new Error("Transformers ESM not loaded");
   }
 
-  await transformers.ready();
+  // Build the pipeline once and cache it on window to avoid re-loading
+  if (!window.__tf_asr) {
+    window.__tf_asr = await window.__tf.pipeline(
+      "automatic-speech-recognition",
+      "Xenova/whisper-tiny.en"
+    );
+    console.log("✅ Whisper pipeline ready");
+  }
 
-  const pipe = await transformers.pipeline(
-    "automatic-speech-recognition",
-    "Xenova/whisper-tiny.en"
-  );
-
-  const result = await pipe(audioBlob, {
+  const { text } = await window.__tf_asr(audioBlob, {
     chunk_length_s: 30,
     stride_length_s: 5,
   });
 
-  if (!result || !result.text) {
-    throw new Error("WASM returned no transcript");
-  }
-
-  return result.text.trim();
+  if (!text || !text.trim()) throw new Error("WASM returned empty transcript.");
+  return text.trim();
 }
-
   
-
 // Track all reports that the user generated (from cache or new) in this session
 const reportSessionMap = new Map();
 
