@@ -988,59 +988,39 @@ async function transcribeWithChromeAI(audioBlob) {
 if (!globalThis.fetch) globalThis.fetch = fetch;
 
 async function transcribeWithTransformersWASM(audioBlob) {
-  console.log("Loading Whisper (Transformers.js)…");
-
-  if (!window.__tf) throw new Error("Transformers not initialized");
-
-  // WASM paths (good!)
-  window.__tf.env.backends.onnx.wasm.paths = {
-    'ort-wasm.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm.wasm',
-    'ort-wasm-simd.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm-simd.wasm',
-    'ort-wasm-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm-threaded.wasm',
-    'ort-wasm-simd-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort-wasm-simd-threaded.wasm'
-  };
-
-  // Init once
   if (!window.__tf_asr) {
-    console.log("Initializing Whisper tiny model…");
+    console.log("Initializing Whisper...");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
       "Xenova/whisper-tiny.en"
     );
-    console.log("Whisper pipeline ready");
   }
 
-  // STEP 1: Decode Blob → AudioBuffer
   const arrayBuffer = await audioBlob.arrayBuffer();
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const audioContext = new AudioContext();
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-if (audioBuffer.sampleRate !== 16000) {
-  throw new Error(`Got ${audioBuffer.sampleRate}Hz, expected 16000. Fix backend.`);
-}
+  if (audioBuffer.sampleRate !== 16000) {
+    throw new Error(`Got ${audioBuffer.sampleRate}Hz — ffmpeg failed`);
+  }
 
-const channelData = audioBuffer.getChannelData(0);
-
-  // STEP 4: Check for silence
+  const channelData = audioBuffer.getChannelData(0);
   const maxAmp = Math.max(...channelData.map(Math.abs));
-  if (maxAmp < 1e-4) throw new Error("Audio is silent");
+  if (maxAmp < 1e-4) throw new Error("Silent audio");
 
-  console.log(`Transcribing: ${audioBuffer.duration.toFixed(1)}s, ${channelData.length} samples`);
+  console.log(`Transcribing ${audioBuffer.duration.toFixed(1)}s...`);
 
-  // STEP 5: Run WASM (correct input!)
-  const result = await window.__tf_asr(channelData, {
+  const output = await window.__tf_asr(channelData, {
     chunk_length_s: 30,
     stride_length_s: 5,
-    language: "en",
-    task: "transcribe"
+    language: "en"
   });
 
-  const text = result.text?.trim();
-  if (!text) throw new Error("Empty transcript from Whisper");
+  const text = output.text?.trim();
+  if (!text) throw new Error("Empty transcript");
 
   return text;
 }
-
 // ✅ Main video handler (fixed)
 async function processVideo() {
   const file = document.getElementById('videoInput').files[0];
@@ -1053,21 +1033,21 @@ async function processVideo() {
   formData.append('file', file);
 
   try {
-    // 1. Get WAV blob from backend
-    const response = await fetch(`${API_BASE}/api/extract-audio`, {
+    // 1. Extract audio → get 16kHz WAV blob
+    const response = await fetch('/api/extract-audio', {
       method: 'POST',
       body: formData
     });
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(err);
+      throw new Error(err || 'Audio extraction failed');
     }
 
     const audioBlob = await response.blob();
-    if (audioBlob.size === 0) throw new Error("Empty audio");
+    if (audioBlob.size === 0) throw new Error("Empty audio file");
 
-    // 2. Transcribe with WASM
+    // 2. Transcribe locally
     toggleLoading(btn, true, 'Transcribing locally...');
     const transcript = await transcribeWithTransformersWASM(audioBlob);
 
@@ -1079,7 +1059,7 @@ async function processVideo() {
     alert('Transcription complete!');
 
   } catch (err) {
-    console.error(err);
+    console.error("Transcription failed:", err);
     alert('Error: ' + err.message);
   } finally {
     toggleLoading(btn, false);
