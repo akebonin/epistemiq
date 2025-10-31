@@ -1034,22 +1034,19 @@ async function processVideo() {
   formData.append('file', file);
 
   try {
-    // Extract audio via backend
-    const formData = new FormData();
-    formData.append("file", currentVideoFile);
-
-    const res = await fetch(`${API_BASE}/api/extract-audio`, {
-      method: "POST",
+    // Step 1: Get WAV from backend
+    const response = await fetch(`${API_BASE}/api/extract-audio`, {
+      method: 'POST',
       body: formData
     });
 
-    const data = await res.json();
-    if (!res.ok || !data.audio_base64) {
-      throw new Error(data.error || "Failed to extract audio");
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || 'Failed to extract audio');
     }
 
-    console.log("✅ Audio received from backend");
-    const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
+    const audioBlob = await response.blob();
+    if (audioBlob.size === 0) throw new Error("Empty audio file received");
 
     // Step 2: Decode WAV robustly
     const arrayBuffer = await audioBlob.arrayBuffer();
