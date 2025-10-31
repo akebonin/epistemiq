@@ -1044,7 +1044,6 @@ toggleLoading(processImageBtn, false);
 }
 }
 
-<script>
 // ✅ Chrome AI transcription helper
 async function transcribeWithChromeAI(audioBlob) {
   const hasPrompt = !!(window.ai && typeof window.ai.prompt === "function");
@@ -1148,7 +1147,6 @@ async function processVideo() {
     toggleLoading(processVideoBtn, false);
   }
 }
-</script>
 
   
 async function transcribeVideoUrl() {
