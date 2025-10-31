@@ -1700,7 +1700,7 @@ try {
 const response = await fetch(`${API_BASE}/api/analyze`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-credentials: "include"  
+credentials: "include",  
 body: JSON.stringify({
 text: articleText,
 mode: promptModeSelect.value,
