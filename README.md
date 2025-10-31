@@ -40,7 +40,6 @@ Epistemiq reduces sensitive data exposure by:
 | Text → extract claims & verify | OpenRouter LLM (cached) + Chrome AI (optional) |
 | Summarize before analyzing     | `window.ai.prompt()` → Gemini Nano             |
 | Local speech-to-text           | Whisper WASM                                   |
-| YouTube transcription          | yt-dlp + ffmpeg → local Whisper                |
 | PDF reports                    | Browser-generated                              |
 | Caching across sessions        | SQLite + text hashing                          |
 
