@@ -734,23 +734,31 @@ function b64ToBlob(b64, mime) {
 
 async function transcribeWithTransformersWASM(audioBlob) {
   console.log("🎧 Loading Whisper (Transformers.js)...");
-  // Ensure backend is ready (downloads model weights on first run)
-  await window.transformers.ready();
 
-  // Choose a light model for speed; upgrade later if needed
-  const pipeline = await window.transformers.pipeline(
+  // ensure library loaded
+  if (typeof transformers === "undefined") {
+    throw new Error("Transformers.js not loaded");
+  }
+
+  await transformers.ready();
+
+  const pipe = await transformers.pipeline(
     "automatic-speech-recognition",
-    "Xenova/whisper-tiny.en"     // change to "whisper-small" later if needed
+    "Xenova/whisper-tiny.en"
   );
 
-  const { text } = await pipeline(audioBlob, {
-    chunk_length_s: 30,          // safe default for longer clips
+  const result = await pipe(audioBlob, {
+    chunk_length_s: 30,
     stride_length_s: 5,
   });
 
-  if (!text || !text.trim()) throw new Error("WASM returned empty transcript");
-  return text.trim();
+  if (!result || !result.text) {
+    throw new Error("WASM returned no transcript");
+  }
+
+  return result.text.trim();
 }
+
   
 async function transcribeWithWhisperWASM(audioBlob) {
     console.log("🎧 Loading Whisper WASM...");
