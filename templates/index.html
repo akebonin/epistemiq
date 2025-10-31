@@ -726,6 +726,28 @@ function b64ToBlob(b64, mime) {
     return new Blob([byteArray], { type: mime });
 }
 
+async function transcribeWithWhisperWASM(audioBlob) {
+    console.log("🎧 Loading Whisper WASM...");
+
+    const whisper = await WhisperWeb.default();
+
+    console.log("✅ Whisper WASM loaded, starting transcription...");
+
+    const audioBuffer = await audioBlob.arrayBuffer();
+
+    const result = await whisper.transcribe(audioBuffer, {
+        language: "en",
+        beam_size: 5,
+        vad: true
+    });
+
+    if (!result?.text) throw new Error("No transcript returned");
+
+    console.log("✅ Whisper WASM transcription complete");
+    return result.text.trim();
+}
+
+  
 async function fallbackTranscription(audioBlob) {
     console.log("⚙️ Using WASM/Cloud fallback transcription");
 
