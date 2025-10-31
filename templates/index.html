@@ -998,20 +998,22 @@ async function transcribeWithChromeAI(audioBlob) {
   return text.trim();
 }
 
-// ✅ WASM Whisper fallback – ESM version
 async function transcribeWithTransformersWASM(audioBlob) {
   console.log("🎧 Loading Whisper (Transformers.js ESM)...");
 
-  if (!window.__tf || !window.__tf.pipeline) {
-    throw new Error("Transformers not initialized yet");
-  }
+  if (!window.__tf) throw new Error("Transformers not initialized yet");
 
-  // Lazy load pipeline once
+  // Configure WASM path
+  window.__tf_env = {
+    BACKEND: "onnx",
+    WASM_URL_PREFIX: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/wasm/"
+  };
+
   if (!window.__tf_asr) {
     console.log("⏳ Initializing Whisper pipeline...");
     window.__tf_asr = await window.__tf.pipeline(
       "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en"
+      "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/model.json"
     );
     console.log("✅ Whisper model ready");
   }
@@ -1019,7 +1021,7 @@ async function transcribeWithTransformersWASM(audioBlob) {
   console.log("⏳ Running WASM inference...");
   const { text } = await window.__tf_asr(audioBlob, {
     chunk_length_s: 30,
-    stride_length_s: 5
+    stride_length_s: 5,
   });
 
   if (!text?.trim()) throw new Error("WASM returned empty transcript");
