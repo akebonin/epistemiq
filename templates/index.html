@@ -1015,18 +1015,11 @@ async function transcribeWithTransformersWASM(audioBlob) {
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-  if (!audioBuffer || audioBuffer.duration === 0) {
-    throw new Error("No audio in file");
-  }
+if (audioBuffer.sampleRate !== 16000) {
+  throw new Error(`Got ${audioBuffer.sampleRate}Hz, expected 16000. Fix backend.`);
+}
 
-  // STEP 2: Validate sample rate
-  if (audioBuffer.sampleRate !== 16000) {
-    console.warn(`Resampling from ${audioBuffer.sampleRate} → 16000 Hz`);
-    // Optional: resample if needed (but backend should already do 16kHz)
-  }
-
-  // STEP 3: Extract Float32Array (mono)
-  const channelData = audioBuffer.getChannelData(0);
+const channelData = audioBuffer.getChannelData(0);
 
   // STEP 4: Check for silence
   const maxAmp = Math.max(...channelData.map(Math.abs));
