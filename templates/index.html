@@ -1024,66 +1024,92 @@ async function transcribeWithTransformersWASM(audioBlob) {
 
 // ✅ Main video handler (fixed)
 async function processVideo() {
-  if (!currentVideoFile) {
-    alert("Please select a video first.");
-    return;
-  }
+  const file = document.getElementById('videoInput').files[0];
+  if (!file) return;
 
-  toggleLoading(processVideoBtn, true, "Extracting audio...");
+  const btn = document.getElementById('process-video-btn');
+  toggleLoading(btn, true, 'Extracting audio...');
+
+  const formData = new FormData();
+  formData.append('file', file);
 
   try {
-    // Extract audio via backend
-    const formData = new FormData();
-    formData.append("file", currentVideoFile);
-
-    const res = await fetch(`${API_BASE}/api/extract-audio`, {
-      method: "POST",
+    // Step 1: Get WAV from backend
+    const response = await fetch('/api/extract-audio', {
+      method: 'POST',
       body: formData
     });
 
-    const data = await res.json();
-    if (!res.ok || !data.audio_base64) {
-      throw new Error(data.error || "Failed to extract audio");
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || 'Failed to extract audio');
     }
 
-    console.log("✅ Audio received from backend");
-    const audioBlob = b64ToBlob(data.audio_base64, "audio/wav");
+    const audioBlob = await response.blob();
+    if (audioBlob.size === 0) throw new Error("Empty audio file received");
 
-    // ✅ Chrome AI path
-    const hasPromptAPI = !!(window.ai && typeof window.ai.prompt === "function");
-    if (hasPromptAPI) {
-      try {
-        toggleLoading(processVideoBtn, true, "Chrome AI transcribing...");
-        const transcript = await transcribeWithChromeAI(audioBlob);
+    // Step 2: Decode WAV robustly
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-        textInput.value = transcript;
-        inputMethodSelect.value = "paste";
-        inputMethodSelect.dispatchEvent(new Event("change"));
-        alert("✅ Video transcribed with Chrome AI");
-        return;
-      } catch (err) {
-        console.warn("⚠️ Chrome AI failed, falling back:", err);
-      }
+    let audioBuffer;
+    try {
+      audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    } catch (decodeErr) {
+      console.error("decodeAudioData failed:", decodeErr);
+      throw new Error("Invalid or corrupted WAV file from server");
     }
 
-    // ✅ WASM fallback
-    console.log("⚙️ Using WASM fallback transcription");
-    toggleLoading(processVideoBtn, true, "Transcribing (WASM)...");
-    const transcript = await transcribeWithTransformersWASM(audioBlob);
+    // Step 3: Validate audio has content
+    if (!audioBuffer || audioBuffer.duration === 0) {
+      throw new Error("No audio track found");
+    }
 
-    textInput.value = transcript;
-    inputMethodSelect.value = "paste";
-    inputMethodSelect.dispatchEvent(new Event("change"));
-    alert("✅ Video transcribed (WASM)");
-    
-  } catch (e) {
-    console.error(e);
-    alert(`Error: ${e.message}`);
+    const channelData = audioBuffer.getChannelData(0);
+    const maxAmplitude = Math.max(...Array.from(channelData).map(Math.abs));
+    if (maxAmplitude < 1e-5) {
+      throw new Error("Audio is completely silent");
+    }
+
+    console.log(`Audio loaded: ${audioBuffer.sampleRate}Hz, ${audioBuffer.duration}s`);
+
+    // Step 4: Run Whisper WASM
+    toggleLoading(btn, true, 'Transcribing (WASM)...');
+
+    if (!window.__tf) {
+      throw new Error("Transformers.js not loaded");
+    }
+
+    const pipeline = await window.__tf.pipeline(
+      'automatic-speech-recognition',
+      'openai/whisper-tiny'
+    );
+
+    const result = await pipeline(channelData, {
+      language: 'en',
+      task: 'transcribe',
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      return_timestamps: true
+    });
+
+    const transcript = result.text?.trim();
+    if (!transcript) throw new Error("Empty transcript from Whisper");
+
+    // Step 5: Success
+    document.getElementById('textInput').value = transcript;
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+
+    alert(`Transcription complete: "${transcript.slice(0, 50)}..."`);
+
+  } catch (err) {
+    console.error("Transcription error:", err);
+    alert("Transcription failed: " + err.message);
   } finally {
-    toggleLoading(processVideoBtn, false);
+    toggleLoading(btn, false);
   }
 }
-
   
 async function transcribeVideoUrl() {
 const videoUrl = videoUrlInput.value.trim();
