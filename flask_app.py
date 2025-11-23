@@ -27,14 +27,17 @@ import yt_dlp
 import unicodedata
 import hashlib
 from flask_cors import CORS, cross_origin
-import tempfile
 import subprocess
+from auth_module import auth_bp, get_current_user, require_user
+
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables
-load_dotenv(dotenv_path="/home/epistemiq/mysite/.env")
+load_dotenv(dotenv_path="/home/scicheckagent/mysite/.env")
 
 
 app = Flask(__name__)
@@ -43,11 +46,14 @@ if not app.secret_key:
     app.secret_key = os.urandom(24)
     logging.warning("FLASK_SECRET_KEY not set. Using a random key for development.")
 
-CORS(app, resources={r"/*": {"origins": "https://epistemiq.vercel.app"}}, supports_credentials=True)
+app.register_blueprint(auth_bp)
 
-# Utility functions
-def sha256_str(s: str) -> str:
-    return hashlib.sha256((s or "").encode("utf-8")).hexdigest()
+CORS(app, supports_credentials=True, origins=["https://sckgnt.vercel.app"])
+
+
+# ==============================================================
+#  Utility functions
+# ==============================================================
 
 def json_dumps(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
@@ -61,22 +67,133 @@ def json_loads(s: str, fallback):
 def new_analysis_id() -> str:
     return str(uuid.uuid4())
 
-# Database setup for normalized storage
+
+# ==============================================================
+#  Concurrency-safe DB helpers
+# ==============================================================
+
+DB_PATH = "/home/scicheckagent/mysite/sessions.db"
+
+def get_conn():
+    """Open SQLite connection with WAL mode and busy timeout."""
+    conn = sqlite3.connect(DB_PATH, timeout=10, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = sqlite3.Row
+
+    # Hardening for concurrency
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=10000;")  # 10 seconds
+
+    return conn
+
+
+def with_retry_db(fn):
+    """Retry decorator to handle 'database is locked' errors."""
+    def wrapper(*args, **kwargs):
+        attempts = 0
+        while True:
+            try:
+                return fn(*args, **kwargs)
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempts < 5:
+                    attempts += 1
+                    time.sleep(0.2 * attempts)
+                else:
+                    raise
+    return wrapper
+
+
+# ==============================================================
+#  Initialization: NEW AUTH TABLES + Extended analyses table
+# ==============================================================
+
 def init_db():
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+    conn = get_conn()
     c = conn.cursor()
 
-    # Workspace pointer only
+    # -------------------------------
+    # USERS TABLE (passwordless login)
+    # -------------------------------
     c.execute("""
-    CREATE TABLE IF NOT EXISTS analyses (
-        analysis_id TEXT PRIMARY KEY,
-        mode TEXT,
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        last_login TIMESTAMP
     )
     """)
 
-    # Pasted text cache
+    # -------------------------------
+    # MAGIC LINKS (email tokens)
+    # -------------------------------
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS magic_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+
+    # -------------------------------
+    # SESSIONS (persistent login)
+    # -------------------------------
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_token TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        user_agent TEXT,
+        ip_hash TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
+
+    # -------------------------------
+    # ANALYSES (EXTENDED)
+    # -------------------------------
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS analyses (
+        analysis_id TEXT PRIMARY KEY,
+        user_id INTEGER,
+        text_hash TEXT,
+        canonical_text TEXT,
+        mode TEXT,
+        source_type TEXT,
+        source_meta TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    # ✅ NEW: Prevent Duplicate Analyses (Race Condition Fix)
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_analyses_hash_mode ON analyses(text_hash, mode)")
+
+    # -------------------------------
+    # USER ↔ ANALYSES mapping
+    # -------------------------------
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS user_analyses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        analysis_id TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (analysis_id) REFERENCES analyses(analysis_id)
+    )
+    """)
+    # ✅ NEW: Prevent Duplicate User Links
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_analyses_unique ON user_analyses(user_id, analysis_id)")
+
+    # -------------------------------
+    # PASTED TEXT CACHE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS pasted_texts (
         text_hash TEXT PRIMARY KEY,
@@ -85,7 +202,9 @@ def init_db():
     )
     """)
 
-    # Article cache (URL -> text)
+    # -------------------------------
+    # ARTICLE CACHE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS article_cache (
         url_hash TEXT PRIMARY KEY,
@@ -99,7 +218,9 @@ def init_db():
     """)
     c.execute("CREATE INDEX IF NOT EXISTS idx_article_cache_url ON article_cache(url)")
 
-    # Media cache
+    # -------------------------------
+    # MEDIA CACHE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS media_cache (
         file_hash TEXT PRIMARY KEY,
@@ -109,7 +230,9 @@ def init_db():
     )
     """)
 
-    # Claims per analysis
+    # -------------------------------
+    # CLAIMS TABLE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS claims (
         claim_id TEXT PRIMARY KEY,
@@ -124,7 +247,9 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_claims_analysis ON claims(analysis_id, ordinal)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_claims_hash ON claims(claim_hash)")
 
-    # Model verdict + questions + keywords (by claim_hash)
+    # -------------------------------
+    # MODEL CACHE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS model_cache (
         claim_hash TEXT PRIMARY KEY,
@@ -134,8 +259,11 @@ def init_db():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_model_cache_hash ON model_cache(claim_hash)")
 
-    # External verdict + sources (by claim_hash)
+    # -------------------------------
+    # EXTERNAL CACHE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS external_cache (
         claim_hash TEXT PRIMARY KEY,
@@ -144,8 +272,11 @@ def init_db():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_external_cache_hash ON external_cache(claim_hash)")
 
-    # Report cache (claim+question -> report text)
+    # -------------------------------
+    # REPORT CACHE
+    # -------------------------------
     c.execute("""
     CREATE TABLE IF NOT EXISTS report_cache (
         rq_hash TEXT PRIMARY KEY,
@@ -154,54 +285,104 @@ def init_db():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_report_cache_rq ON report_cache(rq_hash)")
 
     conn.commit()
     conn.close()
 
+
+# ==============================================================
+#           CACHE + CLAIM HELPERS (UPDATED)
+# ==============================================================
+
+def sha256_str(s: str):
+    return hashlib.sha256(s.encode('utf-8')).hexdigest()
+
+def canonicalize_text(text: str) -> str:
+    """
+    Normalize text so that trivial differences (newlines, spacing)
+    do not create different hashes. This keeps raw vs Chrome-cleaned
+    versions aligned when the content is effectively the same.
+    """
+    if not text:
+        return ""
+
+    # Normalize line endings
+    txt = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Collapse all runs of whitespace (spaces, tabs, newlines) to single spaces
+    txt = " ".join(txt.split())
+
+    # Trim edges
+    txt = txt.strip()
+
+    return txt
+
+
+def text_hash(text: str) -> str:
+    """
+    Hash for full-input texts (pasted, OCR, article, transcription).
+    Always use canonicalized text so Chrome AI preprocessing doesn't
+    cause duplicate analyses.
+    """
+    canon = canonicalize_text(text)
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()
+
+@with_retry_db
 def save_claims_for_analysis(analysis_id: str, claims_list: list):
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+    conn = get_conn()
     c = conn.cursor()
+
     c.execute("DELETE FROM claims WHERE analysis_id=?", (analysis_id,))
 
     for idx, claim_text in enumerate(claims_list):
-        claim_hash = sha256_str(claim_text.strip().lower())
-        claim_id = sha256_str(f"{analysis_id}|{idx}|{claim_text.strip()}")
+        claim_text_clean = claim_text.strip()
+        claim_hash = sha256_str(claim_text_clean.lower())
+        claim_id = sha256_str(f"{analysis_id}|{idx}|{claim_text_clean}")
+
         c.execute("""
         INSERT OR REPLACE INTO claims (claim_id, analysis_id, ordinal, claim_text, claim_hash)
         VALUES (?, ?, ?, ?, ?)
-        """, (claim_id, analysis_id, idx, claim_text.strip(), claim_hash))
+        """, (claim_id, analysis_id, idx, claim_text_clean, claim_hash))
 
     conn.commit()
     conn.close()
 
+
 def get_claims_for_analysis(analysis_id: str):
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+    conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal", (analysis_id,))
     rows = c.fetchall()
     conn.close()
     return [row[0] for row in rows]
 
+
+# ==============================================================
+#               MEDIA CACHE HELPERS
+# ==============================================================
+
 def compute_file_hash(file_path):
-    """Compute SHA256 hash of a file"""
+    """Compute SHA256 hash of a file."""
     hash_sha256 = hashlib.sha256()
     with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_sha256.update(chunk)
     return hash_sha256.hexdigest()
 
+
 def get_cached_media(file_hash):
-    """Get cached media extraction result"""
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+    conn = get_conn()
     c = conn.cursor()
     c.execute('SELECT extracted_text FROM media_cache WHERE file_hash = ?', (file_hash,))
     result = c.fetchone()
     conn.close()
     return result[0] if result else None
 
+
+@with_retry_db
 def store_media_cache(file_hash, media_type, extracted_text):
-    """Store media extraction result in cache"""
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+    conn = get_conn()
     c = conn.cursor()
     c.execute("""
     INSERT OR REPLACE INTO media_cache (file_hash, media_type, extracted_text)
@@ -210,51 +391,56 @@ def store_media_cache(file_hash, media_type, extracted_text):
     conn.commit()
     conn.close()
 
+
+# ==============================================================
+#                       CLEANUP
+# ==============================================================
+
+@with_retry_db
 def cleanup_old_cache():
-    """Clean up old cache entries to prevent database bloat"""
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+    """Clean up old cache entries to prevent database bloat."""
+    conn = get_conn()
     c = conn.cursor()
+
     try:
-        # Clean up media cache older than 30 days
-        c.execute('DELETE FROM media_cache WHERE created_at < ?',
-                 (datetime.now() - timedelta(days=30),))
+        # 30-day media
+        c.execute('DELETE FROM media_cache WHERE created_at < ?', (datetime.now() - timedelta(days=30),))
         media_deleted = c.rowcount
 
-        # Clean up analyses older than 7 days
-        c.execute('DELETE FROM analyses WHERE last_accessed < ?',
-                 (datetime.now() - timedelta(days=7),))
+        # 7-day analyses
+        c.execute('DELETE FROM analyses WHERE last_accessed < ?', (datetime.now() - timedelta(days=7),))
         analyses_deleted = c.rowcount
 
-        # Clean up pasted_texts older than 30 days
-        c.execute('DELETE FROM pasted_texts WHERE created_at < ?',
-                 (datetime.now() - timedelta(days=30),))
+        # pasted texts
+        c.execute('DELETE FROM pasted_texts WHERE created_at < ?', (datetime.now() - timedelta(days=30),))
         texts_deleted = c.rowcount
 
-        # Clean up article_cache older than 30 days
-        c.execute('DELETE FROM article_cache WHERE fetched_at < ?',
-                 (datetime.now() - timedelta(days=30),))
+        # article cache
+        c.execute('DELETE FROM article_cache WHERE fetched_at < ?', (datetime.now() - timedelta(days=30),))
         articles_deleted = c.rowcount
 
-        # Clean up model_cache older than 30 days
-        c.execute('DELETE FROM model_cache WHERE updated_at < ?',
-                 (datetime.now() - timedelta(days=30),))
+        # model cache
+        c.execute('DELETE FROM model_cache WHERE updated_at < ?', (datetime.now() - timedelta(days=30),))
         model_deleted = c.rowcount
 
-        # Clean up external_cache older than 30 days
-        c.execute('DELETE FROM external_cache WHERE updated_at < ?',
-                 (datetime.now() - timedelta(days=30),))
+        # external cache
+        c.execute('DELETE FROM external_cache WHERE updated_at < ?', (datetime.now() - timedelta(days=30),))
         external_deleted = c.rowcount
 
-        # Clean up report_cache older than 30 days
-        c.execute('DELETE FROM report_cache WHERE updated_at < ?',
-                 (datetime.now() - timedelta(days=30),))
+        # report cache
+        c.execute('DELETE FROM report_cache WHERE updated_at < ?', (datetime.now() - timedelta(days=30),))
         report_deleted = c.rowcount
 
         conn.commit()
-        logging.info(f"Cache cleanup completed: {media_deleted} media, {analyses_deleted} analyses, {texts_deleted} texts, {articles_deleted} articles, {model_deleted} model, {external_deleted} external, {report_deleted} reports removed")
+        logging.info(
+            f"Cache cleanup: {media_deleted} media, {analyses_deleted} analyses, "
+            f"{texts_deleted} texts, {articles_deleted} articles, "
+            f"{model_deleted} model, {external_deleted} external, {report_deleted} reports removed"
+        )
 
-        # Optional: Run VACUUM if significant space was freed
-        if (media_deleted + analyses_deleted + texts_deleted + articles_deleted + model_deleted + external_deleted + report_deleted) > 50:
+        if (media_deleted + analyses_deleted + texts_deleted +
+                articles_deleted + model_deleted + external_deleted +
+                report_deleted) > 50:
             c.execute('VACUUM')
             logging.info("Database vacuum performed")
 
@@ -265,17 +451,17 @@ def cleanup_old_cache():
     finally:
         conn.close()
 
-# Initialize database on startup
+
+# ==============================================================
+#                    INIT ON STARTUP
+# ==============================================================
+
 init_db()
+
 
 # API Configuration
 OR_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-WHISPER_API_KEY = os.getenv("WHISPER_API_KEY")
-
-if not WHISPER_API_KEY:
-    logging.error("WHISPER_API_KEY not set.")
-    raise ValueError("WHISPER_API_KEY is not set in environment variables.")
 
 # Base prompt templates
 BASE_EXTRACTION_RULES = '''
@@ -360,6 +546,8 @@ Claim: "{{claim}}"
 }
 
 # Helper functions
+
+
 def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False):
     """Calls the OpenRouter API, supports streaming and JSON mode."""
     if not OPENROUTER_API_KEY:
@@ -371,7 +559,7 @@ def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False):
     }
 
     payload = {
-        "model": "google/gemini-2.0-flash-exp:free",
+        "model": "mistralai/mistral-nemo:free",
         "messages": [{"role": "user", "content": prompt}],
         "stream": stream,
         "temperature": temperature
@@ -389,65 +577,6 @@ def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False):
         if hasattr(e, 'response') and e.response is not None:
             raise Exception(f"API Error {e.response.status_code}: {e.response.text}") from e
         raise Exception(f"Network or API connection error: {e}") from e
-
-def extract_article_from_url(url):
-    """Fetch and extract article content from a URL using direct requests and BeautifulSoup."""
-    try:
-        headers = {"User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com)"}
-        session = requests.Session()
-        logging.info(f"Fetching URL: {url}")
-        response = session.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Prioritize common article content selectors
-        content_selectors = [
-            'article',
-            '.article-body-commercial-selector',
-            'main',
-            '.article-content',
-            '.post-content',
-            '.entry-content',
-            'div[itemprop="articleBody"]',
-            'div[id*="content"]',
-            'div[class*="text"]'
-        ]
-
-        text = ""
-        for selector in content_selectors:
-            elements = soup.select(selector)
-            if elements:
-                current_text = ' '.join(elem.get_text(separator=' ', strip=True) for elem in elements)
-                if len(current_text) > 200:
-                    logging.info(f"BeautifulSoup extracted {len(current_text)} characters using selector: {selector}")
-                    return current_text
-                elif len(current_text) > len(text):
-                    text = current_text
-
-        # Fallback if specific selectors didn't yield much
-        if len(text) > 50:
-            return text
-
-        logging.info("Falling back to raw HTML body extraction if no specific content found.")
-        body = soup.find('body')
-        if body:
-            for elem in body(['script', 'style', 'nav', 'header', 'footer', 'aside', '.sidebar', '.comments', '#comments']):
-                elem.decompose()
-            raw_body_text = ' '.join(body.get_text(separator=' ', strip=True).split())
-            if len(raw_body_text) > 200:
-                return raw_body_text
-            elif len(raw_body_text) > 50:
-                return raw_body_text
-
-        logging.warning("BeautifulSoup extracted insufficient content from URL.")
-        return ""
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Network or HTTP error fetching URL {url}: {e}")
-        return ""
-    except Exception as e:
-        logging.error(f"General error extracting article from URL {url}: {e}")
-        return ""
 
 def generate_questions_for_claim(claim):
     """Generates up to 3 research questions for a claim."""
@@ -552,30 +681,6 @@ def fetch_crossref(keywords):
         return results
     except requests.exceptions.RequestException as e:
         logging.warning(f"CrossRef API call failed for query '{search_query}': {e}")
-        return []
-
-def fetch_core(keywords):
-    if not keywords:
-        return []
-
-    search_query = ' AND '.join([f'"{kw}"' if ' ' in kw else kw for kw in keywords])
-    url = f"https://core.ac.uk:443/api-v2/search/{quote_plus(search_query)}?page=1&pageSize=3&metadata=true"
-    headers = {"User-Agent": "EpistemiqFallback/1.0"}
-
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        results = []
-        if "data" in response.json():
-            for item in response.json()["data"]:
-                results.append({
-                    "title": item.get("title", "No title"),
-                    "abstract": item.get("description", "No abstract available"),
-                    "url": item.get("downloadUrl", item.get("urls", {}).get("fullText", ""))
-                })
-        return results
-    except requests.exceptions.RequestException as e:
-        logging.warning(f"CORE API call failed for query '{search_query}': {e}")
         return []
 
 def fetch_semantic_scholar(keywords, max_results=3):
@@ -685,153 +790,7 @@ def analyze_image_with_ocr(image_path):
         logging.error(f"OCR processing failed: {e}")
         return ""
 
-def transcribe_video(video_path, max_retries=5, retry_delay=5):
-    """Transcribe uploaded video using Whisper API"""
-    try:
-        WHISPER_API_KEY = os.getenv("WHISPER_API_KEY")
-        if not WHISPER_API_KEY:
-            raise ValueError("WHISPER_API_KEY is not set in environment variables.")
-
-        audio_path = video_path + ".mp3"
-        video_clip = VideoFileClip(video_path)
-        video_clip.audio.write_audiofile(audio_path)
-        video_clip.close()
-
-        with open(audio_path, "rb") as audio_file:
-            files = {"file": audio_file}
-            headers = {"X-API-Key": WHISPER_API_KEY}
-            data = {
-                "format": "text",
-                "language": "en",
-                "model_size": "base"
-            }
-
-            response = requests.post(
-                "https://api.whisper-api.com/transcribe",
-                files=files,
-                headers=headers,
-                data=data,
-                timeout=120
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("status") == "pending":
-                    task_id = result.get("task_id")
-                    if not task_id:
-                        raise ValueError("No task_id returned for pending transcription")
-                    return poll_transcription_status(task_id, WHISPER_API_KEY, max_retries, retry_delay)
-                transcription = result.get("result", "")
-                if not transcription:
-                    raise ValueError("No transcription returned from Whisper API")
-                return transcription
-            else:
-                raise ValueError(f"Whisper API error: {response.status_code} - {response.text}")
-
-    except requests.exceptions.RequestException as e:
-        raise ValueError(f"Network error: Failed to connect to transcription service")
-    except Exception as e:
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
-        raise ValueError(f"Failed to transcribe video: {str(e)}")
-    finally:
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
-
-def transcribe_from_url(video_url, max_retries=5, retry_delay=5):
-    """Transcribe video URL using Whisper API"""
-    try:
-        WHISPER_API_KEY = os.getenv("WHISPER_API_KEY")
-        if not WHISPER_API_KEY:
-            raise ValueError("WHISPER_API_KEY is not set in environment variables.")
-
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': '/tmp/%(id)s.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'quiet': True
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=True)
-            audio_path = ydl.prepare_filename(info).rsplit('.', 1)[0] + '.mp3'
-
-        with open(audio_path, "rb") as audio_file:
-            files = {"file": audio_file}
-            headers = {"X-API-Key": WHISPER_API_KEY}
-            data = {
-                "format": "text",
-                "language": "en",
-                "model_size": "base"
-            }
-
-            response = requests.post(
-                "https://api.whisper-api.com/transcribe",
-                files=files,
-                headers=headers,
-                data=data,
-                timeout=120
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("status") == "pending":
-                    task_id = result.get("task_id")
-                    if not task_id:
-                        raise ValueError("No task_id returned for pending transcription")
-                    return poll_transcription_status(task_id, WHISPER_API_KEY, max_retries, retry_delay)
-                transcription = result.get("result", "")
-                if not transcription:
-                    raise ValueError("No transcription returned from Whisper API")
-                return transcription
-            else:
-                raise ValueError(f"Whisper API error: {response.status_code} - {response.text}")
-
-    except requests.exceptions.RequestException as e:
-        raise ValueError(f"Network error: Failed to connect to transcription service")
-    except Exception as e:
-        if 'audio_path' in locals() and os.path.exists(audio_path):
-            os.remove(audio_path)
-        raise ValueError(f"Failed to transcribe video URL: {str(e)}")
-    finally:
-        if 'audio_path' in locals() and os.path.exists(audio_path):
-            os.remove(audio_path)
-
-def poll_transcription_status(task_id, api_key, max_retries, retry_delay):
-    """Poll for transcription status until completion or max retries"""
-    headers = {"X-API-Key": api_key}
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(
-                f"https://api.whisper-api.com/transcribe/{task_id}",
-                headers=headers,
-                timeout=30
-            )
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("status") == "completed":
-                    transcription = result.get("result", "")
-                    if transcription:
-                        return transcription
-                    else:
-                        raise ValueError("Transcription completed but no result returned")
-                elif result.get("status") == "processing":
-                    time.sleep(retry_delay)
-                else:
-                    raise ValueError(f"Transcription failed with status: {result.get('status')}")
-            else:
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-        except requests.exceptions.RequestException as e:
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-    raise ValueError("Transcription timed out after maximum retries")
-
-def save_uploaded_file(file, upload_folder="/home/epistemiq/mysite/uploads"):
+def save_uploaded_file(file, upload_folder="/home/scicheckagent/mysite/uploads"):
     """Save uploaded file and return path"""
     try:
         os.makedirs(upload_folder, exist_ok=True)
@@ -1191,6 +1150,11 @@ def create_table_from_data(table_data, available_width):
 
 # API Endpoints
 
+@app.route("/api/test", methods=["GET"])
+def api_test():
+    return jsonify({"message": "Hello from PythonAnywhere backend!"})
+
+
 @app.route("/")
 def home_redirect():
     return redirect(url_for('analyze_page'))
@@ -1222,74 +1186,408 @@ def share_target():
 
     return render_template('index.html', prefill_claim=prefill_content)
 
-@app.route("/api/extract-article", methods=["POST"])
-def extract_article():
-    url = request.json.get("url")
-    if not url:
-        return jsonify({"error": "URL is required."}), 400
-
-    try:
-        text = extract_article_from_url(url)
-        if not text:
-            return jsonify({"error": "Could not extract content from URL. Please ensure it's a valid public webpage or paste the text manually."}), 400
-        return jsonify({"article_text": text})
-    except Exception as e:
-        logging.error(f"Error in extract_article endpoint: {e}")
-        return jsonify({"error": f"Failed to fetch article: {str(e)}"}), 400
-
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
-    """API endpoint to extract claims ONLY with normalized storage."""
-    data = request.json
+    """
+    API endpoint to extract claims.
+    Includes RACE CONDITION FIX: Uses unique DB constraints and try/except
+    to safely handle double-clicks/duplicate requests.
+    """
+    data = request.json or {}
     text = data.get("text")
-    mode = data.get("mode")
-
+    mode = data.get("mode") or "General Analysis of Testable Claims"
 
     if not text or not mode:
         return jsonify({"error": "Missing text or analysis mode."}), 400
 
-    # Create new analysis
-    analysis_id = new_analysis_id()
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO analyses (analysis_id, mode) VALUES (?, ?)", (analysis_id, mode))
-    conn.commit()
-    conn.close()
+    # 1) Canonicalize text + compute stable hash
+    canonical = canonicalize_text(text)
+    if not canonical:
+        return jsonify({"error": "Text is empty after normalization."}), 400
 
-    extraction_prompt = extraction_templates[mode].format(text=text)
+    txt_hash = text_hash(text)
+
+    # Logged-in user?
+    user = get_current_user()
+    user_id = user["user_id"] if user else None
+
+    conn = get_conn()
+    analysis_id = None
+    cached = False
+
+    try:
+        c = conn.cursor()
+
+        # --------------------------------------------------
+        # 2) Try to Insert NEW Analysis (Optimistic Locking)
+        # --------------------------------------------------
+        new_id = new_analysis_id()
+
+        try:
+            c.execute(
+                """
+                INSERT INTO analyses (
+                    analysis_id, user_id, text_hash, canonical_text,
+                    mode, source_type, source_meta, created_at, last_accessed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                (new_id, user_id, txt_hash, canonical, mode, "pasted_text", None),
+            )
+            # Success - it's new
+            analysis_id = new_id
+            cached = False
+
+        except sqlite3.IntegrityError:
+            # --------------------------------------------------
+            # 3) Duplicate Detected (Race Condition caught)
+            # --------------------------------------------------
+            # Reuse existing analysis logic
+            c.execute(
+                "SELECT analysis_id FROM analyses WHERE text_hash = ? AND mode = ?",
+                (txt_hash, mode)
+            )
+            row = c.fetchone()
+            if row:
+                analysis_id = row["analysis_id"]
+                cached = True
+                # Bump timestamp
+                c.execute("UPDATE analyses SET last_accessed=CURRENT_TIMESTAMP WHERE analysis_id=?", (analysis_id,))
+            else:
+                conn.rollback()
+                return jsonify({"error": "Database integrity error."}), 500
+
+        # --------------------------------------------------
+        # 4) Link to User
+        # --------------------------------------------------
+        if user_id is not None:
+            c.execute(
+                """
+                INSERT OR IGNORE INTO user_analyses (user_id, analysis_id)
+                VALUES (?, ?)
+                """,
+                (user_id, analysis_id),
+            )
+
+        conn.commit()
+
+        # --------------------------------------------------
+        # 5) Return immediately if cached
+        # --------------------------------------------------
+        if cached:
+            cached_claims = get_claims_for_analysis(analysis_id)
+            if cached_claims:
+                return jsonify({
+                    "claims": cached_claims,
+                    "analysis_id": analysis_id,
+                    "cached": True
+                })
+
+    finally:
+        conn.close()
+
+    # ------------------------------------------------------
+    # 6) Run Extraction (OpenRouter) - Only if NOT cached
+    # ------------------------------------------------------
+    template = extraction_templates.get(
+        mode,
+        extraction_templates["General Analysis of Testable Claims"]
+    )
+    extraction_prompt = template.format(text=text)
 
     try:
         res = call_openrouter(extraction_prompt)
-        raw_claims = res.json()["choices"][0]["message"]["content"]
+        raw = res.json()["choices"][0]["message"]["content"]
 
-        if "No explicit claims found" in raw_claims or not raw_claims.strip():
-            return jsonify({"claims": []})
+        if "No explicit claims found" in raw or not raw.strip():
+            return jsonify({
+                "claims": [],
+                "analysis_id": analysis_id,
+                "cached": False
+            })
 
         claims_list = []
-        for line in raw_claims.splitlines():
-            stripped_line = line.strip()
-            if stripped_line and stripped_line[0].isdigit():
-                content_start = 0
-                while content_start < len(stripped_line) and (stripped_line[content_start].isdigit() or stripped_line[content_start] in ['.', ' ']):
-                    content_start += 1
-                if content_start < len(stripped_line):
-                    claims_list.append(stripped_line[content_start:].strip())
-            elif stripped_line:
-                claims_list.append(stripped_line)
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if not stripped: continue
+            if stripped[0].isdigit():
+                i = 0
+                while i < len(stripped) and (stripped[i].isdigit() or stripped[i] in (".", ")", " ")): i += 1
+                if i < len(stripped): claims_list.append(stripped[i:].strip())
+            else:
+                claims_list.append(stripped)
 
-        claims_list = [c for c in claims_list if len(c) > 10 and not c.lower().startswith(("output:", "text:", "no explicit claims found"))]
+        claims_list = [
+            c for c in claims_list
+            if len(c) > 10 and not c.lower().startswith(
+                ("output:", "text:", "no explicit claims found")
+            )
+        ]
 
-        # Save claims to database
         save_claims_for_analysis(analysis_id, claims_list)
 
         return jsonify({
             "claims": claims_list,
-            "analysis_id": analysis_id
+            "analysis_id": analysis_id,
+            "cached": False
         })
 
     except Exception as e:
         logging.error(f"Failed to extract claims: {e}")
         return jsonify({"error": f"Failed to extract claims: {str(e)}"}), 500
+
+
+@app.route("/api/my-analyses", methods=["GET"])
+@require_user
+def my_analyses(user):
+    """
+    Return the last N DISTINCT analyses for the logged-in user.
+    - Deduplicates multiple user_analyses rows for the same analysis_id.
+    - Adds a human-readable title derived from canonical_text.
+    - SORTS BY last_accessed (most recently opened/created first).
+    """
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT
+                a.analysis_id,
+                a.mode,
+                a.source_type,
+                a.canonical_text,
+                a.created_at,
+                a.last_accessed
+            FROM analyses a
+            JOIN user_analyses ua ON ua.analysis_id = a.analysis_id
+            WHERE ua.user_id = ?
+            GROUP BY a.analysis_id
+            ORDER BY a.last_accessed DESC
+            LIMIT 100
+            """,
+            (user["user_id"],),
+        )
+        rows = c.fetchall()
+    finally:
+        conn.close()
+
+    def _ts(val):
+        # Convert datetime objects to ISO strings if needed
+        if hasattr(val, "isoformat"):
+            return val.isoformat()
+        return val
+
+    def _title_from_row(r):
+        """
+        Derive a title from the analysed content (canonical_text).
+        Fallback to mode if content missing.
+        """
+        txt = ""
+        # Row is sqlite.Row, so use keys()
+        if "canonical_text" in r.keys():
+            txt = (r["canonical_text"] or "").strip()
+        if not txt:
+            return r["mode"] or "Untitled analysis"
+
+        # Take first non-empty line
+        first_line = txt.splitlines()[0].strip()
+        if len(first_line) > 120:
+            return first_line[:117] + "..."
+        return first_line
+
+    items = []
+    for r in rows:
+        items.append(
+            {
+                "analysis_id": r["analysis_id"],
+                "mode": r["mode"],
+                "source_type": r["source_type"],
+                "title": _title_from_row(r),
+                "created_at": _ts(r["created_at"]),
+                "last_accessed": _ts(r["last_accessed"]),
+            }
+        )
+
+    return jsonify(
+        {
+            "authenticated": True,
+            "email": user["email"],
+            "items": items,
+        }
+    )
+
+@app.route("/api/analysis-snapshot", methods=["GET"])
+@require_user
+def analysis_snapshot(user):
+    """
+    Return a read-only snapshot of an existing analysis for UI restore.
+    Uses ONLY cached data (no new model/external calls).
+    """
+    analysis_id = request.args.get("analysis_id")
+    if not analysis_id:
+        return jsonify({"error": "Missing analysis_id"}), 400
+
+    user_id = user["user_id"]
+
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+
+        # 1) Verify that this analysis belongs to the user (via mapping)
+        c.execute(
+            """
+            SELECT a.analysis_id,
+                   a.mode,
+                   a.canonical_text,
+                   a.created_at
+            FROM analyses a
+            JOIN user_analyses ua ON ua.analysis_id = a.analysis_id
+            WHERE ua.user_id = ? AND a.analysis_id = ?
+            """,
+            (user_id, analysis_id),
+        )
+        meta = c.fetchone()
+        if not meta:
+            return jsonify({"error": "Not found or not allowed"}), 404
+
+        # 2) Fetch all claims for this analysis
+        c.execute(
+            """
+            SELECT ordinal, claim_text
+            FROM claims
+            WHERE analysis_id = ?
+            ORDER BY ordinal
+            """,
+            (analysis_id,),
+        )
+        claim_rows = c.fetchall()
+
+        # We'll re-use the same connection for cache lookups
+        claims_payload = []
+        for row in claim_rows:
+            ordinal = row["ordinal"]
+            claim_text = row["claim_text"]
+            ch = sha256_str(claim_text.strip().lower())
+
+            # model_cache
+            c.execute(
+                """
+                SELECT verdict, questions_json
+                FROM model_cache
+                WHERE claim_hash=?
+                """,
+                (ch,),
+            )
+            model_row = c.fetchone()
+
+            if model_row:
+                model_verdict = model_row["verdict"]
+                questions = json_loads(model_row["questions_json"], [])
+            else:
+                model_verdict = None
+                questions = []
+
+            # external_cache
+            c.execute(
+                """
+                SELECT verdict, sources_json
+                FROM external_cache
+                WHERE claim_hash=?
+                """,
+                (ch,),
+            )
+            ext_row = c.fetchone()
+
+            if ext_row:
+                external_verdict = ext_row["verdict"]
+                external_sources = json_loads(ext_row["sources_json"], [])
+            else:
+                external_verdict = None
+                external_sources = []
+
+            claims_payload.append(
+                {
+                    "ordinal": ordinal,
+                    "claim_text": claim_text,
+                    "model_verdict": model_verdict,
+                    "questions": questions,
+                    "external_verdict": external_verdict,
+                    "external_sources": external_sources,
+                }
+            )
+
+    finally:
+        conn.close()
+
+    # Title = derived from canonical_text, same logic as history
+    def _title_from_text(txt, fallback_mode):
+        txt = (txt or "").strip()
+        if not txt:
+            return fallback_mode or "Untitled analysis"
+        first_line = txt.splitlines()[0].strip()
+        if len(first_line) > 120:
+            return first_line[:117] + "..."
+        return first_line
+
+    title = _title_from_text(meta["canonical_text"], meta["mode"])
+    created_at = meta["created_at"]
+    if hasattr(created_at, "isoformat"):
+        created_at = created_at.isoformat()
+
+    return jsonify(
+        {
+            "analysis_id": meta["analysis_id"],
+            "mode": meta["mode"],
+            "title": title,
+            "created_at": created_at,
+            "claims": claims_payload,
+        }
+    )
+
+
+@app.route("/api/delete-analysis/<analysis_id>", methods=["DELETE"])
+@require_user
+def delete_analysis(user, analysis_id):
+    """
+    Delete an analysis belonging to the logged-in user.
+    Removes entries from analyses, claims (via cascade), and user_analyses.
+    """
+    user_id = user["user_id"]
+
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+
+        # 1) Verify ownership
+        c.execute(
+            """
+            SELECT 1 FROM user_analyses
+            WHERE user_id = ? AND analysis_id = ?
+            """,
+            (user_id, analysis_id),
+        )
+        row = c.fetchone()
+        if not row:
+            return jsonify({"error": "Not found or not allowed"}), 404
+
+        # 2) Delete from analyses (this cascades claims)
+        c.execute(
+            "DELETE FROM analyses WHERE analysis_id = ?",
+            (analysis_id,),
+        )
+
+        # 3) Delete mapping entry
+        c.execute(
+            "DELETE FROM user_analyses WHERE analysis_id = ?",
+            (analysis_id,),
+        )
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+    return jsonify({"status": "deleted"})
+
 
 @app.route("/api/get-claim-details", methods=["POST"])
 def get_claim_details():
@@ -1301,24 +1599,40 @@ def get_claim_details():
     if analysis_id is None or ordinal is None:
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
-    # 1) Get the claim text
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?", (analysis_id, int(ordinal)))
-    row = c.fetchone()
-    conn.close()
+    # -------------------------------
+    # 1) Fetch claim text (use get_conn)
+    # -------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?",
+            (analysis_id, int(ordinal))
+        )
+        row = c.fetchone()
+    finally:
+        conn.close()
+
     if not row:
         return jsonify({"error": "Claim not found"}), 404
 
     claim_text = row[0]
     ch = sha256_str(claim_text.strip().lower())
 
-    # 2) Hit model_cache
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT verdict, questions_json, keywords_json FROM model_cache WHERE claim_hash=?", (ch,))
-    hit = c.fetchone()
-    conn.close()
+    # -------------------------------
+    # 2) Check model_cache
+    # -------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("""
+            SELECT verdict, questions_json, keywords_json
+            FROM model_cache
+            WHERE claim_hash=?
+        """, (ch,))
+        hit = c.fetchone()
+    finally:
+        conn.close()
 
     if hit:
         return jsonify({
@@ -1328,24 +1642,40 @@ def get_claim_details():
             "cached": True
         })
 
-    # 3) Compute using existing logic
-    verdict_prompt = verification_prompts[(mode if mode in verification_prompts else 'General Analysis of Testable Claims')].format(claim=claim_text)
-    model_verdict_content, questions, search_keywords = generate_model_verdict_and_questions(verdict_prompt, claim_text)
+    # -------------------------------
+    # 3) Compute verdict + questions via existing logic
+    # -------------------------------
+    chosen_mode = mode if mode in verification_prompts else 'General Analysis of Testable Claims'
+    verdict_prompt = verification_prompts[chosen_mode].format(claim=claim_text)
 
-    # 4) Store in model_cache
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("""
-    INSERT INTO model_cache (claim_hash, verdict, questions_json, keywords_json, updated_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(claim_hash) DO UPDATE SET
-    verdict=excluded.verdict,
-    questions_json=excluded.questions_json,
-    keywords_json=excluded.keywords_json,
-    updated_at=CURRENT_TIMESTAMP
-    """, (ch, model_verdict_content, json_dumps(questions or []), json_dumps(search_keywords or [])))
-    conn.commit()
-    conn.close()
+    model_verdict_content, questions, search_keywords = generate_model_verdict_and_questions(
+        verdict_prompt,
+        claim_text
+    )
+
+    # -------------------------------
+    # 4) Store results via get_conn
+    # -------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO model_cache (claim_hash, verdict, questions_json, keywords_json, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(claim_hash) DO UPDATE SET
+                verdict=excluded.verdict,
+                questions_json=excluded.questions_json,
+                keywords_json=excluded.keywords_json,
+                updated_at=CURRENT_TIMESTAMP
+        """, (
+            ch,
+            model_verdict_content,
+            json_dumps(questions or []),
+            json_dumps(search_keywords or [])
+        ))
+        conn.commit()
+    finally:
+        conn.close()
 
     return jsonify({
         "model_verdict": model_verdict_content,
@@ -1353,6 +1683,8 @@ def get_claim_details():
         "search_keywords": search_keywords or [],
         "cached": False
     })
+
+
 
 @app.route("/api/verify-external", methods=["POST"])
 def verify_external():
@@ -1363,60 +1695,107 @@ def verify_external():
     if analysis_id is None or ordinal is None:
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
-    # 1) get claim text
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?", (analysis_id, int(ordinal)))
-    row = c.fetchone()
-    conn.close()
+    # ------------------------------------------------------
+    # 1) Get claim text (using get_conn)
+    # ------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?",
+            (analysis_id, int(ordinal))
+        )
+        row = c.fetchone()
+    finally:
+        conn.close()
+
     if not row:
         return jsonify({"error": "Claim not found"}), 404
 
     claim_text = row[0]
     ch = sha256_str(claim_text.strip().lower())
 
-    # 2) check external_cache
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?", (ch,))
-    hit = c.fetchone()
-    conn.close()
+    # ------------------------------------------------------
+    # 2) Check external_cache
+    # ------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?",
+            (ch,)
+        )
+        hit = c.fetchone()
+    finally:
+        conn.close()
 
     if hit:
-        return jsonify({"verdict": hit[0], "sources": json_loads(hit[1], []), "cached": True})
+        return jsonify({
+            "verdict": hit[0],
+            "sources": json_loads(hit[1], []),
+            "cached": True
+        })
 
-    # 3) build keywords; if model_cache has them, reuse
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT keywords_json FROM model_cache WHERE claim_hash=?", (ch,))
-    kw_row = c.fetchone()
-    conn.close()
+    # ------------------------------------------------------
+    # 3) Build keyword set
+    #    (Prefer model_cache keywords if available)
+    # ------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT keywords_json FROM model_cache WHERE claim_hash=?", (ch,))
+        kw_row = c.fetchone()
+    finally:
+        conn.close()
 
     search_keywords = json_loads(kw_row[0], []) if kw_row else []
+
+    # If no keywords from model, fallback to simple text heuristics
     if not search_keywords:
         import re
         words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
-        search_keywords = list(set(words[:5])) or [claim_text.lower()[:50]]
+        # limit to first 5 unique words
+        search_keywords = list(set(words))[:5] or [claim_text.lower()[:50]]
 
-    # 4) fetch sources (existing functions)
+    # ------------------------------------------------------
+    # 4) Fetch external sources
+    # ------------------------------------------------------
     all_sources = []
-    all_sources.extend(fetch_semantic_scholar(search_keywords))
-    time.sleep(1.1)
-    all_sources.extend(fetch_crossref(search_keywords))
-    time.sleep(0.5)
-    all_sources.extend(fetch_core(search_keywords))
-    time.sleep(0.5)
-    all_sources.extend(fetch_pubmed(search_keywords))
 
-    # de-dup by URL
-    seen, unique_sources = set(), []
+    # Semantic Scholar
+    try:
+        all_sources.extend(fetch_semantic_scholar(search_keywords))
+    except Exception as e:
+        logging.error(f"Semantic Scholar error: {e}")
+
+    time.sleep(1.1)  # preserve existing pacing
+
+    # Crossref
+    try:
+        all_sources.extend(fetch_crossref(search_keywords))
+    except Exception as e:
+        logging.error(f"CrossRef error: {e}")
+
+    time.sleep(0.5)
+
+    # PubMed
+    try:
+        all_sources.extend(fetch_pubmed(search_keywords))
+    except Exception as e:
+        logging.error(f"PubMed error: {e}")
+
+    # Deduplicate by URL
+    seen = set()
+    unique_sources = []
     for s in all_sources:
         url = s.get("url") or ""
         if url and url not in seen:
             unique_sources.append(s)
             seen.add(url)
 
-    # 5) create external verdict with OpenRouter call
+    # ------------------------------------------------------
+    # 5) Generate external verdict using OpenRouter
+    # ------------------------------------------------------
     if unique_sources:
         abstracts_and_titles = "\n\n".join(
             f"Title: {s.get('title','No title')}\n"
@@ -1428,14 +1807,16 @@ def verify_external():
             for s in unique_sources if s.get('title')
         )
 
-        prompt = f"""You are an AI assistant evaluating a claim based on provided scientific paper information.
+        prompt = f"""
+You are an AI assistant evaluating a claim based on provided scientific paper information.
 
 Claim: "{claim_text}"
 
 Papers:
 {abstracts_and_titles}
 
-Return a short verdict and concise justification."""
+Return a short verdict and concise justification.
+"""
 
         try:
             verdict_res = call_openrouter(prompt)
@@ -1446,21 +1827,38 @@ Return a short verdict and concise justification."""
     else:
         external_verdict = "No relevant scientific papers found for this claim."
 
-    # 6) store in external_cache
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("""
-    INSERT INTO external_cache (claim_hash, verdict, sources_json, updated_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(claim_hash) DO UPDATE SET
-    verdict=excluded.verdict,
-    sources_json=excluded.sources_json,
-    updated_at=CURRENT_TIMESTAMP
-    """, (ch, external_verdict, json_dumps(unique_sources)))
-    conn.commit()
-    conn.close()
+    # ------------------------------------------------------
+    # 6) Store result in external_cache using get_conn()
+    # ------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO external_cache
+            (claim_hash, verdict, sources_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(claim_hash) DO UPDATE SET
+                verdict=excluded.verdict,
+                sources_json=excluded.sources_json,
+                updated_at=CURRENT_TIMESTAMP
+        """, (
+            ch,
+            external_verdict,
+            json_dumps(unique_sources)
+        ))
+        conn.commit()
+    finally:
+        conn.close()
 
-    return jsonify({"verdict": external_verdict, "sources": unique_sources, "cached": False})
+    # ------------------------------------------------------
+    # 7) Return response
+    # ------------------------------------------------------
+    return jsonify({
+        "verdict": external_verdict,
+        "sources": unique_sources,
+        "cached": False
+    })
+
 
 @app.route("/api/process-image", methods=["POST"])
 def process_image():
@@ -1510,52 +1908,6 @@ def process_image():
         logging.error(f"Error in process_image endpoint: {e}")
         return jsonify({"error": f"Failed to process image: {str(e)}"}), 500
 
-@app.route("/api/process-video", methods=["POST"])
-def process_video():
-    """Process uploaded video and extract transcription using Whisper with caching"""
-    try:
-        if 'video' not in request.files:
-            return jsonify({"error": "No video file provided"}), 400
-
-        video_file = request.files['video']
-        if video_file.filename == '':
-            return jsonify({"error": "No video file selected"}), 400
-
-        # Save the uploaded video temporarily to compute hash
-        video_path = save_uploaded_file(video_file)
-        if not video_path:
-            return jsonify({"error": "Failed to save video"}), 500
-
-        # Compute file hash and check cache
-        file_hash = compute_file_hash(video_path)
-        cached_transcription = get_cached_media(file_hash)
-        if cached_transcription:
-            try:
-                os.remove(video_path)
-            except:
-                pass
-            return jsonify({"transcription": cached_transcription, "cached": True})
-
-        # Transcribe video if not cached
-        transcription = transcribe_video(video_path)
-
-        # Store in cache
-        if transcription:
-            store_media_cache(file_hash, 'video', transcription)
-
-        # Clean up the uploaded file
-        try:
-            os.remove(video_path)
-        except:
-            pass
-
-        return jsonify({"transcription": transcription, "cached": False})
-
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except Exception as e:
-        logging.error(f"Error in process_video endpoint: {e}")
-        return jsonify({"error": f"Failed to process video: {str(e)}"}), 500
 
 
 MAX_VIDEO_SIZE_MB = 50
@@ -1632,29 +1984,97 @@ def extract_audio():
             except:
                 pass
 
+@app.route("/api/transcribe-url", methods=["POST"])
+def transcribe_url_route():
+    data = request.json or {}
+    url = data.get("url")
 
-@app.route("/api/transcribe-video-url", methods=["POST"])
-def transcribe_video_url():
-    """Transcribe video from URL using Whisper."""
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
     try:
-        data = request.json
-        video_url = data.get("video_url")
-        if not video_url:
-            return jsonify({"error": "No video URL provided"}), 400
+        # Configure yt-dlp to extract metadata only (don't download video)
+        ydl_opts = {
+            'skip_download': True,
+            'quiet': True,
+            'no_warnings': True,
+            'writesubtitles': True,
+            'writeautomaticsub': True,
+            'subtitleslangs': ['en', 'en-US', 'en-GB'],
+        }
 
-        transcription = transcribe_from_url(video_url)
-        return jsonify({"transcription": transcription})
+        text_content = ""
 
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+            # 1. Check for Subtitles (Manual or Auto)
+            subtitles = info.get('subtitles', {})
+            auto_subs = info.get('automatic_captions', {})
+
+            # Prioritize manual English subs, then auto English
+            sub_url = None
+
+            # Helper to find english in a list of langs
+            def find_en(subs_dict):
+                for lang in ['en', 'en-US', 'en-orig', 'en-GB']:
+                    if lang in subs_dict:
+                        # return the JSON format if available, else VTT/SRT
+                        for fmt in subs_dict[lang]:
+                            if fmt['ext'] in ['vtt', 'srv3', 'json3']:
+                                return fmt['url']
+                return None
+
+            sub_url = find_en(subtitles)
+            if not sub_url:
+                sub_url = find_en(auto_subs)
+
+            if sub_url:
+                # 2. Fetch the subtitle file content
+                res = requests.get(sub_url)
+                res.raise_for_status()
+                raw_text = res.text
+
+                # 3. Clean VTT/XML tags to get pure text
+                # (Simple regex to strip timestamps and tags)
+                # Remove header
+                raw_text = re.sub(r'WEBVTT.*', '', raw_text)
+                # Remove timestamps like 00:00:00.000 --> ...
+                raw_text = re.sub(r'\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}.*', '', raw_text)
+                # Remove tags like <c.colorE5E5E5>
+                raw_text = re.sub(r'<[^>]+>', '', raw_text)
+                # Remove timestamps like 00:00:01
+                raw_text = re.sub(r'\d{2}:\d{2}:\d{2}', '', raw_text)
+                # Remove empty lines and extra spaces
+                lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+
+                # Deduplicate repeating lines (common in auto-caps)
+                unique_lines = []
+                prev = ""
+                for line in lines:
+                    if line != prev:
+                        unique_lines.append(line)
+                        prev = line
+
+                text_content = " ".join(unique_lines)
+
+            else:
+                # Fallback: If it's a site without exposed captions (like TikTok/IG sometimes),
+                # You would ideally download audio here and send to Whisper.
+                # For now, we return a specific error.
+                return jsonify({
+                    "error": "No captions found for this video. Please download it and upload the file instead."
+                }), 404
+
+        return jsonify({"text": text_content})
+
     except Exception as e:
-        logging.error(f"Error in transcribe_video_url endpoint: {e}")
-        return jsonify({"error": f"Failed to transcribe video URL: {str(e)}"}), 500
-
+        logging.error(f"Video URL fetch failed: {e}")
+        return jsonify({"error": f"Could not process video URL: {str(e)}"}), 500
 
 @app.route("/api/generate-report", methods=["GET", "POST"])
 def generate_report():
-    # Handle both GET (for EventSource) and POST (for direct calls)
+    # Handle both GET (EventSource) and POST (direct)
     if request.method == "GET":
         claim_idx = request.args.get("claim_idx", type=int)
         question_idx = request.args.get("question_idx", type=int)
@@ -1672,68 +2092,114 @@ def generate_report():
             status=400
         )
 
+    # ---------------------------------------------------------
+    # 1) Get claim text using get_conn()
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?",
+            (analysis_id, int(claim_idx))
+        )
+        row = c.fetchone()
+    finally:
+        conn.close()
 
-    if analysis_id is None:
-        return Response(json.dumps({"error": "Analysis context missing. Please re-run analysis."}),
-                        mimetype='application/json', status=400)
-
-    # Get claim text
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?", (analysis_id, int(claim_idx)))
-    row = c.fetchone()
     if not row:
-        conn.close()
-        return Response(json.dumps({"error": "Claim not found"}), mimetype='application/json', status=404)
+        return Response(
+            json.dumps({"error": "Claim not found"}),
+            mimetype="application/json",
+            status=404
+        )
+
     claim_text = row[0]
-
-    # Get mode from analyses table (sessionless)
-    c.execute("SELECT mode FROM analyses WHERE analysis_id=?", (analysis_id,))
-    mode_row = c.fetchone()
-    mode = (mode_row[0] if mode_row else "General Analysis of Testable Claims")
-
-    # Get question_text from model_cache using claim_hash
     claim_hash = sha256_str(claim_text.strip().lower())
-    c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (claim_hash,))
-    questions_row = c.fetchone()
-    if not questions_row:
+
+    # ---------------------------------------------------------
+    # 2) Get mode from analyses (sessionless architecture)
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT mode FROM analyses WHERE analysis_id=?", (analysis_id,))
+        mode_row = c.fetchone()
+    finally:
         conn.close()
-        return Response(json.dumps({"error": "Questions not found for this claim. Please generate model verdict first."}),
-                        mimetype='application/json', status=400)
+
+    mode = mode_row[0] if mode_row else "General Analysis of Testable Claims"
+
+    # ---------------------------------------------------------
+    # 3) Get selected research question
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (claim_hash,))
+        questions_row = c.fetchone()
+    finally:
+        conn.close()
+
+    if not questions_row:
+        return Response(
+            json.dumps({"error": "Questions not found for this claim. Please generate model verdict first."}),
+            mimetype="application/json",
+            status=400
+        )
+
     questions = json_loads(questions_row[0], [])
     if question_idx >= len(questions):
-        conn.close()
-        return Response(json.dumps({"error": f"Question index {question_idx} out of range. Only {len(questions)} questions available."}),
-                        mimetype='application/json', status=400)
+        return Response(
+            json.dumps({"error": f"Question index {question_idx} out of range. Only {len(questions)} questions available."}),
+            mimetype="application/json",
+            status=400
+        )
+
     question_text = questions[question_idx]
-    conn.close()
+    rq_hash = sha256_str(
+        (claim_text.strip().lower() + "||" + question_text.strip().lower())
+    )
 
-    rq_hash = sha256_str((claim_text.strip().lower() + "||" + question_text.strip().lower()))
+    # ---------------------------------------------------------
+    # 4) Check report_cache
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
+        hit = c.fetchone()
+    finally:
+        conn.close()
 
-    # Hit cache
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
-    hit = c.fetchone()
-    conn.close()
     if hit and hit[0]:
+        # Stream cached content immediately
         def stream_cached():
             yield f"data: {json.dumps({'content': hit[0]})}\n\n"
             yield "data: [DONE]\n\n"
         return Response(stream_cached(), mimetype="text/event-stream")
 
-    # Model/external verdicts from caches
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-    c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
-    model_row = c.fetchone()
-    model_verdict_content = model_row[0] if model_row else "Verdict not yet generated by AI."
-    c.execute("SELECT verdict FROM external_cache WHERE claim_hash=?", (claim_hash,))
-    external_row = c.fetchone()
-    external_verdict_content = external_row[0] if external_row else "Not yet externally verified."
-    conn.close()
+    # ---------------------------------------------------------
+    # 5) Fetch model & external verdicts (from their caches)
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
 
-    # Compose prompt (unchanged except session removal)
+        # model_cache verdict
+        c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
+        row = c.fetchone()
+        model_verdict_content = row[0] if row else "Verdict not yet generated by AI."
+
+        # external_cache verdict
+        c.execute("SELECT verdict FROM external_cache WHERE claim_hash=?", (claim_hash,))
+        row2 = c.fetchone()
+        external_verdict_content = row2[0] if row2 else "Not yet externally verified."
+    finally:
+        conn.close()
+
+    # ---------------------------------------------------------
+    # 6) Compose final report prompt
+    # ---------------------------------------------------------
     prompt = f'''
 You are an AI assistant producing a structured research report.
 
@@ -1762,58 +2228,74 @@ You are an AI assistant producing a structured research report.
 Generate the research report now.
 '''
 
-    # SSE stream (unchanged behavior)
+    # ---------------------------------------------------------
+    # 7) Streamed SSE response
+    # ---------------------------------------------------------
     def stream_response():
-        full_report_content = ""
+        full_report = ""
+
         try:
             response = call_openrouter(prompt, stream=True)
             response.raise_for_status()
+
             for chunk in response.iter_content(chunk_size=1024, decode_unicode=True):
-                if chunk:
-                    lines = chunk.split('\n')
-                    for line in lines:
-                        line = line.strip()
-                        if line.startswith("data:"):
-                            data_part = line[5:].strip()
-                            if data_part == '[DONE]':
-                                continue
-                            try:
-                                json_data = json.loads(data_part)
-                                if 'choices' in json_data and json_data['choices']:
-                                    content = json_data['choices'][0].get('delta', {}).get('content', '')
-                                    if content:
-                                        normalized_content = normalize_text_for_display(content)
-                                        full_report_content += normalized_content
-                                        yield f"data: {json.dumps({'content': normalized_content})}\n\n"
-                            except json.JSONDecodeError:
-                                continue
+                if not chunk:
+                    continue
+
+                for line in chunk.split("\n"):
+                    line = line.strip()
+                    if not line.startswith("data:"):
+                        continue
+
+                    data_part = line[5:].strip()
+                    if data_part == "[DONE]":
+                        continue
+
+                    try:
+                        json_data = json.loads(data_part)
+                    except json.JSONDecodeError:
+                        continue
+
+                    if "choices" in json_data and json_data["choices"]:
+                        delta = json_data["choices"][0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            normalized = normalize_text_for_display(content)
+                            full_report += normalized
+                            yield f"data: {json.dumps({'content': normalized})}\n\n"
+
         except Exception as e:
             logging.error(f"Streaming error: {e}")
             yield f"data: {json.dumps({'error': 'Streaming failed'})}\n\n"
+
         finally:
-            if full_report_content.strip():
+            if full_report.strip():
                 try:
-                    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
+                    conn = get_conn()
                     c = conn.cursor()
                     c.execute("""
                         INSERT OR REPLACE INTO report_cache
                         (rq_hash, question_text, report_text, updated_at)
                         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    """, (rq_hash, question_text, full_report_content))
+                    """, (rq_hash, question_text, full_report))
                     conn.commit()
+                except Exception as db_err:
+                    logging.error(f"Cache save error: {db_err}")
+                finally:
                     conn.close()
-                except Exception as db_error:
-                    logging.error(f"Cache error: {db_error}")
-        yield "data: [DONE]\n\n"
 
-    return Response(stream_response(), mimetype='text/event-stream')
+            yield "data: [DONE]\n\n"
+
+    return Response(stream_response(), mimetype="text/event-stream")
+
 
 @app.route("/api/available-reports", methods=["GET"])
 def get_available_reports():
     """List all available reports for a given analysis (sessionless)."""
     analysis_id = request.args.get("analysis_id")
+
     if not analysis_id:
-        # Optional: allow POST with JSON body too
+        # Optional alternate POST usage
         try:
             payload = request.get_json(silent=True) or {}
             analysis_id = payload.get("analysis_id")
@@ -1823,51 +2305,94 @@ def get_available_reports():
     if not analysis_id:
         return jsonify({"error": "Missing analysis_id"}), 400
 
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
-
-    # Get claims for this analysis
-    c.execute("SELECT ordinal, claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal", (analysis_id,))
-    claim_rows = c.fetchall()
+    # ---------------------------------------------------------
+    # 1) Fetch all claims for this analysis
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT ordinal, claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal",
+            (analysis_id,)
+        )
+        claim_rows = c.fetchall()
+    finally:
+        conn.close()
 
     available_reports = []
-    for ordinal, claim_text in claim_rows:
-        claim_text_preview = claim_text[:80] + '...' if len(claim_text) > 80 else claim_text
 
-        # Add model verdict if available
+    # ---------------------------------------------------------
+    # 2) For each claim, check model_cache + report_cache
+    # ---------------------------------------------------------
+    for ordinal, claim_text in claim_rows:
+        preview = claim_text[:80] + "..." if len(claim_text) > 80 else claim_text
         claim_hash = sha256_str(claim_text.strip().lower())
-        c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
-        model_row = c.fetchone()
-        if model_row:
+
+        # Get model verdict + questions in one DB call
+        conn = get_conn()
+        try:
+            c = conn.cursor()
+            c.execute("""
+                SELECT verdict, questions_json
+                FROM model_cache
+                WHERE claim_hash=?
+            """, (claim_hash,))
+            model_cache_row = c.fetchone()
+        finally:
+            conn.close()
+
+        if not model_cache_row:
+            continue
+
+        verdict, questions_json = model_cache_row
+        questions = json_loads(questions_json, [])
+
+        # ------------------------------------------
+        # 2a) Summary report (Model verdict exists)
+        # ------------------------------------------
+        if verdict:
             available_reports.append({
                 "id": f"claim-{ordinal}-summary",
                 "type": f"Claim {ordinal + 1} - Model Verdict & External Verification",
-                "description": f"Model analysis and external sources for: {claim_text_preview}"
+                "description": f"Model analysis and external sources for: {preview}"
             })
 
-        # Add question reports if available
-        c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (claim_hash,))
-        questions_row = c.fetchone()
-        if questions_row:
-            questions = json_loads(questions_row[0], [])
-            for q_idx, question in enumerate(questions):
-                rq_hash = sha256_str((claim_text.strip().lower()+"||"+question.strip().lower()))
-                c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
-                report_row = c.fetchone()
-                if report_row:
-                    available_reports.append({
-                        "id": f"claim-{ordinal}-question-{q_idx}",
-                        "type": f"Claim {ordinal + 1} - Question Report {q_idx + 1}",
-                        "description": f"Research report for: {question[:100]}..."
-                    })
+        # ------------------------------------------
+        # 2b) Question-based full reports
+        # ------------------------------------------
+        for q_idx, question in enumerate(questions):
+            rq_hash = sha256_str(
+                claim_text.strip().lower() +
+                "||" +
+                question.strip().lower()
+            )
 
-    conn.close()
+            # Check if report exists
+            conn = get_conn()
+            try:
+                c = conn.cursor()
+                c.execute(
+                    "SELECT report_text FROM report_cache WHERE rq_hash=?",
+                    (rq_hash,)
+                )
+                report_row = c.fetchone()
+            finally:
+                conn.close()
+
+            if report_row:
+                available_reports.append({
+                    "id": f"claim-{ordinal}-question-{q_idx}",
+                    "type": f"Claim {ordinal + 1} - Question Report {q_idx + 1}",
+                    "description": f"Research report for: {question[:100]}..."
+                })
+
     return jsonify(available_reports)
+
 
 
 @app.route("/api/export-pdf", methods=["POST", "OPTIONS"])
 @cross_origin(
-    origins=["https://epistemiq.vercel.app"],
+    origins=["https://sckgnt.vercel.app"],
     supports_credentials=True,
     methods=["POST", "OPTIONS"],
     allow_headers=["Content-Type"]
@@ -1875,107 +2400,167 @@ def get_available_reports():
 def export_pdf():
     payload = request.json or {}
     selected_reports = payload.get("selected_reports", [])
-    analysis_id = payload.get("analysis_id")  # ← was session.get("analysis_id")
+    analysis_id = payload.get("analysis_id")
 
     if not analysis_id:
         return "Missing analysis_id. Please include it in the request body.", 400
 
-    conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-    c = conn.cursor()
+    # ---------------------------------------------------------
+    # 1) Fetch analysis + claims using get_conn()
+    # ---------------------------------------------------------
+    conn = get_conn()
+    try:
+        c = conn.cursor()
 
-    # Get analysis mode (kept if you need it later)
-    c.execute("SELECT mode FROM analyses WHERE analysis_id=?", (analysis_id,))
-    analysis_row = c.fetchone()
-    if not analysis_row:
+        # Verify analysis exists
+        c.execute("SELECT mode FROM analyses WHERE analysis_id=?", (analysis_id,))
+        analysis_row = c.fetchone()
+        if not analysis_row:
+            return "Analysis session expired or not found.", 400
+
+        # Get claims
+        c.execute(
+            "SELECT ordinal, claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal",
+            (analysis_id,)
+        )
+        claim_rows = c.fetchall()
+
+    finally:
         conn.close()
-        return "Analysis session expired or not found.", 400
 
-    # Get claims
-    c.execute("SELECT ordinal, claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal", (analysis_id,))
-    claim_rows = c.fetchall()
-    conn.close()
     if not claim_rows:
         return "No claims found for this analysis session.", 400
+
+    # Map ordinal → claim_text for fast lookup
+    claim_map = {ordinal: claim_text for ordinal, claim_text in claim_rows}
 
     pdf_reports = []
     added_ids = set()
 
-    # Build PDF items from selections
+    # ---------------------------------------------------------
+    # 2) Process selected reports
+    # ---------------------------------------------------------
     for report_id in selected_reports:
         if report_id in added_ids:
             continue
 
-        if report_id.endswith('-summary'):
+        # -------------------------
+        # SUMMARY REPORTS
+        # -------------------------
+        if report_id.endswith("-summary"):
             try:
-                claim_idx = int(report_id.split('-')[1])
-                for ordinal, claim_text in claim_rows:
-                    if ordinal == claim_idx:
-                        claim_hash = sha256_str(claim_text.strip().lower())
-                        conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-                        c = conn.cursor()
-                        c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
-                        model_row = c.fetchone()
-                        model_verdict = model_row[0] if model_row else ""
-                        c.execute("SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?", (claim_hash,))
-                        external_row = c.fetchone()
-                        external_verdict = external_row[0] if external_row else "Not verified externally."
-                        sources = json_loads(external_row[1], []) if external_row else []
-                        conn.close()
-
-                        pdf_reports.append({
-                            "id": report_id,
-                            "claim_text": claim_text,
-                            "model_verdict": model_verdict,
-                            "external_verdict": external_verdict,
-                            "sources": sources,
-                            "question": "Model verdict + external verification",
-                            "report": None
-                        })
-                        added_ids.add(report_id)
-                        break
+                claim_idx = int(report_id.split("-")[1])
             except (IndexError, ValueError):
                 continue
 
-        elif 'question' in report_id:
+            if claim_idx not in claim_map:
+                continue
+
+            claim_text = claim_map[claim_idx]
+            claim_hash = sha256_str(claim_text.strip().lower())
+
+            # Fetch model + external data in one DB session
+            conn = get_conn()
             try:
-                parts = report_id.split('-')
+                c = conn.cursor()
+
+                # model verdict
+                c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
+                row = c.fetchone()
+                model_verdict = row[0] if row else ""
+
+                # external verdict + sources
+                c.execute(
+                    "SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?",
+                    (claim_hash,)
+                )
+                row2 = c.fetchone()
+                external_verdict = row2[0] if row2 else "Not verified externally."
+                sources = json_loads(row2[1], []) if row2 else []
+
+            finally:
+                conn.close()
+
+            pdf_reports.append({
+                "id": report_id,
+                "claim_text": claim_text,
+                "model_verdict": model_verdict,
+                "external_verdict": external_verdict,
+                "sources": sources,
+                "question": "Model verdict + external verification",
+                "report": None
+            })
+            added_ids.add(report_id)
+            continue
+
+        # -------------------------
+        # QUESTION REPORTS
+        # -------------------------
+        if "question" in report_id:
+            try:
+                parts = report_id.split("-")
                 claim_idx = int(parts[1])
                 q_idx = int(parts[3])
-
-                for ordinal, claim_text in claim_rows:
-                    if ordinal == claim_idx:
-                        claim_hash = sha256_str(claim_text.strip().lower())
-                        conn = sqlite3.connect('/home/epistemiq/mysite/sessions.db')
-                        c = conn.cursor()
-                        c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (claim_hash,))
-                        questions_row = c.fetchone()
-                        if questions_row:
-                            questions = json_loads(questions_row[0], [])
-                            if q_idx < len(questions):
-                                question_text = questions[q_idx]
-                                rq_hash = sha256_str((claim_text.strip().lower()+"||"+question_text.strip().lower()))
-                                c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
-                                report_row = c.fetchone()
-                                if report_row:
-                                    pdf_reports.append({
-                                        "id": report_id,
-                                        "claim_text": claim_text,
-                                        "model_verdict": "",
-                                        "external_verdict": "",
-                                        "sources": [],
-                                        "question": question_text,
-                                        "report": report_row[0]
-                                    })
-                                    added_ids.add(report_id)
-                        conn.close()
-                        break
             except (IndexError, ValueError):
                 continue
+
+            if claim_idx not in claim_map:
+                continue
+
+            claim_text = claim_map[claim_idx]
+            claim_hash = sha256_str(claim_text.strip().lower())
+
+            # Fetch questions + report in one DB session
+            conn = get_conn()
+            try:
+                c = conn.cursor()
+
+                # Questions from model_cache
+                c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (claim_hash,))
+                q_row = c.fetchone()
+                if not q_row:
+                    continue
+
+                questions = json_loads(q_row[0], [])
+                if q_idx >= len(questions):
+                    continue
+
+                question_text = questions[q_idx]
+                rq_hash = sha256_str(
+                    claim_text.strip().lower() +
+                    "||" +
+                    question_text.strip().lower()
+                )
+
+                # Report text
+                c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
+                r_row = c.fetchone()
+                if not r_row:
+                    continue
+
+                report_text = r_row[0]
+
+            finally:
+                conn.close()
+
+            pdf_reports.append({
+                "id": report_id,
+                "claim_text": claim_text,
+                "model_verdict": "",
+                "external_verdict": "",
+                "sources": [],
+                "question": question_text,
+                "report": report_text
+            })
+            added_ids.add(report_id)
+            continue
 
     if not pdf_reports:
         return "No valid reports selected for export.", 400
 
-    # ----- PDF generation (unchanged from your code) -----
+    # ---------------------------------------------------------
+    # 3) Generate PDF (IDENTICAL to your existing logic)
+    # ---------------------------------------------------------
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -1998,35 +2583,40 @@ def export_pdf():
             y = height - inch
         y -= 20
 
-        # Claim
+        # Claim heading
         y = draw_paragraph(p, f"Claim: {item['claim_text']}", styles['ClaimHeading'], y, width)
 
-        # Model verdict
         if item['model_verdict']:
-            y = draw_paragraph(p, f"<b>Model Verdict:</b> {item.get('model_verdict','')}", styles['NormalParagraph'], y, width)
+            y = draw_paragraph(p, f"<b>Model Verdict:</b> {item['model_verdict']}", styles['NormalParagraph'], y, width)
 
-        # External verdict
         if item['external_verdict']:
-            y = draw_paragraph(p, f"<b>External Verdict:</b> {item.get('external_verdict','')}", styles['NormalParagraph'], y, width)
+            y = draw_paragraph(p, f"<b>External Verdict:</b> {item['external_verdict']}", styles['NormalParagraph'], y, width)
 
-        # Sources
         if item.get('sources'):
             y = draw_paragraph(p, "<b>External Sources:</b>", styles['SectionHeading'], y, width)
             for src in item.get('sources', []):
-                link_text = f"{src.get('title','')}"
-                if src.get('url'):
-                    escaped_url = src['url'].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-                    link_text = f'<link href="{escaped_url}">{link_text}</link>'
+                title = src.get("title", "")
+                url = src.get("url", "")
+                if url:
+                    escaped = (
+                        url.replace("&", "&amp;")
+                           .replace("<", "&lt;")
+                           .replace(">", "&gt;")
+                           .replace('"', "&quot;")
+                    )
+                    link_text = f'<link href="{escaped}">{title}</link>'
+                else:
+                    link_text = title
+
                 y = draw_paragraph(p, f"- {link_text}", styles['SourceLink'], y, width)
 
-        # Question heading
-        y = draw_paragraph(p, f"<b>Research Question:</b> {item.get('question','')}", styles['SectionHeading'], y, width)
+        # Research question
+        y = draw_paragraph(p, f"<b>Research Question:</b> {item['question']}", styles['SectionHeading'], y, width)
 
-        # Full report (split, render with tables)
-        if item.get('report'):
-            report_content = item['report']
-            sections = split_long_report(report_content)
-            for i, section in enumerate(sections):
+        # Full report handling (unchanged)
+        if item.get("report"):
+            sections = split_long_report(item["report"])
+            for si, section in enumerate(sections):
                 blocks = process_report_content_for_pdf(section)
                 for block_type, block_content in blocks:
                     if block_type == "text":
@@ -2034,38 +2624,46 @@ def export_pdf():
                     elif block_type == "table":
                         table_data = parse_markdown_table(block_content)
                         if table_data:
-                            table = create_table_from_data(table_data, width - 1.5 * inch)
-                            if table:
-                                w, h = table.wrapOn(p, width - 1.5 * inch, y)
+                            tbl = create_table_from_data(table_data, width - 1.5 * inch)
+                            if tbl:
+                                w, h = tbl.wrapOn(p, width - 1.5 * inch, y)
                                 if y - h < 1.5 * inch:
                                     p.showPage()
-                                    y = A4[1] - 0.75 * inch
+                                    y = height - 0.75 * inch
                                 try:
-                                    table.drawOn(p, 0.75 * inch, y - h)
+                                    tbl.drawOn(p, 0.75 * inch, y - h)
                                 except Exception as e:
                                     logging.error(f"Error drawing table: {e}")
                                 y -= h + 10
-                if i < len(sections) - 1:
+                if si < len(sections) - 1:
                     y -= 10
                 if y < 2 * inch:
                     p.showPage()
-                    y = A4[1] - 0.75 * inch
+                    y = height - 0.75 * inch
             y -= 20
 
     p.save()
     buffer.seek(0)
-    return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name="Epistemiq_AI_Report.pdf")
+    return send_file(
+        buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="Epistemiq_AI_Report.pdf"
+    )
+
 
 
 @app.route("/api/cleanup-cache", methods=["POST"])
-def cleanup_cache_endpoint():
-    """Manual cache cleanup endpoint"""
+@require_user
+def api_cleanup_cache(user):
+    # TODO: later you can add a simple check for admin emails here
     try:
         cleanup_old_cache()
-        return jsonify({"message": "Cache cleanup completed successfully"})
+        return jsonify({"status": "ok"})
     except Exception as e:
-        logging.error(f"Manual cleanup error: {e}")
-        return jsonify({"error": f"Cleanup failed: {str(e)}"}), 500
+        logging.error(f"Cleanup error: {e}")
+        return jsonify({"error": "Cleanup failed"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
