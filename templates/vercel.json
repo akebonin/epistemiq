@@ -1,13 +1,12 @@
 {
-  "headers": [
+  "rewrites": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"
-        }
-      ]
+      "source": "/api/:path*",
+      "destination": "https://epistemiq.pythonanywhere.com/api/:path*"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "https://epistemiq.pythonanywhere.com/auth/:path*"
     }
   ]
 }
