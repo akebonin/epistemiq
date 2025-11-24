@@ -561,6 +561,7 @@ max-width: none;
     <!-- See Step 2 for the UL changes -->
     <ul class="dropdown-menu text-center p-0 mt-1">
         <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
+        <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn">Clear Chrome AI Cache</button></li>
     </ul>
 </div>
 
@@ -2602,7 +2603,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// ----------------------------------------
+// CLEAR CHROME AI CACHE
+// ----------------------------------------
+document.getElementById("clearNanoCacheBtn").addEventListener("click", () => {
+    localStorage.removeItem("nano_last_input");
+    localStorage.removeItem("nano_last_output");
+    localStorage.removeItem("nano_last_topics");
+    localStorage.removeItem("nano_last_mode");
 
+    // Optional: also clear in-memory
+    lastNanoInput = "";
+    lastNanoOutput = "";
+    lastNanoTopics = "";
+    lastNanoMode = "";
+
+    alert("Chrome AI cache cleared.");
+});
+
+  
 </script>
 </body>
 </html>
