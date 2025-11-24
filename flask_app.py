@@ -37,7 +37,7 @@ from auth_module import auth_bp, get_current_user, require_user
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables
-load_dotenv(dotenv_path="/home/scicheckagent/mysite/.env")
+load_dotenv(dotenv_path="/home/epistemiq/mysite/.env")
 
 
 app = Flask(__name__)
@@ -48,7 +48,7 @@ if not app.secret_key:
 
 app.register_blueprint(auth_bp)
 
-CORS(app, supports_credentials=True, origins=["https://sckgnt.vercel.app"])
+CORS(app, supports_credentials=True, origins=["https://epistemiq.vercel.app"])
 
 
 # ==============================================================
@@ -72,7 +72,7 @@ def new_analysis_id() -> str:
 #  Concurrency-safe DB helpers
 # ==============================================================
 
-DB_PATH = "/home/scicheckagent/mysite/sessions.db"
+DB_PATH = "/home/epistemiq/mysite/sessions.db"
 
 def get_conn():
     """Open SQLite connection with WAL mode and busy timeout."""
@@ -790,7 +790,7 @@ def analyze_image_with_ocr(image_path):
         logging.error(f"OCR processing failed: {e}")
         return ""
 
-def save_uploaded_file(file, upload_folder="/home/scicheckagent/mysite/uploads"):
+def save_uploaded_file(file, upload_folder="/home/epistemiq/mysite/uploads"):
     """Save uploaded file and return path"""
     try:
         os.makedirs(upload_folder, exist_ok=True)
@@ -2392,7 +2392,7 @@ def get_available_reports():
 
 @app.route("/api/export-pdf", methods=["POST", "OPTIONS"])
 @cross_origin(
-    origins=["https://sckgnt.vercel.app"],
+    origins=["https://epistemiq.vercel.app"],
     supports_credentials=True,
     methods=["POST", "OPTIONS"],
     allow_headers=["Content-Type"]
