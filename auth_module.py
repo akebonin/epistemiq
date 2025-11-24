@@ -9,12 +9,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
 # Load environment (matches your backend)
-load_dotenv(dotenv_path="/home/scicheckagent/mysite/.env")
+load_dotenv(dotenv_path="/home/epistemiq/mysite/.env")
 
 # -------------------------------------------------------------------
 # DB helper – same DB as app.py
 # -------------------------------------------------------------------
-DB_PATH = "/home/scicheckagent/mysite/sessions.db"
+DB_PATH = "/home/epistemiq/mysite/sessions.db"
 
 
 def get_conn():
@@ -235,7 +235,7 @@ def request_magic_link():
 
     # Magic link URL: go directly to backend
     link_url = (
-        f"https://sckgnt.vercel.app"
+        f"https://epistemiq.vercel.app"
         f"/auth/verify?token={token}&email={email}"
     )
 
@@ -319,7 +319,7 @@ def verify_magic_link():
     conn.close()
 
     # Set cookie for cross-site use
-    resp = make_response(redirect("https://sckgnt.vercel.app/"))
+    resp = make_response(redirect("https://epistemiq.vercel.app/"))
     resp.set_cookie(
         "ep_session",
         session_token,
@@ -405,7 +405,7 @@ def logout():
     resp = jsonify({"message": "Logged out"})
     resp.delete_cookie(
         "ep_session",
-        domain=".scicheckagent.pythonanywhere.com",
+        domain=".epistemiq.pythonanywhere.com",
         path="/",
     )
     return resp
