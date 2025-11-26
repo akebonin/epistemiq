@@ -2292,13 +2292,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const chromeModeDiv = document.getElementById("chrome-ai-mode");
   const chromeMode = document.getElementById("chromeMode");
 
-  // Toggle MAY be defined elsewhere; if not, treat as always-on
   const chromeToggleEl = document.getElementById("enableChromeAiToggle");
-  const toggleSwitch = chromeToggleEl || { checked: true };
+const toggleSwitch = chromeToggleEl || { checked: true };
 
-  if (chromeToggleEl) chromeToggleEl.checked = false;
+// --- Restore saved preference or default OFF ---
+if (chromeToggleEl) {
+    const saved = localStorage.getItem("ep_nano_enabled");
 
-  updateChromeAiState();
+    if (saved === "1") chromeToggleEl.checked = true;
+    else if (saved === "0") chromeToggleEl.checked = false;
+    else chromeToggleEl.checked = false; // default first load
+}
+
+// --- Persist preference when user changes toggle ---
+if (chromeToggleEl) {
+    chromeToggleEl.addEventListener("change", () => {
+        localStorage.setItem(
+            "ep_nano_enabled",
+            chromeToggleEl.checked ? "1" : "0"
+        );
+        updateChromeAiState();
+    });
+}
+
+// Render UI based on the restored setting
+updateChromeAiState();
+
 
   const undoBtn = document.getElementById("undo-nano-btn");
 
