@@ -1,0 +1,2883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="description" content="Epistemiq – Verify scientific and factual claims using hybrid AI." />
+  <!-- ✅ Favicon and app icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/logo.png">
+  <link rel="apple-touch-icon" href="/static/icons/logo.png">
+  <link rel="shortcut icon" href="/static/icons/logo.png">
+  <meta name="theme-color" content="#0d6efd">
+  
+  <title>Epistemiq – AI Claims Verification</title>
+
+  
+
+  <!-- ✅ Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+        crossorigin="anonymous" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+  <!-- ✅ Custom Styles -->
+  <!-- <link rel="stylesheet" href="templates/static/styles.css" /> -->
+
+
+
+
+ <script type="module">
+  import * as xenova from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js";
+  window.__tf = xenova;
+  console.log("✅ Transformers ESM loaded");
+</script>
+
+
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+body {
+background-color: #f8f9fa;
+color: #212529;
+font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+.container {
+max-width: 900px;
+padding-top: 20px;
+padding-bottom: 50px;
+}
+.control-card, .claim-card {
+background-color: #ffffff;
+padding: 2.5rem;
+border-radius: 15px;
+margin-bottom: 25px;
+box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+border: 1px solid #e0e0e0;
+}
+.form-label {
+font-weight: 600;
+color: #343a40;
+margin-bottom: 8px;
+}
+.form-control, .form-select {
+border-radius: 8px;
+padding: 0.75rem 1rem;
+border: 1px solid #ced4da;
+}
+.form-control:focus, .form-select:focus {
+border-color: #86b7fe;
+box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.btn-primary {
+background-color: #0d6efd;
+border-color: #0d6efd;
+font-weight: 600;
+padding: 0.8rem 1.5rem;
+border-radius: 8px;
+transition: background-color 0.2s, border-color 0.2s;
+}
+.btn-primary:hover {
+background-color: #0b5ed7;
+border-color: #0a58ca;
+}
+.btn-secondary {
+background-color: #6c757d;
+border-color: #6c757d;
+color: #fff;
+font-weight: 500;
+border-radius: 8px;
+}
+.btn-secondary:hover {
+background-color: #5c636a;
+border-color: #565e64;
+}
+.btn-success {
+background-color: #28a745;
+border-color: #28a745;
+font-weight: 600;
+padding: 0.8rem 1.5rem;
+border-radius: 8px;
+transition: background-color 0.2s, border-color 0.2s;
+}
+.btn-success:hover {
+background-color: #218838;
+border-color: #1e7e34;
+}
+.btn-info {
+background-color: #0dcaf0;
+border-color: #0dcaf0;
+}
+.spinner-border {
+width: 1.2rem;
+height: 1.2rem;
+margin-right: 8px;
+}
+.claim-card h5 {
+font-weight: 700;
+color: #0d6efd;
+margin-bottom: 1rem;
+font-size: 1.5rem;
+}
+.claim-card p {
+font-size: 1.05rem;
+line-height: 1.6;
+}
+.verdict-box, .report-box {
+background-color: #e9ecef;
+padding: 18px;
+border-radius: 10px;
+border: 1px solid #dee2e6;
+white-space: pre-wrap;
+font-family: 'Roboto Mono', 'Courier New', monospace;
+font-size: 0.95rem;
+line-height: 1.5;
+color: #343a40;
+overflow-wrap: break-word;
+}
+.report-box {
+background-color: #e8f5ff;
+border-color: #cce7ff;
+margin-top: 15px;
+}
+.report-placeholder {
+min-height: 50px;
+padding-left: 15px;
+}
+.question-list li {
+background-color: #f8f9fa;
+border-color: #e9ecef;
+margin-bottom: 10px;
+border-radius: 8px;
+padding: 15px 20px;
+display: flex;
+flex-direction: column;
+align-items: flex-start;
+justify-content: space-between;
+flex-wrap: wrap;
+}
+.question-list li span {
+flex-grow: 1;
+margin-right: 15px;
+font-size: 1rem;
+line-height: 1.5;
+margin-bottom: 10px;
+width: 100%;
+}
+.question-list li button {
+flex-shrink: 0;
+margin-top: 5px;
+}
+.source-list li {
+word-break: break-all;
+margin-bottom: 5px;
+font-size: 0.9rem;
+}
+.source-list a {
+color: #0d6efd;
+text-decoration: none;
+}
+.source-list a:hover {
+text-decoration: underline;
+}
+.footer {
+margin-top: 5rem;
+padding: 2rem 0;
+border-top: 1px solid #dee2e6;
+font-size: 0.9rem;
+color: #6c757d;
+}
+.alert-danger {
+background-color: #f8d7da;
+color: #721c24;
+border-color: #f5c6cb;
+}
+.alert-info {
+background-color: #d1ecf1;
+color: #0c5460;
+border-color: #bee5eb;
+}
+.d-grid button {
+height: 55px;
+}
+.form-check-input.form-switch {
+width: 3em;
+height: 1.5em;
+margin-left: 0.5em;
+vertical-align: middle;
+background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%280, 0, 0, 0.25%29'/%3e%3c/svg%3e");
+background-position: left center;
+border-radius: 1.5em;
+transition: background-position .15s ease-in-out;
+}
+.form-check-input.form-switch:checked {
+background-position: right center;
+background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+.form-check-input.form-switch:focus {
+box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.form-check-label {
+vertical-align: middle;
+margin-left: 0.5rem;
+}
+.report-checkbox {
+margin-right: 8px;
+}
+.pdf-selection-section {
+background-color: #e8f5e8;
+padding: 1.5rem;
+border-radius: 10px;
+margin-bottom: 20px;
+border: 1px solid #c3e6c3;
+}
+.pdf-selection-list {
+max-height: 300px;
+overflow-y: auto;
+margin-top: 15px;
+}
+.file-upload-group {
+border: 2px dashed #dee2e6;
+border-radius: 8px;
+padding: 2rem;
+text-align: center;
+background-color: #f8f9fa;
+transition: all 0.3s ease;
+}
+.file-upload-group:hover {
+border-color: #0d6efd;
+background-color: #e7f1ff;
+}
+.file-upload-group.dragover {
+border-color: #0d6efd;
+background-color: #d4e6ff;
+}
+.upload-icon {
+font-size: 3rem;
+color: #6c757d;
+margin-bottom: 1rem;
+}
+.file-input-hidden {
+display: none;
+}
+.preview-image {
+max-width: 100%;
+max-height: 200px;
+margin-top: 1rem;
+border-radius: 8px;
+}
+.table {
+width: 100%;
+margin: 10px 0;
+}
+.table-bordered {
+border: 1px solid #dee2e6;
+}
+.table-sm {
+font-size: 0.9rem;
+}
+/* Modal styles for report selection */
+.report-selection-list {
+max-height: 400px;
+overflow-y: auto;
+border: 1px solid #dee2e6;
+border-radius: 8px;
+padding: 15px;
+}
+.report-selection-item {
+padding: 10px;
+border-bottom: 1px solid #f8f9fa;
+}
+.report-selection-item:last-child {
+border-bottom: none;
+}
+/* Compact view for inline reports */
+.compact-report {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #e8f5ff;
+    font-size: 0.9rem;
+}
+/* Custom Modal Styles (Vanilla) */
+.custom-modal {
+display: none;
+position: fixed;
+z-index: 1050;
+left: 0;
+top: 0;
+width: 100%;
+height: 100%;
+overflow: hidden;
+outline: 0;
+}
+.custom-modal-overlay {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background: rgba(0, 0, 0, 0.5);
+z-index: 1040;
+}
+.custom-modal-dialog {
+position: fixed;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+z-index: 1050;
+width: 90%;
+max-width: 1200px;
+margin: auto;
+animation: custom-modal-animatetop 0.4s;
+}
+@keyframes custom-modal-animatetop {
+from {top: -300px; opacity: 0;}
+to {top: 50%; opacity: 1;}
+}
+.custom-modal-content {
+background-color: #e8f5ff;
+border: 1px solid #cce7ff;
+border-radius: 0.3rem;
+box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.5);
+position: relative;
+display: flex;
+flex-direction: column;
+width: 100%;
+pointer-events: auto;
+background-clip: padding-box;
+outline: 0;
+}
+.custom-modal-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 1rem;
+border-bottom: 1px solid #cce7ff;
+border-top-left-radius: 0.3rem;
+border-top-right-radius: 0.3rem;
+background-color: #ffffff;
+}
+.custom-modal-title {
+margin-bottom: 0;
+line-height: 1.5;
+font-size: 1.25rem;
+}
+.custom-close-btn {
+padding: 1rem;
+margin: -1rem -1rem -1rem auto;
+background-color: transparent;
+border: 0;
+font-size: 1.5rem;
+font-weight: 700;
+line-height: 1;
+color: #000;
+text-shadow: 0 1px 0 #fff;
+opacity: 0.5;
+cursor: pointer;
+}
+.custom-close-btn:hover {
+color: #000;
+text-decoration: none;
+opacity: 0.75;
+}
+.custom-modal-body {
+position: relative;
+flex: 1 1 auto;
+padding: 1rem;
+background-color: #ffffff;
+}
+.custom-modal-footer {
+display: flex;
+flex-wrap: wrap;
+align-items: center;
+justify-content: flex-end;
+padding: 0.75rem;
+border-top: 1px solid #cce7ff;
+border-bottom-right-radius: 0.3rem;
+border-bottom-left-radius: 0.3rem;
+gap: 0.5rem;
+background-color: #ffffff;
+}
+.custom-btn {
+display: inline-block;
+font-weight: 400;
+color: #212529;
+text-align: center;
+vertical-align: middle;
+cursor: pointer;
+user-select: none;
+background-color: transparent;
+border: 1px solid transparent;
+padding: 0.375rem 0.75rem;
+font-size: 1rem;
+line-height: 1.5;
+border-radius: 0.25rem;
+transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+margin: 0 0.25rem;
+}
+.custom-btn-secondary {
+color: #fff;
+background-color: #6c757d;
+border-color: #6c757d;
+}
+.custom-btn-secondary:hover {
+background-color: #5a6268;
+border-color: #545b62;
+}
+.custom-btn-outline-primary {
+color: #007bff;
+border-color: #007bff;
+}
+.custom-btn-outline-primary:hover {
+color: #fff;
+background-color: #007bff;
+border-color: #007bff;
+}
+.body-no-scroll {
+overflow: hidden;
+}
+@media (max-width: 576px) {
+.custom-modal-dialog {
+width: 95%;
+max-width: none;
+}
+}
+
+.logo-wrapper {
+  text-align: center;
+}
+
+.logo-wrapper img {
+  width: 100px; /* Increase size */
+  height: 100px;
+  border-radius: 15px; /* Rounded corners */
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+
+.logo-wrapper .tagline {
+  font-size: 1rem;
+  color: #0A0F2C;
+  font-weight: 600;
+  margin: 0;
+}
+
+#chrome-ai-info {
+  box-shadow: 0 0 10px rgba(255, 230, 100, 0.4);
+  border-radius: 8px;
+}
+
+.chrome-ai-btn button {
+  background-color: #fff9e6 !important;
+  border-color: #ffe8b3 !important;
+  color: #5c4a00 !important;
+}
+.chrome-ai-btn button:hover {
+  background-color: #ffe9a8 !important;
+}
+
+.textarea-dim { filter: blur(2px); opacity: .6; }
+
+.ai-pulse {
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#000;
+  animation: aip 0.8s infinite alternate ease-in-out;
+}
+
+@keyframes aip {
+  from { opacity:.2; transform:scale(.6); }
+  to   { opacity:1; transform:scale(1); }
+}
+
+.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Fix for the History Modal styling */
+#historyModal .modal-dialog {
+    max-width: 60%; 
+    width: 100%;
+    margin: 1rem auto; /* Centers it horizontally */
+}
+
+#historyList .list-group-item {
+    /* Remove max-width here so it fills the modal container naturally */
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #e9ecef;
+}
+
+/* Force the dropdown to match the button width exactly */
+#userLoggedInMenu .dropdown-menu {
+    width: 100% !important;     /* Match the width of the parent (the button) */
+    min-width: 0 !important;    /* Override Bootstrap's default 10rem min-width */
+    max-width: 100% !important; /* Prevent it from growing wider */
+    left: 0 !important;         /* Align strictly to the left edge */
+    right: 0 !important;        /* Align strictly to the right edge */
+}
+
+/* Optional: Fix padding on the item to look good in a small space */
+#userLoggedInMenu .dropdown-item {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+    white-space: nowrap;        /* Prevent text wrapping if email is very short */
+    overflow: hidden;
+    text-overflow: ellipsis;    /* Add ... if "Your Analyses" is somehow longer than email */
+}
+  
+</style>
+</head>
+<body>
+<div class="container">
+<div class="control-card">
+    <div class="logo-wrapper mb-4">
+    <img src="https://raw.githubusercontent.com/akebonin/epistemiq/refs/heads/main/templates/static/icons/logo.png" alt="epistemiq logo">
+    <p class="tagline">Your Compass in the Epistemic Fog</p>
+  </div>
+
+<!-- ✨ User Block (Unified Style for Logged In & Logged Out) -->
+<div id="userAccessBlock" class="text-center mb-3">
+
+    <!-- LOGGED OUT DROPDOWN -->
+    <div id="userLoggedOutMenu" class="dropdown d-inline-block">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+            Menu
+        </button>
+
+        <ul class="dropdown-menu text-center p-0 mt-1">
+            <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
+            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
+            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
+        </ul>
+    </div>
+
+    <!-- LOGGED IN DROPDOWN -->
+    <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+            <span id="userEmail"></span>
+        </button>
+
+        <ul class="dropdown-menu text-center p-0 mt-1">
+            <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
+            <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
+            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
+        </ul>
+    </div>
+
+</div>
+
+
+  
+<form id="analysis-form">
+<div class="mb-3">
+  <label for="inputMethod" class="form-label">Input method</label>
+  <select id="inputMethod" class="form-select">
+    <option value="paste">Paste Text</option>
+    <option value="url">Provide URL</option>
+    <option value="image">Upload Image</option>
+    <option value="video">Upload Video</option>
+    <option value="video-url">Video URL</option>
+  </select>
+</div>
+
+<!-- ✅ Chrome AI Info Card -->
+<div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
+     style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
+  
+  <!-- Header: Title + Toggle Switch -->
+  <div class="d-flex justify-content-between align-items-start mb-2">
+    <div>
+      ⚙️ <strong>Chrome AI Mode</strong>
+    </div>
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="enableChromeAiToggle" checked style="cursor: pointer;">
+      <label class="form-check-label fw-bold" for="enableChromeAiToggle" style="font-size: 0.8rem;">Enabled</label>
+    </div>
+  </div>
+
+  <!-- Description -->
+  <div id="chrome-ai-description">
+    🧠 Gemini Nano will locally summarize and translate extracted or pasted text before analysis. This will ensure text preprocessing (cleanup, summarization & translation), full data privacy, and reduced backend costs.
+  </div>
+
+  <!-- Mode Selection -->
+  <div class="mt-2" id="chrome-ai-mode">
+    <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Processing Strategy</label>
+    <select id="chromeMode" class="form-select form-select-sm bg-white">
+      <option value="distill">🔬 Scientific Distillation (Epistemic Mode)</option>
+      <option value="accurate">🎯 Standard Summary</option>
+      <option value="fast">🏎️ Fast Cleanup</option>
+    </select>
+    <div class="form-text text-muted" style="font-size: 0.75rem;">
+      "Distillation" removes fluff but keeps all claims, dates, and data points.
+    </div>
+  </div>
+</div>
+
+<!-- ↩️ Undo Button (Hidden by default, sits below the button container) -->
+<div class="d-flex justify-content-end mt-1">
+    <button id="undo-nano-btn" class="btn btn-link btn-sm text-danger d-none" style="text-decoration:none; font-size: 0.85rem;">
+        ↩ Undo Changes
+    </button>
+</div>
+
+<!-- Area for Local AI Keywords -->
+<div id="nano-topics-container" class="d-none mt-2">
+  <small class="text-muted fw-bold me-2" style="font-size: 0.75rem;">TOPICS DETECTED:</small>
+  <div id="nano-topics-list" class="d-inline-block">
+    <!-- Badges will be injected here via JS -->
+  </div>
+</div>
+  
+<div id="paste-input-group" class="mb-3" style="position:relative;">
+  <label for="textInput" class="form-label">Paste article or post content</label>
+
+  <textarea id="textInput" rows="7" class="form-control"
+            placeholder="Paste content here..."></textarea>
+
+  <div id="chrome-ai-text" class="mt-2 d-none"></div>
+</div>
+
+<div id="url-input-group" class="mb-3 d-none">
+<label for="urlInput" class="form-label">Enter article URL</label>
+<div class="input-group">
+<input id="urlInput" type="text" class="form-control" placeholder="https://example.com">
+<button id="fetch-article-btn" class="btn btn-secondary" type="button">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Fetch Article
+</button>
+</div>
+</div>
+<div id="image-input-group" class="mb-3 d-none">
+<label class="form-label">Upload Image with Text</label>
+<div class="file-upload-group" id="image-upload-area">
+<div class="upload-icon">🖼️</div>
+<h5>Drop image here or click to browse</h5>
+<p class="text-muted">Supports JPG, PNG, GIF (Max 10MB)</p>
+<input type="file" id="imageInput" class="file-input-hidden" accept="image/*">
+<button type="button" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">
+Choose Image
+</button>
+<div id="image-preview" class="mt-3"></div>
+</div>
+<button id="process-image-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Extract Text from Image
+</button>
+</div>
+<div id="video-input-group" class="mb-3 d-none">
+<label class="form-label">Upload Video</label>
+<div class="file-upload-group" id="video-upload-area">
+<div class="upload-icon">📹</div>
+<h5>Drop video here or click to browse</h5>
+<p class="text-muted">Supports MP4, AVI, MOV (Max 50MB)</p>
+<input type="file" id="videoInput" class="file-input-hidden" accept="video/*">
+<button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoInput').click()">
+Choose Video
+</button>
+</div>
+<button id="process-video-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Transcribe Video
+</button>
+</div>
+<div id="video-url-input-group" class="mb-3 d-none">
+<label for="videoUrlInput" class="form-label">Enter Video URL</label>
+<div class="input-group">
+<input id="videoUrlInput" type="text" class="form-control" placeholder="https://youtube.com/watch?v=... or https://vimeo.com/...">
+<button id="transcribe-video-url-btn" class="btn btn-secondary" type="button">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Transcribe Video
+</button>
+</div>
+</div>
+<div class="mb-4">
+<label for="promptMode" class="form-label">Analysis focus</label>
+<select id="promptMode" class="form-select">
+<option>General Analysis of Testable Claims</option>
+<option>Specific Focus on Scientific Claims</option>
+<option>Technology-Focused Extraction</option>
+</select>
+</div>
+<div class="mb-4 form-check form-switch">
+<input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
+<label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + PubMed data</label>
+</div>
+<div class="d-grid">
+<button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Run Analysis
+</button>
+</div>
+</form>
+</div>
+<div id="results-container"></div>
+<!-- Always visible download button -->
+<div id="pdf-download-section" class="text-center mt-5">
+<button id="download-pdf-btn" class="btn btn-success btn-lg">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Download Analysis Report (PDF)
+</button>
+
+</div>
+<footer class="text-center text-muted footer">
+From murk to clarity — powered by Epistemiq.
+</footer>
+</div>
+<!-- Report Selection Modal -->
+<div class="modal fade" id="reportSelectionModal" tabindex="-1" aria-labelledby="reportSelectionModalLabel" aria-hidden="true">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+<div class="modal-header">
+<h5 class="modal-title" id="reportSelectionModalLabel">Select Reports for PDF</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+<div class="mb-3">
+<button id="select-all-reports-modal" class="btn btn-outline-primary btn-sm">Select All</button>
+<button id="deselect-all-reports-modal" class="btn btn-outline-secondary btn-sm">Deselect All</button>
+</div>
+<div id="report-selection-list" class="report-selection-list">
+<!-- Dynamic content will be inserted here -->
+</div>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+<button id="generate-pdf-from-modal" class="btn btn-success">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Generate PDF
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Research Report Modal (Vanilla Implementation) -->
+<div id="researchReportModal" class="custom-modal" aria-hidden="true">
+<div class="custom-modal-overlay" id="custom-modal-overlay"></div>
+<div class="custom-modal-dialog">
+<div class="custom-modal-content">
+<div class="custom-modal-header">
+<h5 class="custom-modal-title" id="researchReportModalLabel">Research Report</h5>
+<button type="button" class="custom-close-btn" aria-label="Close">&times;</button>
+</div>
+<div class="custom-modal-body">
+<div id="modal-report-content" class="report-box" style="max-height: 70vh; overflow-y: auto; padding: 1rem; line-height: 1.6; font-size: 1rem;">
+<!-- Report content will be inserted here -->
+</div>
+</div>
+<div class="custom-modal-footer">
+<button type="button" class="custom-btn custom-btn-secondary custom-close-btn">Close</button>
+<button id="copy-report-btn" class="custom-btn custom-btn-outline-primary">Copy to Clipboard</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Sign In</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <input id="loginEmail" type="email" class="form-control" placeholder="Enter your email">
+        <small id="loginStatus" class="text-muted"></small>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="sendLoginLink">Send Login Link</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+  <!-- 📜 User History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Your Analyses</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+         <ul id="historyList" class="list-group small"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+const inputMethodSelect = document.getElementById('inputMethod');
+const pasteInputGroup = document.getElementById('paste-input-group');
+const urlInputGroup = document.getElementById('url-input-group');
+const imageInputGroup = document.getElementById('image-input-group');
+const videoInputGroup = document.getElementById('video-input-group');
+const videoUrlInputGroup = document.getElementById('video-url-input-group');
+const textInput = document.getElementById('textInput');
+const urlInput = document.getElementById('urlInput');
+const imageInput = document.getElementById('imageInput');
+const videoInput = document.getElementById('videoInput');
+const videoUrlInput = document.getElementById('videoUrlInput');
+const fetchArticleBtn = document.getElementById('fetch-article-btn');
+const processImageBtn = document.getElementById('process-image-btn');
+const processVideoBtn = document.getElementById('process-video-btn');
+const transcribeVideoUrlBtn = document.getElementById('transcribe-video-url-btn');
+const analysisForm = document.getElementById('analysis-form');
+const runAnalysisBtn = document.getElementById('run-analysis-btn');
+const resultsContainer = document.getElementById('results-container');
+const pdfDownloadSection = document.getElementById('pdf-download-section');
+const downloadPdfBtn = document.getElementById('download-pdf-btn');
+const promptModeSelect = document.getElementById('promptMode');
+const usePapersToggle = document.getElementById('usePapersToggle');
+const imageUploadArea = document.getElementById('image-upload-area');
+const videoUploadArea = document.getElementById('video-upload-area');
+const imagePreview = document.getElementById('image-preview');
+const API_BASE = "";
+
+
+let analysisId = null;
+let generatedReports = [];
+let currentImageFile = null;
+let currentVideoFile = null;
+
+
+
+// ----------------------------------------------------
+// 1. Check login status on page load
+// ----------------------------------------------------
+async function checkAuth() {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    credentials: "include"
+  });
+  const data = await res.json();
+
+  const loginBtn = document.getElementById("loginBtn");
+  const userMenu = document.getElementById("userLoggedInMenu");
+  const emailSpan = document.getElementById("userEmail");
+
+  if (!loginBtn || !userMenu || !emailSpan) {
+    return; // defensive guard
+  }
+
+  if (data.authenticated) {
+    document.getElementById("userLoggedOutMenu")?.classList.add("d-none");
+    document.getElementById("userLoggedInMenu")?.classList.remove("d-none");
+    emailSpan.innerText = data.email || "";
+} else {
+    document.getElementById("userLoggedInMenu")?.classList.add("d-none");
+    document.getElementById("userLoggedOutMenu")?.classList.remove("d-none");
+}
+
+}
+
+checkAuth();
+
+
+// ----------------------------------------------------
+// 2. Open login modal
+// ----------------------------------------------------
+document.getElementById("loginBtn").onclick = () => {
+  const modal = new bootstrap.Modal(document.getElementById("loginModal"));
+  modal.show();
+};
+
+// ----------------------------------------------------
+// 3. Request magic link
+// ----------------------------------------------------
+document.getElementById("sendLoginLink").onclick = async () => {
+  const email = document.getElementById("loginEmail").value.trim();
+  const status = document.getElementById("loginStatus");
+
+  status.innerText = "Sending...";
+  const res = await fetch(`${API_BASE}/auth/request-link`, {
+    method: "POST",
+    credentials: "include",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ email })
+  });
+
+  if (!res.ok) {
+    status.innerText = "Error sending link.";
+    return;
+  }
+
+  status.innerText = "Login link sent! Check your email.";
+};
+
+// ----------------------------------------------------
+// 4. Process ?token= & ?email= from magic-link
+// ----------------------------------------------------
+async function processLoginToken() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("token") || !params.has("email")) return;
+
+  const token = params.get("token");
+  const email = params.get("email");
+
+  // Redirect directly to backend GET route
+  window.location.href = `${API_BASE}/auth/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+}
+
+// Always run on page load
+processLoginToken();
+
+
+// ----------------------------------------------------
+// 5. Load user history (Updated)
+// ----------------------------------------------------
+async function loadHistory() {
+  const list = document.getElementById("historyList");
+  if (!list) return; 
+
+  const res = await fetch(`${API_BASE}/api/my-analyses`, {
+    credentials: "include"
+  });
+
+  if (!res.ok) return;
+
+  const data = await res.json();
+
+  list.innerHTML = "";
+
+  if (!data.items || data.items.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "list-group-item text-muted text-center bg-transparent border-0";
+    empty.textContent = "No saved analyses yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  data.items.forEach(item => {
+    const li = document.createElement("li");
+    li.className = "list-group-item bg-white shadow-sm p-3";
+
+    // format created_at as dd/mm/yy
+    let dateLabel = "";
+    if (item.created_at) {
+      const d = new Date(item.created_at);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = String(d.getFullYear()).slice(-2);
+      dateLabel = `${day}/${month}/${year}`;
+    }
+
+    const safeTitle = item.title || item.mode || "Untitled analysis";
+    // Escape basic HTML to prevent XSS in title
+    const escapedTitle = safeTitle.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    li.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <!-- 1. Title: text-wrap allows multi-line, text-break prevents layout break on long words -->
+        <strong class="text-wrap text-break me-2">${escapedTitle}</strong>
+        
+        <!-- 2. Date: flex-shrink-0 ensures the date never gets squashed by a long title -->
+        <span class="badge bg-light text-dark border flex-shrink-0">${dateLabel}</span>
+      </div>
+      
+      <div class="d-flex gap-2 mt-2">
+        <!-- UPDATED: Onclick now hides the modal explicitly -->
+        <button class="btn btn-sm btn-primary me-2"
+          onclick="event.stopPropagation(); loadAnalysis('${item.analysis_id}'); bootstrap.Modal.getInstance(document.getElementById('historyModal')).hide();">
+          Open
+        </button>
+
+        <button class="btn btn-sm btn-outline-danger"
+          onclick="event.stopPropagation(); deleteAnalysis('${item.analysis_id}')">
+          Delete
+        </button>
+      </div>
+    `;
+
+    list.appendChild(li);
+  });
+}
+
+
+// ----------------------------------------------------
+// 6. Delete analysis
+// ----------------------------------------------------
+async function deleteAnalysis(id) {
+  await fetch(`${API_BASE}/api/delete-analysis/${id}`, {
+    method: "DELETE",
+    credentials: "include"
+  });
+  loadHistory();
+}
+
+// ----------------------------------------------------
+// 7. Load an existing analysis back into UI (cached only)
+// ----------------------------------------------------
+async function loadAnalysis(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/analysis-snapshot?analysis_id=${encodeURIComponent(id)}`, {
+      credentials: "include"
+    });
+
+    if (!res.ok) {
+      alert("Could not load analysis (status " + res.status + ").");
+      return;
+    }
+
+    const data = await res.json();
+
+    // Set global analysisId so future actions (reports, PDF) use this one
+    analysisId = data.analysis_id;
+
+    // Clear current results
+    resultsContainer.innerHTML = "";
+
+    if (!data.claims || data.claims.length === 0) {
+      resultsContainer.innerHTML = '<div class="alert alert-info mt-3">No claims stored for this analysis.</div>';
+      return;
+    }
+
+    // Rebuild claim cards using ONLY cached data
+    data.claims.forEach((claim, idx) => {
+      const claimId = `claim-${idx}`;
+      const verdictId = `model-verdict-${claimId}`;
+      const questionsId = `questions-list-${claimId}`;
+      const externalVerdictId = `external-verdict-${claimId}`;
+      const externalSourcesId = `external-sources-${claimId}`;
+
+      const claimHtml = `
+        <div class="claim-card" id="${claimId}">
+          <h5>Claim ${idx + 1}</h5>
+          <p class="claim-text mb-3">${escapeHTML(claim.claim_text)}</p>
+
+          <strong>Model Verdict:</strong>
+          <div id="${verdictId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
+            ${
+              claim.model_verdict
+                ? formatTextWithMarkdownAndLinks(claim.model_verdict)
+                : '<span class="text-muted">No model verdict cached yet.</span>'
+            }
+          </div>
+
+          <strong>Suggested Research Questions:</strong>
+          <ul id="${questionsId}" class="question-list list-group list-group-flush mb-3"></ul>
+
+          <hr>
+
+          <strong>External Verification (Semantic Scholar, Crossref, CORE & PubMed):</strong>
+          <div id="${externalVerdictId}" class="verdict-box mb-2" style="min-height: 50px;">
+            ${
+              claim.external_verdict
+                ? formatTextWithMarkdownAndLinks(claim.external_verdict)
+                : '<span class="text-muted">No external verification cached yet.</span>'
+            }
+          </div>
+          <ul id="${externalSourcesId}" class="source-list list-unstyled ps-3 mb-3"></ul>
+        </div>
+      `;
+
+      resultsContainer.innerHTML += claimHtml;
+
+      // --- Questions (from cache only)
+      const questionsList = document.getElementById(questionsId);
+      if (claim.questions && claim.questions.length > 0) {
+        claim.questions.forEach((q, qIdx) => {
+          const li = document.createElement("li");
+          li.className = "list-group-item";
+          li.innerHTML = `
+            <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
+            <button class="btn btn-primary btn-sm generate-report-btn"
+                data-claim-idx="${idx}"
+                data-question-idx="${qIdx}"
+                data-report-container-id="report-claim-${idx}-${qIdx}">
+              Generate Report
+            </button>
+            <div id="report-claim-${idx}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
+          `;
+          questionsList.appendChild(li);
+        });
+      } else {
+        questionsList.innerHTML = '<li class="list-group-item">No cached research questions for this claim.</li>';
+      }
+
+      // --- External sources (from cache only)
+      const extSourcesUl = document.getElementById(externalSourcesId);
+      if (claim.external_sources && claim.external_sources.length > 0) {
+        extSourcesUl.innerHTML = claim.external_sources
+          .map(s => {
+            const sourceInfo = s.source ? `[${s.source}]` : "";
+            const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : "";
+            const yearInfo = s.year ? ` (${s.year})` : "";
+            const authorsInfo = s.authors ? ` - ${s.authors}` : "";
+            const title = s.title || "Untitled";
+            const url = s.url || "#";
+            return `📄 ${sourceInfo} <a href="${url}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a>${authorsInfo}${yearInfo}${citationInfo}`;
+          })
+          .map(html => `<li>${html}</li>`)
+          .join("");
+      } else {
+        extSourcesUl.innerHTML = "<li>No cached external sources for this claim.</li>";
+      }
+    });
+
+  } catch (err) {
+    console.error("Error loading analysis:", err);
+    alert("Error loading analysis: " + err.message);
+  }
+}
+
+window.loadAnalysis = loadAnalysis;
+window.deleteAnalysis = deleteAnalysis;
+
+document.getElementById("openHistoryBtn").onclick = async () => {
+    await loadHistory();
+    const modal = new bootstrap.Modal(document.getElementById("historyModal"));
+    modal.show();
+};
+
+
+
+function b64ToBlob(b64, mime) {
+    const byteChars = atob(b64);
+    const byteNums = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNums);
+    return new Blob([byteArray], { type: mime });
+}
+  
+// Track all reports that the user generated (from cache or new) in this session
+const reportSessionMap = new Map();
+
+function sessionKey(c, q) { 
+  return `${c}-${q}`; 
+}
+
+// ✅ Register a report as “generated” this session
+function markReportGenerated(claimIdx, questionIdx) {
+  const claimTextEl = document.querySelector(`#claim-${claimIdx} .claim-text`);
+  const claimText = claimTextEl ? claimTextEl.textContent : `Claim ${claimIdx + 1}`;
+
+  // Extract question text (for modal display)
+  const qLi = document.querySelector(`#report-claim-${claimIdx}-${questionIdx}`)?.closest('li');
+  const qSpan = qLi ? qLi.querySelector('span') : null;
+  const questionTextRaw = qSpan ? qSpan.textContent : `Question ${questionIdx + 1}`;
+  const questionText = questionTextRaw.replace(/^Q\d+:\s*/i, '').trim();
+
+  reportSessionMap.set(sessionKey(claimIdx, questionIdx), {
+    claimIdx,
+    questionIdx,
+    claimText,
+    questionText
+  });
+}
+  
+
+// UI/Display Functions
+
+function addCachedIndicator(element, type) {
+    const indicator = document.createElement('span');
+    indicator.className = 'badge bg-secondary ms-2';
+    indicator.textContent = 'Cached';
+    indicator.title = `This ${type} was loaded from cache`;
+    element.appendChild(indicator);
+}
+
+function toggleLoading(button, isLoading, loadingText = '', progress = '') {
+const spinner = button.querySelector('.spinner-border');
+const originalText = button.dataset.originalText || button.textContent.trim();
+if (!button.dataset.originalText) {
+button.dataset.originalText = originalText;
+}
+if (isLoading) {
+button.disabled = true;
+if(spinner) spinner.classList.remove('d-none');
+const progressText = progress ? ` (${progress})` : '';
+const textNode = Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
+if(textNode) textNode.textContent = ` ${loadingText}${progressText}`;
+} else {
+button.disabled = false;
+if(spinner) spinner.classList.add('d-none');
+const textNode = Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
+if(textNode) textNode.textContent = ` ${originalText}`;
+}
+}
+
+function escapeHTML(str) {
+if (typeof str !== 'string') return str;
+return str.replace(/[&<>"']/g, function(match) {
+return {
+'&': '&amp;',
+'<': '&lt;',
+'>': '&gt;',
+'"': '&quot;',
+"'": '&#39;'
+}[match];
+});
+}
+
+function convertMarkdownTablesToHTML(text) {
+const tableRegex = /(\|.*\|\s*\n\|[-:\s|]+\|\s*\n(?:\|.*\|\s*\n)*)/g;
+return text.replace(tableRegex, (tableMatch) => {
+const lines = tableMatch.trim().split('\n').filter(line => line.trim().startsWith('|'));
+if (lines.length < 2) return tableMatch;
+let htmlTable = '<table class="table table-bordered table-sm mt-2 mb-3" style="font-size: 0.9rem;">';
+lines.forEach((line, index) => {
+const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+if (index === 0) {
+htmlTable += '<thead><tr>';
+cells.forEach(cell => {
+htmlTable += `<th style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</th>`;
+});
+htmlTable += '</tr></thead><tbody>';
+} else if (index === 1 && cells.every(cell => cell.replace(/[-:\s]/g, '') === '')) {
+return;
+} else {
+htmlTable += '<tr>';
+cells.forEach(cell => {
+const isHeader = index === 1 && lines[0].replace(/[-:\s|]/g, '') === '';
+if (isHeader) {
+htmlTable += `<th style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</th>`;
+} else {
+htmlTable += `<td style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</td>`;
+}
+});
+htmlTable += '</tr>';
+}
+});
+htmlTable += '</tbody></table>';
+return htmlTable;
+});
+}
+
+function formatTextWithMarkdownAndLinks(text) {
+let normalizedText = text.normalize('NFKD');
+normalizedText = normalizedText.replace(/[–—]/g, '-');
+normalizedText = normalizedText.replace(/[â€"â€"]/g, '-');
+normalizedText = normalizedText.replace(/[â€™]/g, "'");
+normalizedText = normalizedText.replace(/[â€œâ€]/g, '"');
+normalizedText = normalizedText.replace(/[¯]/g, ' ');
+normalizedText = normalizedText.replace(/[­]/g, '');
+normalizedText = normalizedText.replace(/Î²/g, 'beta');
+normalizedText = normalizedText.replace(/Î±/g, 'alpha');
+normalizedText = normalizedText.replace(/Î³/g, 'gamma');
+let formattedText = escapeHTML(normalizedText);
+formattedText = convertMarkdownTablesToHTML(formattedText);
+formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+formattedText = formattedText.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+formattedText = formattedText.replace(/\n/g, '<br>');
+return formattedText;
+}
+
+function setupFileUploadDragAndDrop(uploadArea, fileInput, onFileSelect) {
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+uploadArea.addEventListener(eventName, preventDefaults, false);
+document.body.addEventListener(eventName, preventDefaults, false);
+});
+['dragenter', 'dragover'].forEach(eventName => {
+uploadArea.addEventListener(eventName, highlight, false);
+});
+['dragleave', 'drop'].forEach(eventName => {
+uploadArea.addEventListener(eventName, unhighlight, false);
+});
+uploadArea.addEventListener('drop', handleDrop, false);
+
+function preventDefaults(e) {
+e.preventDefault();
+e.stopPropagation();
+}
+
+function highlight() {
+uploadArea.classList.add('dragover');
+}
+
+function unhighlight() {
+uploadArea.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+const dt = e.dataTransfer;
+const files = dt.files;
+fileInput.files = files;
+onFileSelect(files[0]);
+}
+
+fileInput.addEventListener('change', (e) => {
+if (e.target.files.length > 0) {
+onFileSelect(e.target.files[0]);
+}
+});
+}
+
+function handleImageSelect(file) {
+if (file && file.type.startsWith('image/')) {
+currentImageFile = file;
+processImageBtn.disabled = false;
+const reader = new FileReader();
+reader.onload = (e) => {
+imagePreview.innerHTML = `<img src="${e.target.result}" class="preview-image" alt="Image preview">`;
+};
+reader.readAsDataURL(file);
+} else {
+alert('Please select a valid image file (JPG, PNG, GIF)');
+currentImageFile = null;
+processImageBtn.disabled = true;
+imagePreview.innerHTML = '';
+}
+}
+
+function handleVideoSelect(file) {
+if (file && file.type.startsWith('video/')) {
+currentVideoFile = file;
+processVideoBtn.disabled = false;
+} else {
+alert('Please select a valid video file (MP4, AVI, MOV)');
+currentVideoFile = null;
+processVideoBtn.disabled = true;
+}
+}
+
+async function processImage() {
+if (!currentImageFile) {
+alert('Please select an image first');
+return;
+}
+toggleLoading(processImageBtn, true, 'Processing image...');
+const formData = new FormData();
+formData.append('image', currentImageFile);
+try {
+const response = await fetch(`${API_BASE}/api/process-image`, {
+method: 'POST',
+body: formData
+});
+const data = await response.json();
+if (!response.ok) {
+throw new Error(data.error || 'Failed to process image');
+}
+textInput.value = data.extracted_text;
+inputMethodSelect.value = 'paste';
+inputMethodSelect.dispatchEvent(new Event('change'));
+alert('Text successfully extracted from image! Ready for analysis.');
+} catch (error) {
+alert(`Error processing image: ${error.message}`);
+} finally {
+toggleLoading(processImageBtn, false);
+}
+}
+
+// ✅ Chrome AI transcription helper
+async function transcribeWithChromeAI(audioBlob) {
+  const hasPrompt = !!(window.ai && typeof window.ai.prompt === "function");
+  if (!hasPrompt) throw new Error("Chrome Prompt API not available.");
+
+  const audioBuf = await new Response(audioBlob).arrayBuffer();
+
+  const input = {
+    messages: [{
+      role: "user",
+      content: [
+        { type: "input_audio", data: audioBuf, mime_type: "audio/wav" },
+        { type: "text", text: "Transcribe this audio clearly into English text." }
+      ]
+    }]
+  };
+
+  const result = await window.ai.prompt(input);
+  const text = (result?.output_text ?? result?.text ?? result) || "";
+  if (!text.trim()) throw new Error("Chrome AI returned empty transcript.");
+  return text.trim();
+}
+
+
+// If fetch isn't globally bound (Safari/ESM edge case)
+if (!globalThis.fetch) globalThis.fetch = fetch;
+
+async function transcribeWithTransformersWASM(audioBlob) {
+  if (!window.__tf_asr) {
+    console.log("Initializing Whisper...");
+    window.__tf_asr = await window.__tf.pipeline(
+      "automatic-speech-recognition",
+      "Xenova/whisper-tiny.en"
+    );
+  }
+
+  const arrayBuffer = await audioBlob.arrayBuffer();
+
+  // ✅ Force AudioContext to NOT upsample
+  // Safari/Chrome will default to 48k, so we override
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+    sampleRate: 16000
+  });
+
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+  // ✅ Manually downsample to 16k buffer Whisper expects
+  const input = audioBuffer.getChannelData(0);
+  const sr = audioBuffer.sampleRate;
+
+  if (sr !== 16000) {
+    console.warn(`Browser decoded at ${sr}Hz, resampling to 16k...`);
+
+    const ratio = sr / 16000;
+    const resampled = new Float32Array(Math.round(input.length / ratio));
+
+    for (let i = 0; i < resampled.length; i++) {
+      resampled[i] = input[Math.round(i * ratio)] || 0;
+    }
+
+    return runWhisper(resampled);
+  }
+
+  return runWhisper(input);
+
+  async function runWhisper(float32Audio) {
+    console.log("Transcribing via Whisper WASM…");
+
+    const output = await window.__tf_asr(float32Audio, {
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      language: "en"
+    });
+
+    const text = output.text?.trim();
+    if (!text) throw new Error("Empty transcript");
+
+    return text;
+  }
+}
+
+  
+// ✅ Main video handler (fixed)
+async function processVideo() {
+  const file = document.getElementById('videoInput').files[0];
+  if (!file) return;
+
+  const btn = document.getElementById('process-video-btn');
+  toggleLoading(btn, true, 'Extracting audio...');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    // 1. Extract audio → get 16kHz WAV blob
+    const response = await fetch(`${API_BASE}/api/extract-audio`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || 'Audio extraction failed');
+    }
+
+    const audioBlob = await response.blob();
+    if (audioBlob.size === 0) throw new Error("Empty audio file");
+
+    // 2. Transcribe locally
+    toggleLoading(btn, true, 'Transcribing locally...');
+    const transcript = await transcribeWithTransformersWASM(audioBlob);
+
+    // 3. Success
+    document.getElementById('textInput').value = transcript;
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+
+    alert('Transcription complete!');
+
+  } catch (err) {
+    console.error("Transcription failed:", err);
+    alert('Error: ' + err.message);
+  } finally {
+    toggleLoading(btn, false);
+  }
+}
+  
+async function transcribeVideoUrl() {
+  const urlInput = document.getElementById("videoUrlInput");
+  const btn = document.getElementById("transcribe-video-url-btn");
+  const url = urlInput.value.trim();
+
+  if (!url) return alert("Enter a YouTube URL");
+
+  // 1. Extract Video ID
+  // Handles: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID
+  const ytMatch = url.match(/(?:youtu\.be\/|v=|\/embed\/)([\w-]+)/);
+  if (!ytMatch) {
+    return alert("Invalid YouTube URL. Please use a standard link.");
+  }
+  const videoId = ytMatch[1];
+
+  toggleLoading(btn, true, "Hunting for captions...");
+  urlInput.disabled = true;
+
+  let fullText = "";
+  let usedSource = "";
+
+  try {
+    // =================================================================
+    // ATTEMPT 1: 3rd Party Scraper via 'AllOrigins' Proxy
+    // AllOrigins is often less blocked than other proxies
+    // =================================================================
+    try {
+        console.log("Attempt 1: youtubetranscript.com via AllOrigins");
+        const targetUrl = `https://youtubetranscript.com/Transcript?n=${videoId}`;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+            const xml = await res.text();
+            if (xml.includes("<text")) {
+                fullText = parseXmlTranscript(xml);
+                if (fullText) usedSource = "Scraper (AllOrigins)";
+            }
+        }
+    } catch (e) { console.warn("Attempt 1 failed:", e); }
+
+    // =================================================================
+    // ATTEMPT 2: 3rd Party Scraper via 'CorsProxy'
+    // Fallback proxy if AllOrigins fails/timeouts
+    // =================================================================
+    if (!fullText) {
+        try {
+            console.log("Attempt 2: youtubetranscript.com via CorsProxy");
+            const targetUrl = `https://youtubetranscript.com/Transcript?n=${videoId}`;
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            
+            const res = await fetch(proxyUrl);
+            if (res.ok) {
+                const xml = await res.text();
+                if (xml.includes("<text")) {
+                    fullText = parseXmlTranscript(xml);
+                    if (fullText) usedSource = "Scraper (CorsProxy)";
+                }
+            }
+        } catch (e) { console.warn("Attempt 2 failed:", e); }
+    }
+
+    // =================================================================
+    // ATTEMPT 3: Piped API Network (Decentralized YouTube Backends)
+    // If scraper sites are down, these instances talk to YT directly.
+    // =================================================================
+    if (!fullText) {
+        console.log("Attempt 3: Piped API Network");
+        const pipedInstances = [
+            "https://api.piped.pw",           // Usually most reliable
+            "https://pipedapi.kavin.rocks",   // Popular, sometimes rate limited
+            "https://pipedapi.drgns.space",
+            "https://api.piped.gl",
+            "https://pa.il.ax"
+        ];
+
+        for (const base of pipedInstances) {
+            try {
+                console.log(`Trying Piped instance: ${base}`);
+                // 2 second timeout to fail fast if instance is lagging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                
+                const res = await fetch(`${base}/streams/${videoId}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!res.ok) continue;
+
+                const data = await res.json();
+                if (!data.subtitles || data.subtitles.length === 0) continue;
+
+                // Find English (Manual > Auto)
+                // Check 'code' (en) or 'name' (English)
+                let track = data.subtitles.find(s => s.code === 'en' && !s.autoGenerated);
+                if (!track) track = data.subtitles.find(s => s.code === 'en');
+                if (!track) track = data.subtitles.find(s => s.name && s.name.includes('English'));
+
+                if (track) {
+                    const subRes = await fetch(track.url);
+                    if (subRes.ok) {
+                        const vtt = await subRes.text();
+                        fullText = parseVttTranscript(vtt);
+                        if (fullText) {
+                            usedSource = `Piped API (${base})`;
+                            break; // Exit loop
+                        }
+                    }
+                }
+            } catch (e) { console.warn(`Skipping ${base}:`, e.message); }
+        }
+    }
+
+    // =================================================================
+    // FINALIZE
+    // =================================================================
+    if (!fullText || fullText.length < 20) {
+        throw new Error("Exhausted all sources. Video may lack English captions or is geo-locked.");
+    }
+
+    console.log(`✅ Success via ${usedSource}`);
+
+    // Fill Input
+    const textInput = document.getElementById("textInput");
+    const inputMethodSelect = document.getElementById("inputMethod");
+    
+    textInput.value = fullText;
+    inputMethodSelect.value = "paste";
+    inputMethodSelect.dispatchEvent(new Event("change"));
+
+    // Trigger Chrome AI if enabled
+    const chromeToggle = document.getElementById("enableChromeAiToggle");
+    if (chromeToggle && chromeToggle.checked) {
+         const chromeBtn = document.querySelector("#chrome-ai-text button");
+         if(chromeBtn) {
+             chromeBtn.innerHTML = "🤖 Auto-cleaning transcript...";
+             setTimeout(() => chromeBtn.click(), 500);
+         }
+    } else {
+         alert("✅ Transcript imported!");
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("Unable to fetch captions.\n\nTechnical reason: YouTube is blocking scraping requests from this browser/network.\n\nWorkaround: Please open the video description on YouTube, click 'Show Transcript', copy the text, and paste it here.");
+  } finally {
+    toggleLoading(btn, false);
+    urlInput.disabled = false;
+  }
+}
+
+// --- HELPER PARSERS ---
+
+function parseXmlTranscript(xml) {
+    try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xml, "text/xml");
+        const textNodes = xmlDoc.getElementsByTagName("text");
+        let extracted = [];
+        for (let i = 0; i < textNodes.length; i++) {
+            // Decode HTML entities automatically via textContent
+            extracted.push(textNodes[i].textContent);
+        }
+        return extracted.join(" ").replace(/\s+/g, " ").trim();
+    } catch (e) { return null; }
+}
+
+function parseVttTranscript(vtt) {
+    try {
+        return vtt
+            .replace(/WEBVTT/g, "")
+            .replace(/(\d{2}:)?\d{2}:\d{2}\.\d{3} --> (\d{2}:)?\d{2}:\d{2}\.\d{3}/g, "")
+            .replace(/<[^>]+>/g, "")
+            .replace(/align:[^\s]+/g, "")
+            .replace(/position:[^\s]+/g, "")
+            .replace(/line:[^\s]+/g, "")
+            .replace(/^\s*[\r\n]/gm, "")
+            .replace(/\n+/g, " ")
+            .trim();
+    } catch (e) { return null; }
+}
+
+// (Keep your toggleLoading helper as is)
+function toggleLoading(btn, isLoading, msg = "") {
+  const spinner = btn.querySelector(".spinner-border");
+  if (isLoading) {
+    btn.disabled = true;
+    if(spinner) spinner.classList.remove("d-none");
+    if (!btn.dataset.originalText) btn.dataset.originalText = btn.lastChild.textContent;
+    btn.lastChild.textContent = " " + msg;
+  } else {
+    btn.disabled = false;
+    if(spinner) spinner.classList.add("d-none");
+    if (btn.dataset.originalText) btn.lastChild.textContent = btn.dataset.originalText;
+  }
+}
+function displayClaimsStructure(claims) {
+    claims.forEach((claimText, index) => {
+        const claimId = `claim-${index}`;
+        const claimHtml = `
+        <div class="claim-card" id="${claimId}">
+            <h5>Claim ${index + 1}</h5>
+            <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
+            <strong>Model Verdict:</strong>
+            <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
+                <span class="text-muted">Loading model verdict...</span>
+            </div>
+            <strong>Suggested Research Questions:</strong>
+            <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
+                <li class="list-group-item">
+                    <span class="text-muted">Loading questions...</span>
+                </li>
+            </ul>
+            <hr>
+            <strong>External Verification (Semantic Scholar, Crossref & PubMed):</strong>
+            <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
+                ${usePapersToggle.checked ? '<span class="text-muted">Loading external verification...</span>' : 'External verification is toggled off.'}
+            </div>
+            <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3"></ul>
+        </div>
+        `;
+        resultsContainer.innerHTML += claimHtml;
+    });
+
+    autoLoadClaimDetails(claims);
+    }
+
+async function autoLoadClaimDetails(claims) {
+    const promises = claims.map(async (claim, index) => {
+        const claimId = `claim-${index}`;
+        const verdictContainerId = `model-verdict-${claimId}`;
+        const questionsContainerId = `questions-list-${claimId}`;
+        const externalVerdictContainerId = `external-verdict-${claimId}`;
+        const externalSourcesContainerId = `external-sources-${claimId}`;
+
+        try {
+            // Check if we already have model details
+            const claimElement = document.getElementById(claimId);
+            if (claimElement && claimElement.dataset.hasModelDetails) {
+                // Details already loaded, skip API call
+                console.log(`Using cached model details for claim ${index}`);
+            } else {
+                await getModelDetails(index, verdictContainerId, questionsContainerId, null, true);
+            }
+
+            if (usePapersToggle.checked) {
+                // Check if we already have external verification
+                if (claimElement && claimElement.dataset.hasExternalDetails) {
+                    console.log(`Using cached external verification for claim ${index}`);
+                } else {
+                    await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true);
+                }
+            }
+        } catch (error) {
+            console.error(`Error loading details for claim ${index}:`, error);
+        }
+    });
+
+    for (let i = 0; i < claims.length; i++) {
+        toggleLoading(runAnalysisBtn, true, 'Analyzing', `Claim ${i + 1} of ${claims.length}`);
+        await promises[i];
+    }
+    toggleLoading(runAnalysisBtn, false);
+    }
+
+async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false) {
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const questionsList = document.getElementById(questionsContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Loading details...");
+
+  try {
+    const response = await fetch(`${API_BASE}/api/get-claim-details`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx   // ← fix: use claimIdx, not idx
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || `Failed to get claim details: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
+    verdictContainer.innerHTML = formattedVerdict;
+
+    questionsList.innerHTML = '';
+    if (data.questions && data.questions.length > 0) {
+      data.questions.forEach((q, q_idx) => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item';
+        listItem.innerHTML = `
+          <span class="d-block mb-2"><b>Q${q_idx + 1}:</b> ${escapeHTML(q)}</span>
+          <button class="btn btn-primary btn-sm generate-report-btn"
+            data-claim-idx="${claimIdx}"
+            data-question-idx="${q_idx}"
+            data-report-container-id="report-claim-${claimIdx}-${q_idx}">
+            Generate Report
+          </button>
+          <div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
+        `;
+        questionsList.appendChild(listItem);
+
+        const reportId = `claim-${claimIdx}-question-${q_idx}`;
+        if (!generatedReports.find(r => r.id === reportId)) {
+          generatedReports.push({
+            id: reportId,
+            claimIdx: claimIdx,
+            questionIdx: q_idx,
+            claimText: document.querySelector(`#claim-${claimIdx} .claim-text`).textContent,
+            questionText: q
+          });
+        }
+      });
+    } else {
+      questionsList.innerHTML = '<li class="list-group-item">No research questions generated.</li>';
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${escapeHTML(error.message)}</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
+}
+
+async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false) {
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const sourcesContainer = document.getElementById(sourcesContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Verifying...");
+  verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
+  sourcesContainer.innerHTML = '';
+
+  try {
+    const response = await fetch(`${API_BASE}/api/verify-external`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx   // ← fix: use claimIdx
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `External verification failed: ${response.status}`); // ← fix: backticks already used
+    }
+
+    verdictContainer.innerHTML = formatTextWithMarkdownAndLinks(data.verdict);
+
+    if (data.sources && data.sources.length > 0) {
+      sourcesContainer.innerHTML = data.sources.map(s => {
+        const sourceInfo = s.source ? `[${s.source}]` : '';
+        const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
+        const yearInfo = s.year ? ` (${s.year})` : '';
+        const authorsInfo = s.authors ? ` - ${s.authors}` : '';
+        return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
+      }).join('');
+    } else {
+      sourcesContainer.innerHTML = `<li>No external sources found.</li>`;
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-warning p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    sourcesContainer.innerHTML = `<li>Could not fetch sources.</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
+}
+
+function showReportInModal(reportContent, claimIdx, questionIdx) {
+const modal = document.getElementById('researchReportModal');
+const modalTitle = document.getElementById('researchReportModalLabel');
+const modalContent = document.getElementById('modal-report-content');
+modalTitle.textContent = `Research Report - Claim ${claimIdx + 1}, Question ${questionIdx + 1}`;
+modalContent.innerHTML = formatTextWithMarkdownAndLinks(reportContent);
+modal.style.display = 'block';
+document.body.classList.add('body-no-scroll');
+const copyButton = document.getElementById('copy-report-btn');
+copyButton.onclick = () => {
+navigator.clipboard.writeText(reportContent).then(() => {
+const originalText = copyButton.innerHTML;
+copyButton.innerHTML = '✓ Copied!';
+setTimeout(() => {
+copyButton.innerHTML = originalText;
+}, 2000);
+}).catch(err => {
+console.error('Failed to copy: ', err);
+alert('Failed to copy report to clipboard');
+});
+};
+}
+
+async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
+  const reportContainer = document.getElementById(reportContainerId);
+  reportContainer.innerHTML =
+    '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
+  if (button) { button.disabled = true; button.innerHTML = 'Generating...'; }
+
+  try {
+    const es = new EventSource(
+      `${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}`,
+      { withCredentials: true }
+    );
+
+    reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
+    const reportBox = reportContainer.querySelector('.report-box');
+    let fullContent = '';
+
+    es.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        es.close();
+
+        if (fullContent && fullContent.trim().length > 0) {
+          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+
+          // ✅ View full report button
+          const viewBtn = document.createElement('button');
+          viewBtn.className = 'btn btn-outline-primary btn-sm mt-2';
+          viewBtn.textContent = '📖 View Full Report';
+          viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
+          reportContainer.appendChild(viewBtn);
+
+          // ✅ Register as “generated this session” (cached or streamed)
+          markReportGenerated(claimIdx, questionIdx);
+        } else {
+          reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
+        }
+        return;
+      }
+
+      try {
+        const data = JSON.parse(event.data);
+        if (data.content) {
+          fullContent += data.content;
+          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+        }
+        if (data.error) {
+          reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(data.error)}</strong>`;
+        }
+      } catch {
+        // cached or non-JSON chunk
+        fullContent += event.data;
+        reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      reportContainer.innerHTML = `<div class="alert alert-danger">Stream error or unsupported media type.</div>`;
+    };
+  } catch (error) {
+    console.error('Report generation error:', error);
+    reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
+  } finally {
+    if (button) { button.disabled = false; button.innerHTML = 'Generate Report'; }
+  }
+}
+
+
+// NEW PDF DOWNLOAD FUNCTIONS
+
+async function openReportSelectionModal() {
+  try {
+    if (!analysisId) {
+      alert('No analysis found. Please run an analysis first.');
+      return;
+    }
+
+    toggleLoading(downloadPdfBtn, true, 'Loading available reports...');
+
+    const resp = await fetch(`${API_BASE}/api/available-reports?analysis_id=${analysisId}`, {
+      credentials: "include"
+    });
+    if (!resp.ok) throw new Error('Failed to load available reports');
+
+    const available = await resp.json(); // [{ id, type, description }, ...]
+
+    // Always include claim summaries (model + external)
+    const summaries = available.filter(r => r.id && r.id.endsWith('-summary'));
+
+    // Only include research reports generated this session
+    const sessionKeys = Array.from(reportSessionMap.keys());
+    const sessionReports = available.filter(r => {
+      if (!r.id || !r.id.includes('question')) return false;
+      const parts = r.id.split('-');
+      if (parts.length !== 4) return false;
+      const c = parseInt(parts[1], 10);
+      const q = parseInt(parts[3], 10);
+      if (Number.isNaN(c) || Number.isNaN(q)) return false;
+      return sessionKeys.includes(`${c}-${q}`);
+    });
+
+    const listForModal = [...summaries, ...sessionReports];
+
+    if (!listForModal || listForModal.length === 0) {
+      alert('No reports or claim summaries found for this analysis.');
+      return;
+    }
+
+    populateReportSelectionModal(listForModal);
+
+    const modal = new bootstrap.Modal(document.getElementById('reportSelectionModal'));
+    modal.show();
+
+  } catch (err) {
+    console.error('Error opening report selection modal:', err);
+    alert(`Error: ${err.message}`);
+  } finally {
+    toggleLoading(downloadPdfBtn, false);
+  }
+}
+
+
+  
+  
+function populateReportSelectionModal(availableReports) {
+const selectionList = document.getElementById('report-selection-list');
+if (!availableReports || availableReports.length === 0) {
+selectionList.innerHTML = '<p class="text-muted">No reports available for download.</p>';
+return;
+}
+let html = '';
+availableReports.forEach((report, index) => {
+html += `
+<div class="report-selection-item">
+<div class="form-check">
+<input class="form-check-input report-selection-checkbox" type="checkbox"
+id="modal-report-${index}" value="${report.id}" checked>
+<label class="form-check-label" for="modal-report-${index}">
+<strong>${report.type}</strong><br>
+<small class="text-muted">${report.description}</small>
+</label>
+</div>
+</div>
+`;
+});
+selectionList.innerHTML = html;
+setupSelectionModalEvents();
+}
+
+function setupSelectionModalEvents() {
+const selectAllBtn = document.getElementById('select-all-reports-modal');
+const deselectAllBtn = document.getElementById('deselect-all-reports-modal');
+const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
+selectAllBtn.replaceWith(selectAllBtn.cloneNode(true));
+deselectAllBtn.replaceWith(deselectAllBtn.cloneNode(true));
+generatePdfBtn.replaceWith(generatePdfBtn.cloneNode(true));
+const freshSelectAllBtn = document.getElementById('select-all-reports-modal');
+const freshDeselectAllBtn = document.getElementById('deselect-all-reports-modal');
+const freshGeneratePdfBtn = document.getElementById('generate-pdf-from-modal');
+freshSelectAllBtn.addEventListener('click', () => {
+document.querySelectorAll('.report-selection-checkbox').forEach(checkbox => {
+checkbox.checked = true;
+});
+});
+freshDeselectAllBtn.addEventListener('click', () => {
+document.querySelectorAll('.report-selection-checkbox').forEach(checkbox => {
+checkbox.checked = false;
+});
+});
+freshGeneratePdfBtn.addEventListener('click', generatePdfFromSelections);
+}
+
+async function generatePdfFromSelections() {
+  const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
+  const checkboxes = document.querySelectorAll('.report-selection-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one report to include in the PDF.');
+    return;
+  }
+  const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
+
+  try {
+    toggleLoading(generatePdfBtn, true, 'Generating PDF...');
+    const response = await fetch(`${API_BASE}/api/export-pdf`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    analysis_id: analysisId,
+    selected_reports: selectedReportIds
+  }),
+  credentials: "include"
+});
+
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to generate PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Epistemiq_AI_Report.pdf';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById('reportSelectionModal'));
+    modal.hide();
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert(`Error generating PDF: ${error.message}`);
+  } finally {
+    toggleLoading(generatePdfBtn, false);
+  }
+}
+
+
+// Modal close functionality
+const researchReportModal = document.getElementById('researchReportModal');
+const closeButtons = researchReportModal.querySelectorAll('.custom-close-btn');
+const overlay = document.getElementById('custom-modal-overlay');
+closeButtons.forEach(btn => {
+btn.addEventListener('click', () => {
+researchReportModal.style.display = 'none';
+document.body.classList.remove('body-no-scroll');
+});
+});
+overlay.addEventListener('click', () => {
+researchReportModal.style.display = 'none';
+document.body.classList.remove('body-no-scroll');
+});
+document.addEventListener('keydown', (e) => {
+if (e.key === 'Escape' && researchReportModal.style.display === 'block') {
+researchReportModal.style.display = 'none';
+document.body.classList.remove('body-no-scroll');
+}
+});
+
+// Event Listeners
+inputMethodSelect.addEventListener('change', (event) => {
+const method = inputMethodSelect.value;
+[pasteInputGroup, urlInputGroup, imageInputGroup, videoInputGroup, videoUrlInputGroup]
+.forEach(el => el.classList.add('d-none'));
+const groupMap = {
+'paste': pasteInputGroup,
+'url': urlInputGroup,
+'image': imageInputGroup,
+'video': videoInputGroup,
+'video-url': videoUrlInputGroup
+};
+if(groupMap[method]) groupMap[method].classList.remove('d-none');
+});
+
+setupFileUploadDragAndDrop(imageUploadArea, imageInput, handleImageSelect);
+setupFileUploadDragAndDrop(videoUploadArea, videoInput, handleVideoSelect);
+processImageBtn.addEventListener('click', processImage);
+processVideoBtn.addEventListener('click', processVideo);
+transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
+
+fetchArticleBtn.addEventListener('click', async () => {
+  let url = urlInput.value.trim();
+  if (!url) {
+    alert('Please enter a valid URL.');
+    return;
+  }
+
+  if (!url.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+    alert('Invalid URL format. Please use http:// or https://.');
+    return;
+  }
+
+  toggleLoading(fetchArticleBtn, true, 'Fetching...');
+
+  try {
+    const response = await fetch(`/api/fetch-article`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch article.');
+    }
+
+    if (!data.content || typeof data.content !== 'string') {
+      alert('No readable content extracted. Try paste manually.');
+      return;
+    }
+
+    // ✅ Convert HTML → plain text (keeps paragraphs)
+    const cleaned = (function stripHtml(html) {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const paragraphs = doc.body.querySelectorAll("p, br");
+      if (paragraphs.length) {
+        return Array.from(paragraphs)
+          .map(el => (el.tagName === "BR" ? "\n" : el.textContent || ""))
+          .join("\n")
+          .trim();
+      }
+      return (doc.body.textContent || "").trim();
+    })(data.content);
+
+    // ✅ Insert into textarea
+    textInput.value = cleaned;
+
+    // ✅ Switch UI to paste mode
+    inputMethodSelect.value = 'paste';
+    inputMethodSelect.dispatchEvent(new Event('change'));
+
+    alert('Article text has been fetched and pasted.');
+
+  } catch (error) {
+    console.error('Fetch error:', error);
+    alert(`Error fetching article: ${error.message}`);
+  } finally {
+    toggleLoading(fetchArticleBtn, false);
+  }
+});
+
+  
+analysisForm.addEventListener('submit', async (e) => {
+e.preventDefault();
+const articleText = textInput.value.trim();
+if (!articleText) {
+alert('Article text is empty. Please paste content or use one of the input methods.');
+return;
+}
+toggleLoading(runAnalysisBtn, true, 'Analyzing...');
+resultsContainer.innerHTML = '';
+generatedReports = [];
+try {
+const response = await fetch(`${API_BASE}/api/analyze`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+text: articleText,
+mode: promptModeSelect.value,
+usePapers: usePapersToggle.checked
+}),
+});
+const data = await response.json();
+analysisId = data.analysis_id;   
+if (!response.ok) {
+const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
+throw new Error(errorMessage);
+}
+if (data.claims.length === 0) {
+resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
+toggleLoading(runAnalysisBtn, false);
+return;
+}
+displayClaimsStructure(data.claims);
+} catch (error) {
+resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
+toggleLoading(runAnalysisBtn, false);
+}
+});
+
+downloadPdfBtn.addEventListener('click', openReportSelectionModal);
+
+resultsContainer.addEventListener('click', async (e) => {
+const targetBtn = e.target.closest('.generate-report-btn');
+if (targetBtn) {
+const { claimIdx, questionIdx, reportContainerId } = targetBtn.dataset;
+generateReport(parseInt(claimIdx), parseInt(questionIdx), reportContainerId, targetBtn);
+}
+});
+});
+
+if ('serviceWorker' in navigator) {
+window.addEventListener('load', () => {
+navigator.serviceWorker.register('/static/service-worker.js')
+.then(registration => {
+console.log('Service Worker registered:', registration);
+})
+.catch(error => {
+console.error('Service Worker registration failed:', error);
+});
+});
+}
+
+// ===== Chrome AI Local Pre-Processing (SAFE, Mode-Aware Persistent Cache) =====
+document.addEventListener("DOMContentLoaded", () => {
+  const textInput = document.getElementById("textInput");
+  const chromeBtnContainer = document.getElementById("chrome-ai-text");
+  const chromeInfo = document.getElementById("chrome-ai-info");
+  const chromeModeDiv = document.getElementById("chrome-ai-mode");
+  const chromeMode = document.getElementById("chromeMode");
+
+  const chromeToggleEl = document.getElementById("enableChromeAiToggle");
+const toggleSwitch = chromeToggleEl || { checked: true };
+
+// --- Restore saved preference or default OFF ---
+if (chromeToggleEl) {
+    const saved = localStorage.getItem("ep_nano_enabled");
+
+    if (saved === "1") chromeToggleEl.checked = true;
+    else if (saved === "0") chromeToggleEl.checked = false;
+    else chromeToggleEl.checked = false; // default first load
+}
+
+// --- Persist preference when user changes toggle ---
+if (chromeToggleEl) {
+    chromeToggleEl.addEventListener("change", () => {
+        localStorage.setItem(
+            "ep_nano_enabled",
+            chromeToggleEl.checked ? "1" : "0"
+        );
+        updateChromeAiState();
+    });
+}
+
+// Render UI based on the restored setting
+updateChromeAiState();
+
+
+  const undoBtn = document.getElementById("undo-nano-btn");
+
+  const DEFAULT_BTN_TEXT = "🧠 Summarize / Translate with Gemini Nano";
+  let previousTextSnapshot = "";
+
+  // ---------- Mode-aware persistent cache helpers ----------
+  function nanoHash(text, mode) {
+    const str = (mode || "") + "::" + text;
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) | 0;
+    }
+    return "ep_nano_v1:" + h.toString(16);
+  }
+
+  function loadNanoCache(text, mode) {
+    try {
+      const key = nanoHash(text, mode);
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn("Nano cache read failed:", e);
+      return null;
+    }
+  }
+
+  function saveNanoCache(text, mode, output, topics) {
+    try {
+      const key = nanoHash(text, mode);
+      const payload = {
+        output: output || "",
+        topics: topics || ""
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Nano cache write failed:", e);
+    }
+  }
+
+  // ---------- Detect Chrome built-in AI ----------
+  const hasChromeAI =
+    (typeof self !== "undefined" && "Summarizer" in self) ||
+    (window.ai && typeof window.ai.prompt === "function");
+
+  if (!hasChromeAI) {
+    console.info("ℹ️ Chrome AI not detected. Skipping local preprocessing.");
+    return;
+  }
+
+  if (!textInput || !chromeBtnContainer || !chromeInfo) {
+    // Defensive guard: required elements missing
+    return;
+  }
+
+  chromeInfo.classList.remove("d-none");
+
+  // ---------- Create the button ----------
+  const btn = document.createElement("button");
+  btn.className = "btn btn-warning w-100 fw-semibold";
+  btn.textContent = DEFAULT_BTN_TEXT;
+  chromeBtnContainer.appendChild(btn);
+
+  // ---------- Toggle visibility (safe even without real toggle) ----------
+  function updateChromeAiState() {
+    const isEnabled = !!toggleSwitch.checked;
+
+    if (isEnabled) {
+      if (chromeModeDiv) chromeModeDiv.classList.remove("d-none");
+      chromeBtnContainer.classList.remove("d-none");
+      chromeInfo.style.opacity = "1";
+    } else {
+      if (chromeModeDiv) chromeModeDiv.classList.add("d-none");
+      chromeBtnContainer.classList.add("d-none");
+      chromeInfo.style.opacity = "0.7";
+    }
+  }
+
+  if (chromeToggleEl) {
+    chromeToggleEl.addEventListener("change", updateChromeAiState);
+  }
+  updateChromeAiState();
+
+  // Auto-unlock when user edits text
+  textInput.addEventListener("input", () => {
+    if (btn.disabled && btn.textContent.includes("Processed")) {
+      btn.disabled = false;
+      btn.textContent = DEFAULT_BTN_TEXT;
+      btn.className = "btn btn-warning w-100 fw-semibold";
+      const topicsContainer = document.getElementById("nano-topics-container");
+      if (topicsContainer) topicsContainer.classList.add("d-none");
+    }
+  });
+
+  // ============================================================
+  // AI HELPERS
+  // ============================================================
+
+  async function aiPromptNano(text) {
+    if ("Summarizer" in self) {
+      try {
+        const summarizer = await Summarizer.create({
+          outputLanguage: "en",
+          type: "key-points",
+          format: "markdown",
+          length: "medium"
+        });
+        return await summarizer.summarize(text);
+      } catch (err) {
+        console.warn("Summarizer API failed", err);
+      }
+    }
+    if (window.ai && typeof window.ai.prompt === "function") {
+      try {
+        const r = await window.ai.prompt(text);
+        return r?.output ?? r?.text ?? String(r ?? "");
+      } catch (err) {
+        console.warn("window.ai.prompt failed", err);
+      }
+    }
+    throw new Error("No local AI available");
+  }
+
+  async function summarizeIfLong(text, limit = 4000) {
+    const mode = chromeMode?.value || "accurate";
+
+    if (mode === "fast") {
+      // Light-touch cleanup
+      return await aiPromptNano("Fix formatting and remove artefacts:\n\n" + text);
+    }
+
+    let chunkPrefix = "Summarize clearly:\n\n";
+    let finalPrefix = "Condense the following text into a clean English summary:\n\n";
+
+    if (mode === "distill") {
+      chunkPrefix = "Extract specific scientific claims, data, and numbers. Remove fluff:\n\n";
+      finalPrefix = "Combine these points into a dense, factual list of claims for verification. Preserve numbers and citations:\n\n";
+    }
+
+    if (text.length <= limit) {
+      return await aiPromptNano(finalPrefix + text);
+    }
+
+    const parts = [];
+    for (let i = 0; i < text.length; i += limit) {
+      parts.push(text.slice(i, i + limit));
+    }
+
+    const results = [];
+    for (const part of parts) {
+      try {
+        results.push(await aiPromptNano(chunkPrefix + part));
+      } catch (err) {
+        console.warn("Chunk summarization failed", err);
+      }
+    }
+
+    return await aiPromptNano(finalPrefix + results.join("\n\n"));
+  }
+
+  async function detectLang(text) {
+    const out = await aiPromptNano(
+      "Return only the ISO2 language code for this text:\n" + text.slice(0, 600)
+    );
+    return out.trim().toLowerCase().slice(0, 2) || "en";
+  }
+
+  async function translateIfNeeded(text) {
+    const lang = await detectLang(text);
+    if (lang === "en") return text;
+    return await aiPromptNano("Translate the following text into English only:\n" + text);
+  }
+
+  async function extractKeywordsNano(text) {
+    const context = text.slice(0, 3000);
+    const prompt =
+      "Analyze the following text and extract 5 to 7 specific scientific entities, concepts, or methodology terms. " +
+      "Output strictly as a comma-separated list, no numbering.\nText:\n" + context;
+    try {
+      return await aiPromptNano(prompt);
+    } catch (e) {
+      console.warn("Keyword extraction failed", e);
+      return "";
+    }
+  }
+
+  function renderTopics(csvString) {
+    const container = document.getElementById("nano-topics-container");
+    const list = document.getElementById("nano-topics-list");
+    if (!container || !list) return;
+
+    if (!csvString || csvString.length < 3) {
+      container.classList.add("d-none");
+      return;
+    }
+
+    const topics = csvString
+      .split(",")
+      .map(t => t.replace(/^[-\*\s]+/, "").trim())
+      .filter(t => t.length > 2 && t.length < 40);
+
+    if (!topics.length) {
+      container.classList.add("d-none");
+      return;
+    }
+
+    list.innerHTML = topics
+      .map(
+        topic =>
+          `<span class="badge bg-light text-secondary border me-1 mb-1" style="font-weight:500;">${topic}</span>`
+      )
+      .join("");
+
+    container.classList.remove("d-none");
+  }
+
+  // ============================================================
+  // MAIN BUTTON CLICK — MODE-AWARE, PERSISTENT CACHE
+  // ============================================================
+  btn.addEventListener("click", async () => {
+    if (!toggleSwitch.checked) return;
+
+    let text = textInput.value.trim();
+    if (!text) {
+      alert("No text present — paste/extract/fetch first.");
+      return;
+    }
+
+    const mode = chromeMode?.value || "accurate";
+
+    // Always keep snapshot for Undo
+    previousTextSnapshot = text;
+
+    // ---------- CACHE FAST PATH ----------
+    const cached = loadNanoCache(text, mode);
+    if (cached && cached.output) {
+      console.info("✨ Chrome AI cache hit for this text + mode");
+      textInput.value = cached.output;
+      renderTopics(cached.topics || "");
+
+      btn.innerHTML = "✅ Processed";
+      btn.className = "btn btn-success w-100 fw-semibold";
+      btn.disabled = true;
+      if (undoBtn) undoBtn.classList.remove("d-none");
+      return;
+    }
+
+    // ---------- PROCESSING PATH ----------
+    const topicsContainer = document.getElementById("nano-topics-container");
+    if (topicsContainer) topicsContainer.classList.add("d-none");
+    if (undoBtn) undoBtn.classList.add("d-none");
+
+    textInput.classList.add("textarea-dim");
+    btn.disabled = true;
+    btn.innerHTML = `⏳ <span class="ai-pulse"></span> Processing...`;
+
+    let success = false;
+    let finalText = "";
+    let keywordResult = "";
+
+    try {
+      const keywordPromise = extractKeywordsNano(text);
+      const summaryPromise = summarizeIfLong(text);
+
+      const [resultText, keywords] = await Promise.all([
+        summaryPromise,
+        keywordPromise
+      ]);
+
+      keywordResult = keywords || "";
+      const translated = await translateIfNeeded(resultText);
+      finalText = translated.trim();
+
+      // Update UI
+      textInput.value = finalText;
+      renderTopics(keywordResult);
+
+      // Save to persistent cache
+      saveNanoCache(text, mode, finalText, keywordResult);
+
+      success = true;
+    } catch (err) {
+      console.error("Chrome AI error:", err);
+      btn.innerHTML = "⚠️ Error (Click to retry)";
+      btn.disabled = false;
+    } finally {
+      textInput.classList.remove("textarea-dim");
+    }
+
+    if (success) {
+      btn.innerHTML = "✅ Processed";
+      btn.className = "btn btn-success w-100 fw-semibold";
+      btn.disabled = true;
+      if (undoBtn) undoBtn.classList.remove("d-none");
+    }
+  });
+
+  // ---------- Undo ----------
+  if (undoBtn) {
+    undoBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!previousTextSnapshot) return;
+
+      textInput.value = previousTextSnapshot;
+      const topicsContainer = document.getElementById("nano-topics-container");
+      if (topicsContainer) topicsContainer.classList.add("d-none");
+
+      undoBtn.classList.add("d-none");
+      btn.disabled = false;
+      btn.textContent = DEFAULT_BTN_TEXT;
+      btn.className = "btn btn-warning w-100 fw-semibold";
+    });
+  }
+});
+
+// --- Claer Chrome Cache ---
+function clearNanoCache() {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("ep_nano_v1:")) {
+            localStorage.removeItem(key);
+        }
+    }
+
+    alert("Chrome AI cache cleared.");
+}
+
+document.getElementById("clearNanoCacheBtn_LoggedOut")?.addEventListener("click", clearNanoCache);
+document.getElementById("clearNanoCacheBtn_LoggedIn")?.addEventListener("click", clearNanoCache);
+
+// --- FAQ Buttons ---
+
+document.getElementById("openFaqBtn_LoggedOut")?.addEventListener("click", () => {
+    new bootstrap.Modal(document.getElementById("faqModal")).show();
+});
+
+document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => {
+    new bootstrap.Modal(document.getElementById("faqModal")).show();
+});
+
+  
+</script>
+
+
+
+<!-- ============================
+     FAQ MODAL
+============================= -->
+<div class="modal fade" id="faqModal" tabindex="-1" aria-labelledby="faqModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="faqModalLabel">Epistemiq — FAQ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Accordion -->
+        <div class="accordion" id="faqAccordion">
+
+          <!-- ============================
+               SECTION A — CORE CONCEPT
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingA">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseA">
+                Section A — Core Concept
+              </button>
+            </h2>
+            <div id="collapseA" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">What is Epistemiq?</h6>
+                <p>
+                  Epistemiq is a browser-first misinformation defense tool. It extracts claims,
+                  summarizes text locally using Chrome’s Gemini Nano, and verifies them using
+                  specialized cloud models, helping you quickly check scientific accuracy.
+                </p>
+
+                <h6 class="fw-bold mt-3">How does it work?</h6>
+                <p>
+                  Epistemiq combines <strong>local AI inside Chrome</strong> for preprocessing
+                  (summarization, translation, keyword extraction) with a secure
+                  <strong>cloud verifier</strong> for evidence-based analysis.
+                  It never sends raw text to the cloud unless verification is explicitly triggered.
+                </p>
+
+                <h6 class="fw-bold mt-3">Is Epistemiq an AI chatbot?</h6>
+                <p>
+                  No. Epistemiq is not a conversational assistant.
+                  It is an <strong>evidence engine</strong> that extracts claims, checks science,
+                  pulls papers, and produces structured reports.
+                </p>
+
+                <h6 class="fw-bold mt-3">What models does Epistemiq use?</h6>
+                <p>
+                  • <strong>Gemini Nano (browser built-in)</strong> for summarization, translation, cleanup  
+                  • <strong>Various LLM models via OpenRouter</strong> for claim verification  
+                  • <strong>Semantic Scholar, CrossRef + PubMed</strong> for retrieving academic literature  
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               SECTION B — PRIVACY
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingB">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseB">
+                Section B — Privacy + Local Processing
+              </button>
+            </h2>
+            <div id="collapseB" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">Does Epistemiq send my text to the cloud?</h6>
+                <p>
+                  Not automatically. Epistemiq keeps preprocessing fully local.
+                  Raw text leaves your device <strong>only if you explicitly run analysis</strong>.
+                </p>
+
+                <h6 class="fw-bold mt-3">What is Chrome’s Gemini Nano and why does Epistemiq use it?</h6>
+                <p>
+                  Gemini Nano is a small on-device AI model built into Chrome.  
+                  Epistemiq uses it for:
+                  <br>• Summarization  
+                  <br>• Translation  
+                  <br>• Keyword extraction  
+                  <br>
+                  This keeps preprocessing private and extremely fast.
+                </p>
+
+                <h6 class="fw-bold mt-3">When is cloud verification used?</h6>
+                <p>
+                  Only during the “Run Analysis” step.  
+                  At that moment, extracted claims are sent to OpenRouter’s scientific model
+                  to check for accuracy, uncertainty, and available evidence.
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               SECTION C — USAGE
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingC">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseC">
+                Section C — Usage Instructions
+              </button>
+            </h2>
+            <div id="collapseC" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">How do I analyze an article or video?</h6>
+                <p>
+                  Paste a URL → Extract text → (Optional) summarize with Chrome AI →
+                  Run Analysis → Explore evidence.
+                </p>
+
+                <h6 class="fw-bold mt-3">How do I paste text instead of a URL?</h6>
+                <p>
+                  Simply paste any text into the input box.  
+                  Chrome AI will preprocess it, and the cloud verifier will analyze it.
+                </p>
+
+                <h6 class="fw-bold mt-3">How do I undo a summarization?</h6>
+                <p>
+                  Tap the <strong>Undo</strong> button that appears after Nano processing.
+                </p>
+
+                <h6 class="fw-bold mt-3">Can I use different summarization modes?</h6>
+                <p>
+                  Yes — Epistemiq supports:
+                  <br>• Standard (accurate)
+                  <br>• Fast (simple cleanup)
+                  <br>• Distill (extract scientific claims only)
+                </p>
+
+                <h6 class="fw-bold mt-3">How do I access my analysis history?</h6>
+                <p>
+                  Open the History panel from the top navigation.
+                  You can reopen, delete, and inspect past analyses.
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               SECTION D — TECHNICAL
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingD">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseD">
+                Section D — Technical Questions
+              </button>
+            </h2>
+            <div id="collapseD" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">Why is analysis sometimes slow?</h6>
+                <p>
+                  • Very large input text  
+                  • Limited mobile CPU for on-device AI  
+                  • OpenRouter rate limits  
+                  • Semantic Scholar/CrossRef/PubMed lookup time  
+                </p>
+
+                <h6 class="fw-bold mt-3">Why do some claims say “uncertain”?</h6>
+                <p>
+                  The model marks claims as uncertain when scientific consensus is mixed,
+                  evidence is weak, or contradictory studies exist.
+                </p>
+
+                <h6 class="fw-bold mt-3">Why do I get 429 / rate-limits?</h6>
+                <p>
+                  Free OpenRouter key → shared rate-limit pool. Try later.              
+                </p>
+
+                
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               VIDEO PLACEHOLDER
+          ============================= -->
+          <div class="mt-4">
+            <h6 class="fw-bold">Demo Video</h6>
+            <div class="ratio ratio-16x9 rounded border bg-light">
+              <!-- Replace this when ready -->
+              <iframe 
+                src="https://www.youtube.com/embed/XXXXXXXXXXX" 
+                allowfullscreen
+                style="border:0;">
+              </iframe>
+            </div>
+            <p class="text-muted small mt-1">
+              Video walkthrough coming soon.
+            </p>
+          </div>
+
+        </div> <!-- end accordion -->
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
