@@ -1089,6 +1089,30 @@ async function loadAnalysis(id) {
 
       resultsContainer.innerHTML += claimHtml;
 
+      // ------------------------------
+// ADD CACHE BADGES HERE
+// ------------------------------
+
+const verdictEl = document.getElementById(verdictId);
+const questionsEl = document.getElementById(questionsId);
+const externalVerdictEl = document.getElementById(externalVerdictId);
+
+// MODEL VERDICT
+if (claim.model_verdict) {
+    addCachedIndicator(verdictEl, "model verdict");
+}
+
+// QUESTIONS
+if (claim.questions && claim.questions.length > 0) {
+    addCachedIndicator(questionsEl, "research questions");
+}
+
+// EXTERNAL VERIFICATION
+if (claim.external_verdict) {
+    addCachedIndicator(externalVerdictEl, "external verification");
+}
+
+
       // --- Questions (from cache only)
       const questionsList = document.getElementById(questionsId);
       if (claim.questions && claim.questions.length > 0) {
