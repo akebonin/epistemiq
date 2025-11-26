@@ -1255,17 +1255,17 @@ function applyBackendCacheBadges(claimsArray) {
     if (!Array.isArray(claimsArray)) return;
 
     claimsArray.forEach((claim, index) => {
-        const claimId = index; // Your frontend uses array index as ID
 
-        const verdictEl = document.getElementById(`model-verdict-${claimId}`);
-        const questionsEl = document.getElementById(`questions-list-${claimId}`);
-        const externalEl = document.getElementById(`external-verdict-${claimId}`);
+        const verdictEl = document.getElementById(`model-verdict-claim-${index}`);
+        const questionsEl = document.getElementById(`questions-list-claim-${index}`);
+        const externalEl = document.getElementById(`external-verdict-claim-${index}`);
 
         if (verdictEl) addCachedIndicator(verdictEl, "model verdict");
         if (questionsEl) addCachedIndicator(questionsEl, "research questions");
         if (externalEl) addCachedIndicator(externalEl, "external verification");
     });
 }
+
 
 
 function toggleLoading(button, isLoading, loadingText = '', progress = '') {
