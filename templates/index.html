@@ -2298,6 +2298,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (chromeToggleEl) chromeToggleEl.checked = false;
 
+  updateChromeAiState();
+
   const undoBtn = document.getElementById("undo-nano-btn");
 
   const DEFAULT_BTN_TEXT = "🧠 Summarize / Translate with Gemini Nano";
