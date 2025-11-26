@@ -856,6 +856,7 @@ let analysisId = null;
 let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
+let backendCacheUsed = false;
 
 
 
@@ -1216,6 +1217,56 @@ function addCachedIndicator(element, type) {
     indicator.title = `This ${type} was loaded from cache`;
     element.appendChild(indicator);
 }
+
+/* -------------------------------------------------------------
+   🔵 GLOBAL: Track whether this /api/analyze response was cached
+-------------------------------------------------------------- */
+window.__ep_backend_cached = false;
+
+
+/* -------------------------------------------------------------
+   1️⃣ When user clicks “Run Analysis”
+   Clear cached flag at the start of each new analysis run
+-------------------------------------------------------------- */
+function startNewAnalysisRun() {
+    window.__ep_backend_cached = false;
+}
+
+
+/* -------------------------------------------------------------
+   2️⃣ Capture backend cached=True when /api/analyze completes
+   Insert this right after parsing the JSON from /api/analyze
+-------------------------------------------------------------- */
+function markBackendCacheStatus(apiResponseJson) {
+    if (apiResponseJson && apiResponseJson.cached === true) {
+        window.__ep_backend_cached = true;
+    } else {
+        window.__ep_backend_cached = false;
+    }
+}
+
+
+/* -------------------------------------------------------------
+   3️⃣ Apply badges to verdicts, research questions, external checks
+   Call this AFTER claims are rendered to DOM
+-------------------------------------------------------------- */
+function applyBackendCacheBadges(claimsArray) {
+    if (!window.__ep_backend_cached) return;
+    if (!Array.isArray(claimsArray)) return;
+
+    claimsArray.forEach((claim, index) => {
+        const claimId = index; // Your frontend uses array index as ID
+
+        const verdictEl = document.getElementById(`model-verdict-${claimId}`);
+        const questionsEl = document.getElementById(`questions-list-${claimId}`);
+        const externalEl = document.getElementById(`external-verdict-${claimId}`);
+
+        if (verdictEl) addCachedIndicator(verdictEl, "model verdict");
+        if (questionsEl) addCachedIndicator(questionsEl, "research questions");
+        if (externalEl) addCachedIndicator(externalEl, "external verification");
+    });
+}
+
 
 function toggleLoading(button, isLoading, loadingText = '', progress = '') {
 const spinner = button.querySelector('.spinner-border');
@@ -2248,42 +2299,64 @@ fetchArticleBtn.addEventListener('click', async () => {
 
   
 analysisForm.addEventListener('submit', async (e) => {
-e.preventDefault();
-const articleText = textInput.value.trim();
-if (!articleText) {
-alert('Article text is empty. Please paste content or use one of the input methods.');
-return;
-}
-toggleLoading(runAnalysisBtn, true, 'Analyzing...');
-resultsContainer.innerHTML = '';
-generatedReports = [];
-try {
-const response = await fetch(`${API_BASE}/api/analyze`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
-text: articleText,
-mode: promptModeSelect.value,
-usePapers: usePapersToggle.checked
-}),
+    e.preventDefault();
+
+    // 🔵 PATCH A — reset backend cache tracking on every new run
+    startNewAnalysisRun();
+
+    const articleText = textInput.value.trim();
+    if (!articleText) {
+        alert('Article text is empty. Please paste content or use one of the input methods.');
+        return;
+    }
+
+    toggleLoading(runAnalysisBtn, true, 'Analyzing...');
+    resultsContainer.innerHTML = '';
+    generatedReports = [];
+
+    try {
+        const response = await fetch(`${API_BASE}/api/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: articleText,
+                mode: promptModeSelect.value,
+                usePapers: usePapersToggle.checked
+            }),
+        });
+
+        const data = await response.json();
+
+        // 🔵 PATCH B — store backend cache status ("cached": true/false)
+        markBackendCacheStatus(data);
+
+        analysisId = data.analysis_id;
+
+        if (!response.ok) {
+            const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+
+        if (data.claims.length === 0) {
+            resultsContainer.innerHTML =
+                '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
+            toggleLoading(runAnalysisBtn, false);
+            return;
+        }
+
+        // Render claims (your existing function)
+        displayClaimsStructure(data.claims);
+
+        // 🔵 PATCH C — after UI renders, label model/external verdicts as "Cached"
+        applyBackendCacheBadges(data.claims);
+
+    } catch (error) {
+        resultsContainer.innerHTML =
+            `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
+        toggleLoading(runAnalysisBtn, false);
+    }
 });
-const data = await response.json();
-analysisId = data.analysis_id;   
-if (!response.ok) {
-const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
-throw new Error(errorMessage);
-}
-if (data.claims.length === 0) {
-resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
-toggleLoading(runAnalysisBtn, false);
-return;
-}
-displayClaimsStructure(data.claims);
-} catch (error) {
-resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
-toggleLoading(runAnalysisBtn, false);
-}
-});
+
 
 downloadPdfBtn.addEventListener('click', openReportSelectionModal);
 
