@@ -2700,8 +2700,8 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
                 <h6 class="fw-bold mt-3">What models does Epistemiq use?</h6>
                 <p>
                   • <strong>Gemini Nano (browser built-in)</strong> for summarization, translation, cleanup  
-                  • <strong>Mistral-7B via OpenRouter</strong> for claim verification  
-                  • <strong>CrossRef + CORE</strong> for retrieving academic literature  
+                  • <strong>Various LLM models via OpenRouter</strong> for claim verification  
+                  • <strong>Semantic Scholar, CrossRef + PubMed</strong> for retrieving academic literature  
                 </p>
 
               </div>
@@ -2723,7 +2723,7 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
                 <h6 class="fw-bold mt-2">Does Epistemiq send my text to the cloud?</h6>
                 <p>
                   Not automatically. Epistemiq keeps preprocessing fully local.
-                  Raw text leaves your device <strong>only if you explicitly run verification</strong>.
+                  Raw text leaves your device <strong>only if you explicitly run analysis</strong>.
                 </p>
 
                 <h6 class="fw-bold mt-3">What is Chrome’s Gemini Nano and why does Epistemiq use it?</h6>
@@ -2739,7 +2739,7 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
 
                 <h6 class="fw-bold mt-3">When is cloud verification used?</h6>
                 <p>
-                  Only during the “Verify Claims” step.  
+                  Only during the “Run Analysis” step.  
                   At that moment, extracted claims are sent to OpenRouter’s scientific model
                   to check for accuracy, uncertainty, and available evidence.
                 </p>
@@ -2763,7 +2763,7 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
                 <h6 class="fw-bold mt-2">How do I analyze an article or video?</h6>
                 <p>
                   Paste a URL → Extract text → (Optional) summarize with Chrome AI →
-                  Verify claims → Explore evidence.
+                  Run Analysis → Explore evidence.
                 </p>
 
                 <h6 class="fw-bold mt-3">How do I paste text instead of a URL?</h6>
@@ -2812,7 +2812,7 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
                   • Very large input text  
                   • Limited mobile CPU for on-device AI  
                   • OpenRouter rate limits  
-                  • CrossRef/CORE lookup time  
+                  • Semantic Scholar/CrossRef/PubMed lookup time  
                 </p>
 
                 <h6 class="fw-bold mt-3">Why do some claims say “uncertain”?</h6>
@@ -2823,16 +2823,10 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
 
                 <h6 class="fw-bold mt-3">Why do I get 429 / rate-limits?</h6>
                 <p>
-                  Free OpenRouter key → shared rate-limit pool.  
-                  Add your own key in Settings for a personal rate-limit bucket.
+                  Free OpenRouter key → shared rate-limit pool. Try later.              
                 </p>
 
-                <h6 class="fw-bold mt-3">Can I use my own OpenRouter key?</h6>
-                <p>
-                  Yes. Adding your own key lets you use higher request volumes
-                  and avoids shared-pool throttling.
-                </p>
-
+                
               </div>
             </div>
           </div>
