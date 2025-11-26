@@ -544,28 +544,38 @@ max-width: none;
     <p class="tagline">Your Compass in the Epistemic Fog</p>
   </div>
 
-<!-- ✨ User Block (Centered) -->
+<!-- ✨ User Block (Unified Style for Logged In & Logged Out) -->
 <div id="userAccessBlock" class="text-center mb-3">
 
-    <!-- Logged OUT -->
-    <button id="loginBtn" class="btn btn-outline-primary btn-sm">
-        Sign In
-    </button>
+    <!-- LOGGED OUT DROPDOWN -->
+    <div id="userLoggedOutMenu" class="dropdown d-inline-block">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+            Menu
+        </button>
 
-    <!-- User Logged IN -->
-<div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
-    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
-        <span id="userEmail"></span>
-    </button>
+        <ul class="dropdown-menu text-center p-0 mt-1">
+            <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
+            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
+            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
+        </ul>
+    </div>
 
-    <!-- See Step 2 for the UL changes -->
-    <ul class="dropdown-menu text-center p-0 mt-1">
-        <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
-        <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn">Clear Chrome AI Cache</button></li>
-    </ul>
+    <!-- LOGGED IN DROPDOWN -->
+    <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+            <span id="userEmail"></span>
+        </button>
+
+        <ul class="dropdown-menu text-center p-0 mt-1">
+            <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
+            <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
+            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
+        </ul>
+    </div>
+
 </div>
 
-</div>
+
   
 <form id="analysis-form">
 <div class="mb-3">
@@ -867,16 +877,14 @@ async function checkAuth() {
   }
 
   if (data.authenticated) {
-    // hide "Sign In", show dropdown with email
-    loginBtn.classList.add("d-none");
-    userMenu.classList.remove("d-none");
+    document.getElementById("userLoggedOutMenu")?.classList.add("d-none");
+    document.getElementById("userLoggedInMenu")?.classList.remove("d-none");
     emailSpan.innerText = data.email || "";
-  } else {
-    // show "Sign In", hide dropdown
-    loginBtn.classList.remove("d-none");
-    userMenu.classList.add("d-none");
-    emailSpan.innerText = "";
-  }
+} else {
+    document.getElementById("userLoggedInMenu")?.classList.add("d-none");
+    document.getElementById("userLoggedOutMenu")?.classList.remove("d-none");
+}
+
 }
 
 checkAuth();
@@ -2603,25 +2611,261 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// ----------------------------------------
-// CLEAR CHROME AI CACHE
-// ----------------------------------------
-document.getElementById("clearNanoCacheBtn").addEventListener("click", () => {
-    localStorage.removeItem("nano_last_input");
-    localStorage.removeItem("nano_last_output");
-    localStorage.removeItem("nano_last_topics");
-    localStorage.removeItem("nano_last_mode");
-
-    // Optional: also clear in-memory
-    lastNanoInput = "";
-    lastNanoOutput = "";
-    lastNanoTopics = "";
-    lastNanoMode = "";
+// --- Claer Chrome Cache ---
+function clearNanoCache() {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("ep_nano_v1:")) {
+            localStorage.removeItem(key);
+        }
+    }
 
     alert("Chrome AI cache cleared.");
+}
+
+document.getElementById("clearNanoCacheBtn_LoggedOut")?.addEventListener("click", clearNanoCache);
+document.getElementById("clearNanoCacheBtn_LoggedIn")?.addEventListener("click", clearNanoCache);
+
+// --- FAQ Buttons ---
+
+document.getElementById("openFaqBtn_LoggedOut")?.addEventListener("click", () => {
+    new bootstrap.Modal(document.getElementById("faqModal")).show();
+});
+
+document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => {
+    new bootstrap.Modal(document.getElementById("faqModal")).show();
 });
 
   
 </script>
+
+<!-- ============================
+     FAQ BUTTON (trigger)
+============================= -->
+<button class="btn btn-link text-decoration-none" data-bs-toggle="modal" data-bs-target="#faqModal">
+  ❓ FAQ
+</button>
+
+<!-- ============================
+     FAQ MODAL
+============================= -->
+<div class="modal fade" id="faqModal" tabindex="-1" aria-labelledby="faqModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="faqModalLabel">Epistemiq — FAQ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Accordion -->
+        <div class="accordion" id="faqAccordion">
+
+          <!-- ============================
+               SECTION A — CORE CONCEPT
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingA">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseA">
+                Section A — Core Concept
+              </button>
+            </h2>
+            <div id="collapseA" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">What is Epistemiq?</h6>
+                <p>
+                  Epistemiq is a browser-first misinformation defense tool. It extracts claims,
+                  summarizes text locally using Chrome’s Gemini Nano, and verifies them using
+                  specialized cloud models, helping you quickly check scientific accuracy.
+                </p>
+
+                <h6 class="fw-bold mt-3">How does it work?</h6>
+                <p>
+                  Epistemiq combines <strong>local AI inside Chrome</strong> for preprocessing
+                  (summarization, translation, keyword extraction) with a secure
+                  <strong>cloud verifier</strong> for evidence-based analysis.
+                  It never sends raw text to the cloud unless verification is explicitly triggered.
+                </p>
+
+                <h6 class="fw-bold mt-3">Is Epistemiq an AI chatbot?</h6>
+                <p>
+                  No. Epistemiq is not a conversational assistant.
+                  It is an <strong>evidence engine</strong> that extracts claims, checks science,
+                  pulls papers, and produces structured reports.
+                </p>
+
+                <h6 class="fw-bold mt-3">What models does Epistemiq use?</h6>
+                <p>
+                  • <strong>Gemini Nano (browser built-in)</strong> for summarization, translation, cleanup  
+                  • <strong>Mistral-7B via OpenRouter</strong> for claim verification  
+                  • <strong>CrossRef + CORE</strong> for retrieving academic literature  
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               SECTION B — PRIVACY
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingB">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseB">
+                Section B — Privacy + Local Processing
+              </button>
+            </h2>
+            <div id="collapseB" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">Does Epistemiq send my text to the cloud?</h6>
+                <p>
+                  Not automatically. Epistemiq keeps preprocessing fully local.
+                  Raw text leaves your device <strong>only if you explicitly run verification</strong>.
+                </p>
+
+                <h6 class="fw-bold mt-3">What is Chrome’s Gemini Nano and why does Epistemiq use it?</h6>
+                <p>
+                  Gemini Nano is a small on-device AI model built into Chrome.  
+                  Epistemiq uses it for:
+                  <br>• Summarization  
+                  <br>• Translation  
+                  <br>• Keyword extraction  
+                  <br>
+                  This keeps preprocessing private and extremely fast.
+                </p>
+
+                <h6 class="fw-bold mt-3">When is cloud verification used?</h6>
+                <p>
+                  Only during the “Verify Claims” step.  
+                  At that moment, extracted claims are sent to OpenRouter’s scientific model
+                  to check for accuracy, uncertainty, and available evidence.
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               SECTION C — USAGE
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingC">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseC">
+                Section C — Usage Instructions
+              </button>
+            </h2>
+            <div id="collapseC" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">How do I analyze an article or video?</h6>
+                <p>
+                  Paste a URL → Extract text → (Optional) summarize with Chrome AI →
+                  Verify claims → Explore evidence.
+                </p>
+
+                <h6 class="fw-bold mt-3">How do I paste text instead of a URL?</h6>
+                <p>
+                  Simply paste any text into the input box.  
+                  Chrome AI will preprocess it, and the cloud verifier will analyze it.
+                </p>
+
+                <h6 class="fw-bold mt-3">How do I undo a summarization?</h6>
+                <p>
+                  Tap the <strong>Undo</strong> button that appears after Nano processing.
+                </p>
+
+                <h6 class="fw-bold mt-3">Can I use different summarization modes?</h6>
+                <p>
+                  Yes — Epistemiq supports:
+                  <br>• Standard (accurate)
+                  <br>• Fast (simple cleanup)
+                  <br>• Distill (extract scientific claims only)
+                </p>
+
+                <h6 class="fw-bold mt-3">How do I access my analysis history?</h6>
+                <p>
+                  Open the History panel from the top navigation.
+                  You can reopen, delete, and inspect past analyses.
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               SECTION D — TECHNICAL
+          ============================= -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingD">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseD">
+                Section D — Technical Questions
+              </button>
+            </h2>
+            <div id="collapseD" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">
+
+                <h6 class="fw-bold mt-2">Why is analysis sometimes slow?</h6>
+                <p>
+                  • Very large input text  
+                  • Limited mobile CPU for on-device AI  
+                  • OpenRouter rate limits  
+                  • CrossRef/CORE lookup time  
+                </p>
+
+                <h6 class="fw-bold mt-3">Why do some claims say “uncertain”?</h6>
+                <p>
+                  The model marks claims as uncertain when scientific consensus is mixed,
+                  evidence is weak, or contradictory studies exist.
+                </p>
+
+                <h6 class="fw-bold mt-3">Why do I get 429 / rate-limits?</h6>
+                <p>
+                  Free OpenRouter key → shared rate-limit pool.  
+                  Add your own key in Settings for a personal rate-limit bucket.
+                </p>
+
+                <h6 class="fw-bold mt-3">Can I use my own OpenRouter key?</h6>
+                <p>
+                  Yes. Adding your own key lets you use higher request volumes
+                  and avoids shared-pool throttling.
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================
+               VIDEO PLACEHOLDER
+          ============================= -->
+          <div class="mt-4">
+            <h6 class="fw-bold">Demo Video</h6>
+            <div class="ratio ratio-16x9 rounded border bg-light">
+              <!-- Replace this when ready -->
+              <iframe 
+                src="https://www.youtube.com/embed/XXXXXXXXXXX" 
+                allowfullscreen
+                style="border:0;">
+              </iframe>
+            </div>
+            <p class="text-muted small mt-1">
+              Video walkthrough coming soon.
+            </p>
+          </div>
+
+        </div> <!-- end accordion -->
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
