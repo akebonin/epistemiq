@@ -2034,9 +2034,16 @@ alert('Failed to copy report to clipboard');
 
 async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
   const reportContainer = document.getElementById(reportContainerId);
+  
+  // 1. Show Spinner
   reportContainer.innerHTML =
     '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
-  if (button) { button.disabled = true; button.innerHTML = 'Generating...'; }
+  
+  // 2. Disable Button
+  if (button) { 
+      button.disabled = true; 
+      button.innerHTML = 'Generating...'; 
+  }
 
   try {
     const es = new EventSource(
@@ -2044,16 +2051,24 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
       { withCredentials: true }
     );
 
-    reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
-    const reportBox = reportContainer.querySelector('.report-box');
+    // Don't clear spinner yet! Wait for data.
     let fullContent = '';
+    let isFirstChunk = true;
+    let reportBox = null;
 
     es.onmessage = (event) => {
+      // 3. Handle Completion
       if (event.data === '[DONE]') {
         es.close();
+        
+        // Re-enable button
+        if (button) { 
+            button.disabled = false; 
+            button.innerHTML = 'Generate Report'; 
+        }
 
         if (fullContent && fullContent.trim().length > 0) {
-          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+          if (reportBox) reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
 
           // ✅ View full report button
           const viewBtn = document.createElement('button');
@@ -2062,14 +2077,22 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
           viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
           reportContainer.appendChild(viewBtn);
 
-          // ✅ Register as “generated this session” (cached or streamed)
+          // ✅ Register as “generated this session”
           markReportGenerated(claimIdx, questionIdx);
         } else {
-          reportBox.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
+          reportContainer.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
         }
         return;
       }
 
+      // 4. Handle First Chunk (Remove Spinner -> Show Box)
+      if (isFirstChunk) {
+          reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
+          reportBox = reportContainer.querySelector('.report-box');
+          isFirstChunk = false;
+      }
+
+      // 5. Accumulate and Render Data
       try {
         const data = JSON.parse(event.data);
         if (data.content) {
@@ -2089,13 +2112,22 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
     es.onerror = () => {
       es.close();
       reportContainer.innerHTML = `<div class="alert alert-danger">Stream error or unsupported media type.</div>`;
+      // Re-enable button on error
+      if (button) { 
+          button.disabled = false; 
+          button.innerHTML = 'Generate Report'; 
+      }
     };
   } catch (error) {
     console.error('Report generation error:', error);
     reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
-  } finally {
-    if (button) { button.disabled = false; button.innerHTML = 'Generate Report'; }
+    // Re-enable button on sync error
+    if (button) { 
+        button.disabled = false; 
+        button.innerHTML = 'Generate Report'; 
+    }
   }
+  // ⚠️ Removed 'finally' block to prevent button resetting early
 }
 
 
