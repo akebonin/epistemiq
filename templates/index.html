@@ -533,6 +533,47 @@ max-width: none;
     overflow: hidden;
     text-overflow: ellipsis;    /* Add ... if "Your Analyses" is somehow longer than email */
 }
+
+/* ✨ Standardized Badge Styles */
+.ep-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem; /* Keeps it small even in H5 headers */
+    font-weight: 600;
+    padding: 0.25em 0.65em;
+    border-radius: 50rem; /* Pill shape */
+    vertical-align: middle;
+    margin-left: 8px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    white-space: nowrap;
+}
+
+/* Backend/Database Cache (Blue) */
+.ep-badge-db {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+    border: 1px solid #cce5ff;
+}
+
+/* Frontend/Chrome AI Cache (Teal/Green) */
+.ep-badge-nano {
+    background-color: #e0f2f1;
+    color: #00695c;
+    border: 1px solid #b2dfdb;
+}
+
+/* Icon inside badge */
+.ep-badge i {
+    font-size: 0.85em;
+}
+
+/* Fix specific alignment in List Groups */
+.list-group-item .ep-badge {
+    margin-top: -2px; 
+}
   
 </style>
 </head>
@@ -1036,9 +1077,7 @@ async function loadAnalysis(id) {
     }
 
     const data = await res.json();
-
-    // Set global analysisId so future actions (reports, PDF) use this one
-    analysisId = data.analysis_id;
+    analysisId = data.analysis_id; // Set global ID
 
     // Clear current results
     resultsContainer.innerHTML = "";
@@ -1048,23 +1087,21 @@ async function loadAnalysis(id) {
       return;
     }
 
+    // ✅ PRE-CALCULATE BADGE HTML
+    const cachedBadgeStr = getBadgeHtml('db'); 
+
     // Rebuild claim cards using ONLY cached data
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
-      const verdictId = `model-verdict-${claimId}`;
-      const questionsId = `questions-list-${claimId}`;
-      const externalVerdictId = `external-verdict-${claimId}`;
-      const externalSourcesId = `external-sources-${claimId}`;
-
-      applyCachedBadgesForClaims(data.claims);
       
+      // We inject ${cachedBadgeStr} into the H5, Questions, and Sources
       const claimHtml = `
-        <div class="claim-card" id="${claimId}">
-          <h5>Claim ${idx + 1}</h5>
+        <div class="claim-card" id="${claimId}" data-has-model-details="true" data-has-external-details="true">
+          <h5>Claim ${idx + 1} ${cachedBadgeStr}</h5> 
           <p class="claim-text mb-3">${escapeHTML(claim.claim_text)}</p>
 
           <strong>Model Verdict:</strong>
-          <div id="${verdictId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
+          <div class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
             ${
               claim.model_verdict
                 ? formatTextWithMarkdownAndLinks(claim.model_verdict)
@@ -1073,64 +1110,42 @@ async function loadAnalysis(id) {
           </div>
 
           <strong>Suggested Research Questions:</strong>
-          <ul id="${questionsId}" class="question-list list-group list-group-flush mb-3"></ul>
+          <ul class="question-list list-group list-group-flush mb-3">
+            ${(claim.questions || []).map((q, qIdx) => `
+                <li class="list-group-item">
+                    <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)} ${cachedBadgeStr}</span>
+                    <button class="btn btn-primary btn-sm generate-report-btn"
+                        data-claim-idx="${idx}"
+                        data-question-idx="${qIdx}"
+                        data-report-container-id="report-claim-${idx}-${qIdx}">
+                    Generate Report
+                    </button>
+                    <div id="report-claim-${idx}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
+                </li>
+            `).join('')}
+             ${(!claim.questions || claim.questions.length === 0) ? '<li class="list-group-item">No cached research questions.</li>' : ''}
+          </ul>
 
           <hr>
 
           <strong>External Verification (Semantic Scholar, Crossref, CORE & PubMed):</strong>
-          <div id="${externalVerdictId}" class="verdict-box mb-2" style="min-height: 50px;">
+          <div class="verdict-box mb-2" style="min-height: 50px;">
             ${
               claim.external_verdict
                 ? formatTextWithMarkdownAndLinks(claim.external_verdict)
                 : '<span class="text-muted">No external verification cached yet.</span>'
             }
           </div>
-          <ul id="${externalSourcesId}" class="source-list list-unstyled ps-3 mb-3"></ul>
+          <ul class="source-list list-unstyled ps-3 mb-3">
+             ${(claim.external_sources || []).map(s => `
+                <li>📄 [${s.source || 'Ref'}] <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title || 'Source')}</a> ${cachedBadgeStr}</li>
+             `).join('')}
+             ${(!claim.external_sources || claim.external_sources.length === 0) ? '<li>No cached external sources.</li>' : ''}
+          </ul>
         </div>
       `;
 
       resultsContainer.innerHTML += claimHtml;
-
-      // --- Questions (from cache only)
-      const questionsList = document.getElementById(questionsId);
-      if (claim.questions && claim.questions.length > 0) {
-        claim.questions.forEach((q, qIdx) => {
-          const li = document.createElement("li");
-          li.className = "list-group-item";
-          li.innerHTML = `
-            <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
-            <button class="btn btn-primary btn-sm generate-report-btn"
-                data-claim-idx="${idx}"
-                data-question-idx="${qIdx}"
-                data-report-container-id="report-claim-${idx}-${qIdx}">
-              Generate Report
-            </button>
-            <div id="report-claim-${idx}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
-          `;
-          questionsList.appendChild(li);
-        });
-      } else {
-        questionsList.innerHTML = '<li class="list-group-item">No cached research questions for this claim.</li>';
-      }
-
-      // --- External sources (from cache only)
-      const extSourcesUl = document.getElementById(externalSourcesId);
-      if (claim.external_sources && claim.external_sources.length > 0) {
-        extSourcesUl.innerHTML = claim.external_sources
-          .map(s => {
-            const sourceInfo = s.source ? `[${s.source}]` : "";
-            const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : "";
-            const yearInfo = s.year ? ` (${s.year})` : "";
-            const authorsInfo = s.authors ? ` - ${s.authors}` : "";
-            const title = s.title || "Untitled";
-            const url = s.url || "#";
-            return `📄 ${sourceInfo} <a href="${url}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a>${authorsInfo}${yearInfo}${citationInfo}`;
-          })
-          .map(html => `<li>${html}</li>`)
-          .join("");
-      } else {
-        extSourcesUl.innerHTML = "<li>No cached external sources for this claim.</li>";
-      }
     });
 
   } catch (err) {
@@ -1183,38 +1198,16 @@ function markReportGenerated(claimIdx, questionIdx) {
     questionText
   });
 }
-  
 
-// UI/Display Functions
-
-/* ===== Unified blue "Cached" badge (used for backend-cached analysis results) ===== */
-function addCachedIndicator(element, opts = {}) {
-  if (!element) return;
-  // prevent duplicate
-  if (element.querySelector('.cached-badge')) return;
-
-  // remove any old grey badges if present in element
-  element.querySelectorAll('.badge.bg-secondary, .cached-badge-old').forEach(n => n.remove());
-
-  const badge = document.createElement('span');
-  badge.className = 'cached-badge';
-  badge.textContent = opts.label || 'Cached';
-
-  // styling (blue pill) — tweak if you want different size for small areas
-  badge.style.background = '#00bcd4';
-  badge.style.color = '#fff';
-  badge.style.padding = opts.small ? '3px 8px' : '6px 12px';
-  badge.style.borderRadius = '999px';
-  badge.style.marginLeft = '8px';
-  badge.style.fontSize = opts.small ? '12px' : '14px';
-  badge.style.fontWeight = '700';
-  badge.style.display = 'inline-block';
-  badge.style.verticalAlign = 'middle';
-
-  element.appendChild(badge);
+// ✅ Helper to generate badge HTML string
+function getBadgeHtml(type = 'db') {
+    if (type === 'nano') {
+        return `<span class="ep-badge ep-badge-nano"><i class="bi bi-cpu"></i> LOCAL</span>`;
+    }
+    // Default to DB/Backend
+    return `<span class="ep-badge ep-badge-db"><i class="bi bi-database-check"></i> CACHED</span>`;
 }
-
-
+  
 function toggleLoading(button, isLoading, loadingText = '', progress = '') {
 const spinner = button.querySelector('.spinner-border');
 const originalText = button.dataset.originalText || button.textContent.trim();
@@ -1720,24 +1713,32 @@ function toggleLoading(btn, isLoading, msg = "") {
     if (btn.dataset.originalText) btn.lastChild.textContent = btn.dataset.originalText;
   }
 }
-function displayClaimsStructure(claims) {
+
+function displayClaimsStructure(claims, isCached = false) {
+    // Generate the badge string once if cached
+    const badgeHtml = isCached ? getBadgeHtml('db') : '';
+
     claims.forEach((claimText, index) => {
         const claimId = `claim-${index}`;
         const claimHtml = `
         <div class="claim-card" id="${claimId}">
-            <h5>Claim ${index + 1}</h5>
+            <h5>Claim ${index + 1} ${badgeHtml}</h5>
             <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
+            
             <strong>Model Verdict:</strong>
             <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
                 <span class="text-muted">Loading model verdict...</span>
             </div>
+            
             <strong>Suggested Research Questions:</strong>
             <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
                 <li class="list-group-item">
                     <span class="text-muted">Loading questions...</span>
                 </li>
             </ul>
+            
             <hr>
+            
             <strong>External Verification (Semantic Scholar, Crossref & PubMed):</strong>
             <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
                 ${usePapersToggle.checked ? '<span class="text-muted">Loading external verification...</span>' : 'External verification is toggled off.'}
@@ -1749,7 +1750,7 @@ function displayClaimsStructure(claims) {
     });
 
     autoLoadClaimDetails(claims);
-    }
+}
 
 async function autoLoadClaimDetails(claims) {
     const promises = claims.map(async (claim, index) => {
@@ -2246,81 +2247,53 @@ fetchArticleBtn.addEventListener('click', async () => {
 
   
 analysisForm.addEventListener('submit', async (e) => {
-e.preventDefault();
-const articleText = textInput.value.trim();
-if (!articleText) {
-alert('Article text is empty. Please paste content or use one of the input methods.');
-return;
-}
-toggleLoading(runAnalysisBtn, true, 'Analyzing...');
-resultsContainer.innerHTML = '';
-generatedReports = [];
-try {
-const response = await fetch(`${API_BASE}/api/analyze`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
-text: articleText,
-mode: promptModeSelect.value,
-usePapers: usePapersToggle.checked
-}),
+    e.preventDefault();
+    const articleText = textInput.value.trim();
+    if (!articleText) {
+        alert('Article text is empty. Please paste content or use one of the input methods.');
+        return;
+    }
+    toggleLoading(runAnalysisBtn, true, 'Analyzing...');
+    resultsContainer.innerHTML = '';
+    generatedReports = [];
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: articleText,
+                mode: promptModeSelect.value,
+                usePapers: usePapersToggle.checked
+            }),
+        });
+        const data = await response.json();
+        
+        // 1. Capture the backend cached flag
+        const backendCached = !!data.cached;
+        
+        analysisId = data.analysis_id;   
+        if (!response.ok) {
+            const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+        if (data.claims.length === 0) {
+            resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
+            toggleLoading(runAnalysisBtn, false);
+            return;
+        }
+
+        // 2. Pass the flag to the display function
+        displayClaimsStructure(data.claims, backendCached);
+
+        // 3. Removed applyCachedBadgesForClaims() call here
+
+    } catch (error) {
+        resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
+        toggleLoading(runAnalysisBtn, false);
+    }
 });
-const data = await response.json();
-  
-const backendCached = !!data.cached;
-  
-analysisId = data.analysis_id;   
-if (!response.ok) {
-const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
-throw new Error(errorMessage);
-}
-if (data.claims.length === 0) {
-resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
-toggleLoading(runAnalysisBtn, false);
-return;
-}
-displayClaimsStructure(data.claims);
 
-if (backendCached) {
-  applyCachedBadgesForClaims(data.claims);
-}
-  
-} catch (error) {
-resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
-toggleLoading(runAnalysisBtn, false);
-}
-});
-
-function applyCachedBadgesForClaims(claims) {
-  if (!Array.isArray(claims)) return;
-  claims.forEach((claim, idx) => {
-    // claim container
-    const claimEl = document.getElementById(`claim-${idx}`);
-    if (claimEl) addCachedIndicator(claimEl);
-
-    // model verdict
-    const mv = document.getElementById(`model-verdict-claim-${idx}`);
-    if (mv) addCachedIndicator(mv);
-
-    // external verdict
-    const ev = document.getElementById(`external-verdict-claim-${idx}`);
-    if (ev) addCachedIndicator(ev);
-
-    // external sources list
-    const es = document.getElementById(`external-sources-claim-${idx}`);
-    if (es) addCachedIndicator(es);
-
-    // questions list
-    const ql = document.getElementById(`questions-list-claim-${idx}`);
-    if (ql) addCachedIndicator(ql);
-
-    // reports placeholders (report-claim-<idx>-<q>)
-    const reportNodes = document.querySelectorAll(`[id^="report-claim-${idx}-"]`);
-    reportNodes.forEach(rn => addCachedIndicator(rn));
-  });
-}
-
-  
 downloadPdfBtn.addEventListener('click', openReportSelectionModal);
 
 resultsContainer.addEventListener('click', async (e) => {
@@ -2615,30 +2588,17 @@ updateChromeAiState();
     // ---------- CACHE FAST PATH ----------
     const cached = loadNanoCache(text, mode);
     if (cached && cached.output) {
-      console.info("✨ Chrome AI cache hit for this text + mode");
+      console.info("✨ Chrome AI cache hit");
       textInput.value = cached.output;
       renderTopics(cached.topics || "");
 
-      // CLEAN any previous nano-badge on the button:
-btn.querySelectorAll('.cached-badge-nano').forEach(n => n.remove());
-
-// small nano badge (distinct classname to avoid collision)
-const nanoBadge = document.createElement('span');
-nanoBadge.className = 'cached-badge-nano';
-nanoBadge.textContent = 'Local';
-nanoBadge.style.background = '#37474f';
-nanoBadge.style.color = '#fff';
-nanoBadge.style.padding = '3px 8px';
-nanoBadge.style.borderRadius = '8px';
-nanoBadge.style.marginLeft = '8px';
-nanoBadge.style.fontSize = '12px';
-nanoBadge.style.fontWeight = '700';
-btn.appendChild(nanoBadge);
-
-
-      btn.innerHTML = "✅ Processed";
-      btn.className = "btn btn-success w-100 fw-semibold";
+      // ✅ Use Standardized HTML for the button label
+      btn.innerHTML = `✅ Processed ${getBadgeHtml('nano')}`;
+      
+      // Styling
+      btn.className = "btn btn-success w-100 fw-semibold d-flex align-items-center justify-content-center gap-2";
       btn.disabled = true;
+      
       if (undoBtn) undoBtn.classList.remove("d-none");
       return;
     }
