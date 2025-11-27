@@ -684,16 +684,14 @@ max-width: none;
     background-position: center center;
     background-repeat: no-repeat;
     
-    /* 🟢 FIX 1: 'contain' ensures the whole logo fits without being cut off */
-    /* You can also use 'auto 80%' if you want a bit of padding around it */
-    background-size: contain; 
+    /* 🟢 FIX 1: 'auto 95%' fills the HEIGHT of the box almost completely */
+    background-size: auto 95%; 
     
     transition: background-image 0.2s ease;
 }
 
-/* 🟢 FIX 2: Added '#' selector to make the focus state work */
+/* 🟢 FIX 2: Added '#' selector (This fixes the "doesn't work" issue) */
 #textInput:focus {
-    /* Removes the logo when user clicks to type */
     background-image: none;
     background-color: #fff; 
 }
