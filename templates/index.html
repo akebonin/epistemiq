@@ -927,10 +927,10 @@ Generate PDF
 // ✅ Helper to generate badge HTML string
 function getBadgeHtml(type = 'db') {
     if (type === 'nano') {
-        return `<span class="ep-badge ep-badge-nano" tabindex="0" data-reason="Retrieved from previous analysis history for performance optimization."><i class="bi bi-cpu"></i> CACHED</span>`;
+        return `<span class="ep-badge ep-badge-nano" tabindex="0" data-reason="Data retrieved from prior analysis for performance optimization."><i class="bi bi-cpu"></i> CACHED</span>`;
     }
     // Default to DB/Backend
-    return `<span class="ep-badge ep-badge-db" tabindex="0" data-reason="Retrieved from previous analysis history for performance optimization."><i class="bi bi-database-check"></i> CACHED</span>`;
+    return `<span class="ep-badge ep-badge-db" tabindex="0" data-reason="Data retrieved from prior analysis for performance optimization."><i class="bi bi-database-check"></i> CACHED</span>`;
 }
 
   
