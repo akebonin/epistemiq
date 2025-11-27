@@ -516,28 +516,48 @@ max-width: none;
     border: 1px solid #e9ecef;
 }
 
-/* ✨ Unified User Menu Styles */
+/* ✨ Unified User Menu Styles (Fixed Width & Symmetry) */
 
-/* 1. Ensure the button has a consistent minimum size */
+/* 1. Standardize the Button Size (Logged In & Out) */
 .user-menu-btn {
-    min-width: 100px;        /* "Menu" won't look too skinny */
-    max-width: 250px;        /* Long emails get truncated with ... */
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
+    width: 240px;               /* Fixed width for perfect symmetry */
+    display: inline-flex;       /* Keeps text centered */
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;           /* Hide overflow if email is huge */
 }
 
-/* 2. Center the dropdown and give it a fixed width regardless of button size */
+/* Ensure the text inside the button truncates with "..." if too long */
+.user-menu-btn span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* 2. Standardize the Dropdown (Same width, placed below) */
 .user-menu-dropdown {
-    /* Center logic */
-    left: 50% !important;
-    right: auto !important;
-    transform: translateX(-50%) !important;
+    width: 240px !important;      /* Match button width exactly */
+    min-width: 240px !important;
+    max-width: 240px !important;
     
-    /* Width logic */
-    width: auto !important;
-    min-width: 260px;       /* Wide enough to fit the contact email comfortably */
-    margin-top: 8px;        /* Slight gap */
+    /* Reset positioning to default (fixes obscuring issue) */
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+    
+    /* Add a small gap so it doesn't touch the button */
+    margin-top: 8px !important; 
+    
+    /* Center text inside */
+    text-align: center;
+}
+
+/* Optional: Make the email inside the dropdown wrap if needed */
+.dropdown-item-text {
+    white-space: normal;
+    word-break: break-all; 
+    line-height: 1.4;
 }
 
 /* ✨ Standardized Badge Styles */
@@ -655,47 +675,45 @@ max-width: none;
 
     <!-- LOGGED OUT DROPDOWN -->
     <div id="userLoggedOutMenu" class="dropdown d-inline-block">
-        <!-- Added class: user-menu-btn -->
+        <!-- Button: Fixed Width -->
         <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
-            Menu
+            <span>Menu</span>
         </button>
 
-        <!-- Added class: user-menu-dropdown -->
-        <ul class="dropdown-menu user-menu-dropdown text-center p-0 mt-1">
+        <!-- Dropdown: Same Width, Below -->
+        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
             <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
             
-            <!-- Contact Display -->
             <li><hr class="dropdown-divider"></li>
-            <li><small class="text-muted">Contact:</small></li>
+            <li><small class="text-muted" style="font-size: 0.75rem;">Contact Support</small></li>
             <li>
-                <span class="dropdown-item-text p-1 fw-normal small" style="user-select: all;">
+                <span class="dropdown-item-text p-2 fw-normal small" style="user-select: all;">
                     epistemiq.ai@gmail.com
                 </span>
             </li>
             <li><hr class="dropdown-divider"></li>
             
             <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
-            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
+            <li><button class="dropdown-item fw-bold text-primary" id="loginBtn">Sign In</button></li>
         </ul>
     </div>
 
     <!-- LOGGED IN DROPDOWN -->
     <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
-        <!-- Added class: user-menu-btn -->
+        <!-- Button: Fixed Width (Contains Email) -->
         <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
             <span id="userEmail"></span>
         </button>
 
-        <!-- Added class: user-menu-dropdown -->
-        <ul class="dropdown-menu user-menu-dropdown text-center p-0 mt-1">
+        <!-- Dropdown: Same Width, Below -->
+        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
             <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
             <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
             
-            <!-- Contact Display -->
             <li><hr class="dropdown-divider"></li>
-            <li><small class="text-muted">Contact:</small></li>
+            <li><small class="text-muted" style="font-size: 0.75rem;">Contact Support</small></li>
             <li>
-                <span class="dropdown-item-text p-1 fw-normal small" style="user-select: all;">
+                <span class="dropdown-item-text p-2 fw-normal small" style="user-select: all;">
                     epistemiq.ai@gmail.com
                 </span>
             </li>
