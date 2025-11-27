@@ -1094,6 +1094,9 @@ async function loadHistory() {
     return;
   }
 
+  // ✅ SORTING FIX: Sort items by date (Newest First)
+  data.items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
   data.items.forEach(item => {
     const li = document.createElement("li");
     li.className = "list-group-item bg-white shadow-sm p-3";
@@ -1114,15 +1117,14 @@ async function loadHistory() {
 
     li.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <!-- 1. Title: text-wrap allows multi-line, text-break prevents layout break on long words -->
+        <!-- 1. Title -->
         <strong class="text-wrap text-break me-2">${escapedTitle}</strong>
         
-        <!-- 2. Date: flex-shrink-0 ensures the date never gets squashed by a long title -->
+        <!-- 2. Date -->
         <span class="badge bg-light text-dark border flex-shrink-0">${dateLabel}</span>
       </div>
       
       <div class="d-flex gap-2 mt-2">
-        <!-- UPDATED: Onclick now hides the modal explicitly -->
         <button class="btn btn-sm btn-primary me-2"
           onclick="event.stopPropagation(); loadAnalysis('${item.analysis_id}'); bootstrap.Modal.getInstance(document.getElementById('historyModal')).hide();">
           Open
@@ -1138,7 +1140,6 @@ async function loadHistory() {
     list.appendChild(li);
   });
 }
-
 
 // ----------------------------------------------------
 // 6. Delete analysis
