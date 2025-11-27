@@ -2663,18 +2663,27 @@ updateChromeAiState();
     previousTextSnapshot = text;
 
     // ---------- CACHE FAST PATH ----------
-    const cached = loadNanoCache(text, mode);
-    if (cached && cached.output) {
-      console.info("✨ Chrome AI cache hit for this text + mode");
-      textInput.value = cached.output;
-      renderTopics(cached.topics || "");
+const cached = loadNanoCache(text, mode);
+if (cached && cached.output) {
+    console.info("✨ Chrome AI cache hit for this text + mode");
 
-      btn.innerHTML = "✅ Processed";
-      btn.className = "btn btn-success w-100 fw-semibold";
-      btn.disabled = true;
-      if (undoBtn) undoBtn.classList.remove("d-none");
-      return;
-    }
+    textInput.value = cached.output;
+    renderTopics(cached.topics || "");
+
+   // CLEAN existing badges
+btn.querySelectorAll(".badge").forEach(b => b.remove());
+
+// ADD cached badge
+addCachedIndicator(btn, "local preprocessing");
+
+
+    btn.innerHTML = "✅ Processed";
+    btn.className = "btn btn-success w-100 fw-semibold";
+    btn.disabled = true;
+    if (undoBtn) undoBtn.classList.remove("d-none");
+    return;
+}
+
 
     // ---------- PROCESSING PATH ----------
     const topicsContainer = document.getElementById("nano-topics-container");
