@@ -2619,6 +2619,23 @@ updateChromeAiState();
       textInput.value = cached.output;
       renderTopics(cached.topics || "");
 
+      // CLEAN any previous nano-badge on the button:
+btn.querySelectorAll('.cached-badge-nano').forEach(n => n.remove());
+
+// small nano badge (distinct classname to avoid collision)
+const nanoBadge = document.createElement('span');
+nanoBadge.className = 'cached-badge-nano';
+nanoBadge.textContent = 'Local';
+nanoBadge.style.background = '#37474f';
+nanoBadge.style.color = '#fff';
+nanoBadge.style.padding = '3px 8px';
+nanoBadge.style.borderRadius = '8px';
+nanoBadge.style.marginLeft = '8px';
+nanoBadge.style.fontSize = '12px';
+nanoBadge.style.fontWeight = '700';
+btn.appendChild(nanoBadge);
+
+
       btn.innerHTML = "✅ Processed";
       btn.className = "btn btn-success w-100 fw-semibold";
       btn.disabled = true;
