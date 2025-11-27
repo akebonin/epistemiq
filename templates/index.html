@@ -864,6 +864,17 @@ Generate PDF
 
   
 <script>
+
+// ✅ Helper to generate badge HTML string
+function getBadgeHtml(type = 'db') {
+    if (type === 'nano') {
+        return `<span class="ep-badge ep-badge-nano"><i class="bi bi-cpu"></i> LOCAL</span>`;
+    }
+    // Default to DB/Backend
+    return `<span class="ep-badge ep-badge-db"><i class="bi bi-database-check"></i> CACHED</span>`;
+}
+
+  
 document.addEventListener('DOMContentLoaded', () => {
 const inputMethodSelect = document.getElementById('inputMethod');
 const pasteInputGroup = document.getElementById('paste-input-group');
@@ -898,14 +909,6 @@ let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
 
-// ✅ Helper to generate badge HTML string
-function getBadgeHtml(type = 'db') {
-    if (type === 'nano') {
-        return `<span class="ep-badge ep-badge-nano"><i class="bi bi-cpu"></i> LOCAL</span>`;
-    }
-    // Default to DB/Backend
-    return `<span class="ep-badge ep-badge-db"><i class="bi bi-database-check"></i> CACHED</span>`;
-}
 
 // ----------------------------------------------------
 // 1. Check login status on page load
