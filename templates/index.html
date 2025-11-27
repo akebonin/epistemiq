@@ -672,6 +672,31 @@ max-width: none;
 .list-group-item .ep-badge {
     margin-top: -2px; 
 }
+
+/* Watermark Logo in Text Area */
+#textInput {
+    /* 1. Layer a 92% white wash over the logo to make it very faint */
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)),
+        url('https://raw.githubusercontent.com/akebonin/epistemiq/refs/heads/main/templates/static/icons/logo.png');
+    
+    /* 2. Center the logo */
+    background-position: center center;
+    background-repeat: no-repeat;
+    
+    /* 3. Set a reasonable size (contain works, but fixed px often looks cleaner for logos) */
+    background-size: 120px; 
+    
+    /* Optional: Transition to clear background when user types/focuses */
+    transition: background-image 0.3s ease;
+}
+
+/* Optional: If you want it to vanish when they click to type, uncomment this: */
+/*
+#textInput:focus {
+    background-image: none;
+}
+*/
   
 </style>
 </head>
