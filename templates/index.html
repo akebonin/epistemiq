@@ -2662,6 +2662,14 @@ updateChromeAiState();
     // Always keep snapshot for Undo
     previousTextSnapshot = text;
 
+    function addCachedIndicator(element, type) {
+    const indicator = document.createElement('span');
+    indicator.className = 'badge bg-secondary ms-2';
+    indicator.textContent = 'Cached';
+    indicator.title = `This ${type} was loaded from cache`;
+    element.appendChild(indicator);
+}
+    
     // ---------- CACHE FAST PATH ----------
 const cached = loadNanoCache(text, mode);
 if (cached && cached.output) {
