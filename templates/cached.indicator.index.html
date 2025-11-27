@@ -1250,22 +1250,22 @@ function markBackendCacheStatus(apiResponseJson) {
    3️⃣ Apply badges to verdicts, research questions, external checks
    Call this AFTER claims are rendered to DOM
 -------------------------------------------------------------- */
-function applyBackendCacheBadges(claimsArray) {
-    if (!window.__ep_backend_cached) return;
-    if (!Array.isArray(claimsArray)) return;
+function applyBackendCacheBadges() {
+    const claimCards = document.querySelectorAll(".claim-card");
 
-    claimsArray.forEach((claim, index) => {
+    claimCards.forEach(card => {
+        const title = card.querySelector("h5");
+        if (!title) return;
 
-        const verdictEl = document.getElementById(`model-verdict-claim-${index}`);
-        const questionsEl = document.getElementById(`questions-list-claim-${index}`);
-        const externalEl = document.getElementById(`external-verdict-claim-${index}`);
+        // Do not double-insert
+        if (title.querySelector(".cached-badge")) return;
 
-        if (verdictEl) addCachedIndicator(verdictEl, "model verdict");
-        if (questionsEl) addCachedIndicator(questionsEl, "research questions");
-        if (externalEl) addCachedIndicator(externalEl, "external verification");
+        const badge = document.createElement("span");
+        badge.className = "badge bg-info text-dark ms-2 cached-badge";
+        badge.textContent = "Cached";
+        title.appendChild(badge);
     });
 }
-
 
 
 function toggleLoading(button, isLoading, loadingText = '', progress = '') {
@@ -2301,6 +2301,10 @@ fetchArticleBtn.addEventListener('click', async () => {
 analysisForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+  // Reset UI state for new run
+document.querySelectorAll(".cached-badge").forEach(x => x.remove());
+
+
     // 🔵 PATCH A — reset backend cache tracking on every new run
     startNewAnalysisRun();
 
@@ -2332,6 +2336,10 @@ analysisForm.addEventListener('submit', async (e) => {
 
         analysisId = data.analysis_id;
 
+      // If backend says it's cached, mark it so UI knows
+window._LAST_BACKEND_CACHED = !!data.cached;
+
+
         if (!response.ok) {
             const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
             throw new Error(errorMessage);
@@ -2346,6 +2354,11 @@ analysisForm.addEventListener('submit', async (e) => {
 
         // Render claims (your existing function)
         displayClaimsStructure(data.claims);
+
+      if (window._LAST_BACKEND_CACHED) {
+    applyBackendCacheBadges();
+}
+
 
         // 🔵 PATCH C — after UI renders, label model/external verdicts as "Cached"
         applyBackendCacheBadges(data.claims);
