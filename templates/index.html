@@ -516,18 +516,17 @@ max-width: none;
     border: 1px solid #e9ecef;
 }
 
-/* ✨ Unified User Menu Styles (Fixed Width & Symmetry) */
+/* ✨ Unified User Menu Styles (Fixed Width, Below Button, Uniform Text) */
 
-/* 1. Standardize the Button Size (Logged In & Out) */
+/* 1. Standardize the Button Size */
 .user-menu-btn {
-    width: 240px;               /* Fixed width for perfect symmetry */
-    display: inline-flex;       /* Keeps text centered */
+    width: 240px;
+    display: inline-flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;           /* Hide overflow if email is huge */
+    overflow: hidden;
 }
 
-/* Ensure the text inside the button truncates with "..." if too long */
 .user-menu-btn span {
     white-space: nowrap;
     overflow: hidden;
@@ -535,29 +534,43 @@ max-width: none;
     max-width: 100%;
 }
 
-/* 2. Standardize the Dropdown (Same width, placed below) */
+/* 2. Standardize the Dropdown Position */
 .user-menu-dropdown {
-    width: 240px !important;      /* Match button width exactly */
+    width: 240px !important;
     min-width: 240px !important;
     max-width: 240px !important;
     
-    /* Reset positioning to default (fixes obscuring issue) */
+    /* 🟢 FORCE POSITION BELOW BUTTON */
+    position: absolute !important;
+    top: 100% !important; 
     left: 0 !important;
-    right: auto !important;
     transform: none !important;
+    inset: auto !important; /* Overrides newer Bootstrap positioning */
+    margin-top: 6px !important;
     
-    /* Add a small gap so it doesn't touch the button */
-    margin-top: 8px !important; 
-    
-    /* Center text inside */
     text-align: center;
 }
 
-/* Optional: Make the email inside the dropdown wrap if needed */
-.dropdown-item-text {
-    white-space: normal;
-    word-break: break-all; 
-    line-height: 1.4;
+/* 3. Uniform Item Styling (Removes colors/bolding) */
+.user-menu-dropdown .dropdown-item,
+.user-menu-dropdown .dropdown-item-text {
+    color: #212529 !important; /* Standard dark text */
+    font-weight: 400 !important; /* Normal weight */
+    font-size: 0.95rem;
+    padding: 0.5rem 1rem;
+}
+
+.user-menu-dropdown .dropdown-item:active,
+.user-menu-dropdown .dropdown-item:focus {
+    background-color: #e9ecef; /* Light gray hover instead of blue */
+    color: #212529 !important;
+}
+
+/* Email text specific */
+.user-menu-dropdown .dropdown-item-text {
+    cursor: text;
+    user-select: all;
+    background: transparent !important;
 }
 
 /* ✨ Standardized Badge Styles */
@@ -671,32 +684,51 @@ max-width: none;
   </div>
 
 <!-- ✨ User Block (Unified Style for Logged In & Logged Out) -->
-<div id="userAccessBlock" class="text-center mb-3">
+<div id="userAccessBlock" class="text-center mb-3" style="position: relative;">
 
     <!-- LOGGED OUT DROPDOWN -->
     <div id="userLoggedOutMenu" class="dropdown d-inline-block">
-        <!-- Button: Fixed Width -->
         <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
             <span>Menu</span>
         </button>
 
-        <!-- Dropdown: Same Width, Below -->
         <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
             <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
             
-            <li><hr class="dropdown-divider"></li>
-            <li><small class="text-muted" style="font-size: 0.75rem;">Contact Support</small></li>
+            <li><hr class="dropdown-divider my-1"></li>
+            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
             <li>
-                <span class="dropdown-item-text p-2 fw-normal small" style="user-select: all;">
-                    epistemiq.ai@gmail.com
-                </span>
+                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
             </li>
-            <li><hr class="dropdown-divider"></li>
+            <li><hr class="dropdown-divider my-1"></li>
             
-            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
-            <li><button class="dropdown-item fw-bold text-primary" id="loginBtn">Sign In</button></li>
+            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
+            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
         </ul>
     </div>
+
+    <!-- LOGGED IN DROPDOWN -->
+    <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
+            <span id="userEmail"></span>
+        </button>
+
+        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
+            <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
+            <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
+            
+            <li><hr class="dropdown-divider my-1"></li>
+            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
+            <li>
+                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>
+
+            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
+        </ul>
+    </div>
+
+</div>
 
     <!-- LOGGED IN DROPDOWN -->
     <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
