@@ -675,25 +675,27 @@ max-width: none;
 
 /* Watermark Logo in Text Area */
 #textInput {
-    /* 1. Heavy white wash (96% opacity) to make the logo very faint */
+    /* 1. Heavy white wash (96% opacity) */
     background-image: 
         linear-gradient(rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.96)),
         url('https://raw.githubusercontent.com/akebonin/epistemiq/refs/heads/main/templates/static/icons/logo.png');
     
     /* 2. Center the image */
     background-position: center center;
-    
-    /* 3. 'cover' fills the entire box without distorting the image */
-    background-size: cover;
-    
     background-repeat: no-repeat;
     
-    /* Optional: Transition to clear background when user types/focuses */
-    transition: background-image 0.3s ease;
+    /* 🟢 FIX 1: 'contain' ensures the whole logo fits without being cut off */
+    /* You can also use 'auto 80%' if you want a bit of padding around it */
+    background-size: contain; 
+    
+    transition: background-image 0.2s ease;
 }
 
-textInput:focus {
+/* 🟢 FIX 2: Added '#' selector to make the focus state work */
+#textInput:focus {
+    /* Removes the logo when user clicks to type */
     background-image: none;
+    background-color: #fff; 
 }
   
 </style>
