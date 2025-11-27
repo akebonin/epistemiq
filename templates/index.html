@@ -539,38 +539,82 @@ max-width: none;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.75rem; /* Keeps it small even in H5 headers */
+    font-size: 0.75rem;
     font-weight: 600;
     padding: 0.25em 0.65em;
-    border-radius: 50rem; /* Pill shape */
+    border-radius: 50rem;
     vertical-align: middle;
     margin-left: 8px;
     letter-spacing: 0.3px;
     text-transform: uppercase;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     white-space: nowrap;
+    
+    /* Tooltip logic */
+    position: relative;
+    cursor: help; 
 }
 
-/* Backend/Database Cache (Blue) */
+/* Tooltip Popup Box */
+.ep-badge::after {
+    content: attr(data-reason); /* Pulls text from HTML attribute */
+    visibility: hidden;
+    opacity: 0;
+    width: 220px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 8px;
+    position: absolute;
+    z-index: 100;
+    bottom: 135%; /* Position above badge */
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    font-weight: 400;
+    text-transform: none;
+    line-height: 1.4;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+/* Little triangle arrow below tooltip */
+.ep-badge::before {
+    content: "";
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    top: -5px; /* Adjust to connect with bottom of tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+    transition: opacity 0.2s;
+}
+
+/* Show on Hover (Desktop) or Focus (Mobile Tap) */
+.ep-badge:hover::after, .ep-badge:focus::after,
+.ep-badge:hover::before, .ep-badge:focus::before {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Colors */
 .ep-badge-db {
     background-color: #e7f1ff;
     color: #0d6efd;
     border: 1px solid #cce5ff;
 }
 
-/* Frontend/Chrome AI Cache (Teal/Green) */
 .ep-badge-nano {
     background-color: #e0f2f1;
     color: #00695c;
     border: 1px solid #b2dfdb;
 }
 
-/* Icon inside badge */
-.ep-badge i {
-    font-size: 0.85em;
-}
-
-/* Fix specific alignment in List Groups */
 .list-group-item .ep-badge {
     margin-top: -2px; 
 }
@@ -868,10 +912,10 @@ Generate PDF
 // ✅ Helper to generate badge HTML string
 function getBadgeHtml(type = 'db') {
     if (type === 'nano') {
-        return `<span class="ep-badge ep-badge-nano"><i class="bi bi-cpu"></i> CACHED</span>`;
+        return `<span class="ep-badge ep-badge-nano" tabindex="0" data-reason="Retrieved from previous analysis history for performance optimization."><i class="bi bi-cpu"></i> CACHED</span>`;
     }
     // Default to DB/Backend
-    return `<span class="ep-badge ep-badge-db"><i class="bi bi-database-check"></i> CACHED</span>`;
+    return `<span class="ep-badge ep-badge-db" tabindex="0" data-reason="Retrieved from previous analysis history for performance optimization."><i class="bi bi-database-check"></i> CACHED</span>`;
 }
 
   
@@ -1087,9 +1131,7 @@ async function loadAnalysis(id) {
     }
 
     const data = await res.json();
-    analysisId = data.analysis_id; // Set global ID
-
-    // Clear current results
+    analysisId = data.analysis_id;
     resultsContainer.innerHTML = "";
 
     if (!data.claims || data.claims.length === 0) {
@@ -1097,14 +1139,12 @@ async function loadAnalysis(id) {
       return;
     }
 
-    // ✅ PRE-CALCULATE BADGE HTML
+    // Badge HTML (Only used in Title now)
     const cachedBadgeStr = getBadgeHtml('db'); 
 
-    // Rebuild claim cards using ONLY cached data
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
       
-      // We inject ${cachedBadgeStr} into the H5, Questions, and Sources
       const claimHtml = `
         <div class="claim-card" id="${claimId}" data-has-model-details="true" data-has-external-details="true">
           <h5>Claim ${idx + 1} ${cachedBadgeStr}</h5> 
@@ -1123,7 +1163,7 @@ async function loadAnalysis(id) {
           <ul class="question-list list-group list-group-flush mb-3">
             ${(claim.questions || []).map((q, qIdx) => `
                 <li class="list-group-item">
-                    <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)} ${cachedBadgeStr}</span>
+                    <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
                     <button class="btn btn-primary btn-sm generate-report-btn"
                         data-claim-idx="${idx}"
                         data-question-idx="${qIdx}"
@@ -1148,7 +1188,7 @@ async function loadAnalysis(id) {
           </div>
           <ul class="source-list list-unstyled ps-3 mb-3">
              ${(claim.external_sources || []).map(s => `
-                <li>📄 [${s.source || 'Ref'}] <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title || 'Source')}</a> ${cachedBadgeStr}</li>
+                <li>📄 [${s.source || 'Ref'}] <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title || 'Source')}</a></li>
              `).join('')}
              ${(!claim.external_sources || claim.external_sources.length === 0) ? '<li>No cached external sources.</li>' : ''}
           </ul>
