@@ -516,22 +516,28 @@ max-width: none;
     border: 1px solid #e9ecef;
 }
 
-/* Force the dropdown to match the button width exactly */
-#userLoggedInMenu .dropdown-menu {
-    width: 100% !important;     /* Match the width of the parent (the button) */
-    min-width: 0 !important;    /* Override Bootstrap's default 10rem min-width */
-    max-width: 100% !important; /* Prevent it from growing wider */
-    left: 0 !important;         /* Align strictly to the left edge */
-    right: 0 !important;        /* Align strictly to the right edge */
+/* ✨ Unified User Menu Styles */
+
+/* 1. Ensure the button has a consistent minimum size */
+.user-menu-btn {
+    min-width: 100px;        /* "Menu" won't look too skinny */
+    max-width: 250px;        /* Long emails get truncated with ... */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
-/* Optional: Fix padding on the item to look good in a small space */
-#userLoggedInMenu .dropdown-item {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.9rem;
-    white-space: nowrap;        /* Prevent text wrapping if email is very short */
-    overflow: hidden;
-    text-overflow: ellipsis;    /* Add ... if "Your Analyses" is somehow longer than email */
+/* 2. Center the dropdown and give it a fixed width regardless of button size */
+.user-menu-dropdown {
+    /* Center logic */
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    
+    /* Width logic */
+    width: auto !important;
+    min-width: 260px;       /* Wide enough to fit the contact email comfortably */
+    margin-top: 8px;        /* Slight gap */
 }
 
 /* ✨ Standardized Badge Styles */
@@ -649,11 +655,13 @@ max-width: none;
 
     <!-- LOGGED OUT DROPDOWN -->
     <div id="userLoggedOutMenu" class="dropdown d-inline-block">
-        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+        <!-- Added class: user-menu-btn -->
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
             Menu
         </button>
 
-        <ul class="dropdown-menu text-center p-0 mt-1" style="min-width: 200px;">
+        <!-- Added class: user-menu-dropdown -->
+        <ul class="dropdown-menu user-menu-dropdown text-center p-0 mt-1">
             <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
             
             <!-- Contact Display -->
@@ -673,11 +681,13 @@ max-width: none;
 
     <!-- LOGGED IN DROPDOWN -->
     <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
-        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+        <!-- Added class: user-menu-btn -->
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
             <span id="userEmail"></span>
         </button>
 
-        <ul class="dropdown-menu text-center p-0 mt-1" style="min-width: 200px;">
+        <!-- Added class: user-menu-dropdown -->
+        <ul class="dropdown-menu user-menu-dropdown text-center p-0 mt-1">
             <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
             <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
             
