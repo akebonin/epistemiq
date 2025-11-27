@@ -653,11 +653,20 @@ max-width: none;
             Menu
         </button>
 
-        <ul class="dropdown-menu text-center p-0 mt-1">
+        <ul class="dropdown-menu text-center p-0 mt-1" style="min-width: 200px;">
             <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
-            <li><a class="dropdown-item" href="mailto:epistemiq.ai@gmail.com">Contact</a></li>
-            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
+            
+            <!-- Contact Display -->
             <li><hr class="dropdown-divider"></li>
+            <li><small class="text-muted">Contact:</small></li>
+            <li>
+                <span class="dropdown-item-text p-1" style="user-select: all; font-weight: 500;">
+                    epistemiq.ai@gmail.com
+                </span>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            
+            <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
             <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
         </ul>
     </div>
@@ -668,16 +677,26 @@ max-width: none;
             <span id="userEmail"></span>
         </button>
 
-        <ul class="dropdown-menu text-center p-0 mt-1">
+        <ul class="dropdown-menu text-center p-0 mt-1" style="min-width: 200px;">
             <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
             <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
-            <li><a class="dropdown-item" href="mailto:epistemiq.ai@gmail.com">Contact</a></li>
+            
+            <!-- Contact Display -->
+            <li><hr class="dropdown-divider"></li>
+            <li><small class="text-muted">Contact:</small></li>
+            <li>
+                <span class="dropdown-item-text p-1" style="user-select: all; font-weight: 500;">
+                    epistemiq.ai@gmail.com
+                </span>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+
             <li><button class="dropdown-item text-danger" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
         </ul>
     </div>
 
 </div>
-
+  
 <form id="analysis-form">
 <div class="mb-3">
   <label for="inputMethod" class="form-label">Input method</label>
