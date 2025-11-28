@@ -970,12 +970,21 @@ Generate PDF
       </div>
 
       <div class="modal-body">
-        <input id="loginEmail" type="email" class="form-control" placeholder="Enter your email">
-        <small id="loginStatus" class="text-muted"></small>
+        <!-- Input Group -->
+        <div id="loginInputGroup">
+            <input id="loginEmail" type="email" class="form-control" placeholder="Enter your email">
+            <div class="form-text text-muted small mt-2">
+                <i class="bi bi-info-circle"></i> We will send a magic link to your inbox.
+            </div>
+        </div>
+        
+        <!-- Status / Success Message Area -->
+        <div id="loginStatus" class="mt-3"></div>
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-primary" id="sendLoginLink">Send Login Link</button>
+        <!-- Button ID remains the same for JS hook -->
+        <button class="btn btn-primary w-100" id="sendLoginLink">Send Login Link</button>
       </div>
 
     </div>
@@ -1086,26 +1095,76 @@ document.getElementById("loginBtn").onclick = () => {
 };
 
 // ----------------------------------------------------
-// 3. Request magic link
+// 3. Request magic link (Updated with Spam Warning & Close Button)
 // ----------------------------------------------------
-document.getElementById("sendLoginLink").onclick = async () => {
-  const email = document.getElementById("loginEmail").value.trim();
-  const status = document.getElementById("loginStatus");
+document.getElementById("sendLoginLink").onclick = async function() {
+  const emailInput = document.getElementById("loginEmail");
+  const inputGroup = document.getElementById("loginInputGroup");
+  const statusDiv = document.getElementById("loginStatus");
+  const btn = document.getElementById("sendLoginLink");
+  
+  const email = emailInput.value.trim();
 
-  status.innerText = "Sending...";
-  const res = await fetch(`${API_BASE}/auth/request-link`, {
-    method: "POST",
-    credentials: "include",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ email })
-  });
-
-  if (!res.ok) {
-    status.innerText = "Error sending link.";
+  if (!email) {
+    statusDiv.innerHTML = '<div class="text-danger small">Please enter a valid email address.</div>';
     return;
   }
 
-  status.innerText = "Login link sent! Check your email.";
+  // 1. Loading State
+  btn.disabled = true;
+  btn.innerText = "Sending...";
+  statusDiv.innerHTML = ""; // Clear previous errors
+
+  try {
+      const res = await fetch(`${API_BASE}/auth/request-link`, {
+        method: "POST",
+        credentials: "include",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ email })
+      });
+
+      // 2. Success State
+      if (res.ok) {
+        // Hide the input field to reduce clutter
+        inputGroup.style.display = 'none';
+
+        // Show prominent success message with Spam Warning
+        statusDiv.innerHTML = `
+            <div class="alert alert-success text-center" role="alert">
+                <h4 class="alert-heading h6 fw-bold">Link Sent! 🚀</h4>
+                <p class="mb-2">Please check your inbox for the login link.</p>
+                <hr>
+                <p class="mb-0 small text-start">
+                    <i class="bi bi-exclamation-triangle-fill text-warning"></i> 
+                    <strong>Important:</strong> If you don't see the email within a minute, 
+                    please check your <span class="text-decoration-underline fw-bold">Spam</span> 
+                    or <span class="text-decoration-underline fw-bold">Junk</span> folder.
+                </p>
+            </div>
+        `;
+
+        // Change button to "Close" and set it to dismiss modal
+        btn.innerText = "Close";
+        btn.className = "btn btn-secondary w-100"; // Change color to gray
+        btn.disabled = false;
+        
+        // Remove this click listener and set Bootstrap dismiss attribute
+        btn.onclick = null; 
+        btn.setAttribute('data-bs-dismiss', 'modal');
+      } 
+      else {
+        // Handle Server Error
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to send link");
+      }
+
+  } catch (error) {
+      // 3. Error State
+      console.error(error);
+      btn.disabled = false;
+      btn.innerText = "Send Login Link";
+      statusDiv.innerHTML = `<div class="alert alert-danger small">${error.message || "Error sending link. Please try again."}</div>`;
+  }
 };
 
 // ----------------------------------------------------
