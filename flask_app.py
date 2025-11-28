@@ -478,13 +478,13 @@ BASE_JSON_STRUCTURE = '''
 Output a structured text response with the following format. Do NOT use code fences (```), JSON, or extra text outside this structure. Use exact labels and colons.
 
 Verdict: VERIFIED
-Justification: Concise explanation under 1000 characters.
+Justification: Concise explanation of up to 300 words.
 Sources: None
 Keywords: term1, term2, term3, term4, term5
 
 STRICT RULES:
 - Verdict: Exactly one of VERIFIED, PARTIALLY_SUPPORTED, INCONCLUSIVE, CONTRADICTED, SUPPORTED, NOT_SUPPORTED, FEASIBLE, POSSIBLE_BUT_UNPROVEN, UNLIKELY, NONSENSE
-- Justification: String, max 1000 characters
+- Justification: String, max 300 words
 - Sources: 0-2 valid URLs, comma-separated, or "None" if none
 - Keywords: 3-5 scientific/technical terms, comma-separated, each 3-20 characters
 - Output ONLY the structured text, nothing else
@@ -527,39 +527,107 @@ OUTPUT:
 '''
 }
 
+# Updated verification prompts with STRICT LOGIC TABLE
 verification_prompts = {
     "General Analysis of Testable Claims": f'''
-Analyze this claim and return a structured text response. {BASE_JSON_STRUCTURE}
+You are a rigorous scientific fact-checker.
 
-Claim: "{{claim}}"
+INPUT DATA:
+1. **SOURCE TEXT TO ANALYZE** (The document containing the claims):
+"""{{context}}"""
+
+2. **CLAIM TO CHECK**:
+"{{claim}}"
+
+YOUR TASK:
+Determine if the Claim is true in the real world, based on your internal training data and established scientific consensus.
+
+VERDICT LOGIC TABLE (Follow strictly):
+- If the claim is a known scientific fact -> VERIFIED
+- If the claim is plausible but lacks proof -> POSSIBLE_BUT_UNPROVEN
+- If the claim contradicts known science (e.g. "Earth is flat", "CERN opened portal") -> NONSENSE
+- If the claim is from a fictional/viral story and not real science -> NONSENSE
+- If the claim is nowhere to be found in real science -> NOT_SUPPORTED
+
+CRITICAL RULES:
+1. **Use the Source Text ONLY for definition.** If the claim says "The team", check the Source Text to know it refers to CERN.
+2. **Do NOT treat the Source Text as evidence.** The Source Text is the material we are questioning.
+3. **REALITY CHECK:** Does this event exist in the real world outside of this text? If not, the verdict is NOT_SUPPORTED or NONSENSE.
+
+{BASE_JSON_STRUCTURE}
 ''',
+
     "Specific Focus on Scientific Claims": f'''
-Analyze this scientific claim and return a structured text response. {BASE_JSON_STRUCTURE}
+You are a rigorous scientific fact-checker.
 
-Claim: "{{claim}}"
+INPUT DATA:
+1. **SOURCE TEXT TO ANALYZE** (The document containing the claims):
+"""{{context}}"""
+
+2. **CLAIM TO CHECK**:
+"{{claim}}"
+
+YOUR TASK:
+Determine if this scientific claim is true in the real world.
+
+VERDICT LOGIC TABLE (Follow strictly):
+- If the claim is a known scientific fact -> VERIFIED
+- If the claim contradicts standard models (e.g. "CERN simulation became conscious") -> NONSENSE
+- If the claim is a misinterpretation of real science -> UNLIKELY
+- If the claim exists only in viral posts -> NOT_SUPPORTED
+
+CRITICAL RULES:
+1. **Context Usage:** Use the Source Text only to understand specific entities.
+2. **No Hallucinated Support:** Do NOT verify the claim just because it appears in the Source Text.
+3. **Consensus:** Judge validity against established physics and biology.
+
+{BASE_JSON_STRUCTURE}
 ''',
-    "Technology-Focused Extraction": f'''
-Evaluate this technology claim and return a structured text response. {BASE_JSON_STRUCTURE}
 
-Claim: "{{claim}}"
+    "Technology-Focused Extraction": f'''
+You are a technology fact-checker.
+
+INPUT DATA:
+1. **SOURCE TEXT TO ANALYZE**:
+"""{{context}}"""
+
+2. **CLAIM TO CHECK**:
+"{{claim}}"
+
+YOUR TASK:
+Evaluate the technical feasibility and truth of this claim based on real-world engineering standards.
+
+VERDICT LOGIC TABLE:
+- If technology exists and works -> VERIFIED
+- If technology is theoretical -> FEASIBLE
+- If technology is scientifically impossible -> NONSENSE
+- If claim is a hoax -> NOT_SUPPORTED
+
+CRITICAL RULES:
+1. **Identify Entities:** Use the Source Text to define vague terms.
+2. **Reality Check:** Do not blindly believe the Source Text.
+
+{BASE_JSON_STRUCTURE}
 '''
 }
 
 # Helper functions
 
 
-def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False):
-    """Calls the OpenRouter API, supports streaming and JSON mode."""
+def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False, model="x-ai/grok-4.1-fast:free"):
+    """Calls the OpenRouter API, supports streaming, JSON mode, and dynamic models."""
     if not OPENROUTER_API_KEY:
         raise Exception("OPENROUTER_API_KEY is not set in environment variables.")
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://epistemiq.vercel.app", # Recommended by OpenRouter
+        "X-Title": "Epistemiq"
     }
 
     payload = {
-        "model": "mistralai/mistral-nemo:free",
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": stream,
         "temperature": temperature
@@ -569,14 +637,22 @@ def call_openrouter(prompt, stream=False, temperature=0.0, json_mode=False):
         payload["response_format"] = {"type": "json_object"}
 
     try:
-        response = requests.post(OR_URL, headers=headers, json=payload, stream=stream, timeout=90)
+        # Reduced timeout to fail fast and try next model
+        response = requests.post(OR_URL, headers=headers, json=payload, stream=stream, timeout=25)
+
+        # Handle 429 specifically
+        if response.status_code == 429:
+            raise Exception("Rate Limit Hit")
+
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as e:
-        logging.error(f"OpenRouter API call failed: {e}")
         if hasattr(e, 'response') and e.response is not None:
+            # Pass the status code up
+            if e.response.status_code == 429:
+                raise Exception("Rate Limit Hit")
             raise Exception(f"API Error {e.response.status_code}: {e.response.text}") from e
-        raise Exception(f"Network or API connection error: {e}") from e
+        raise Exception(f"Network error: {e}") from e
 
 def generate_questions_for_claim(claim):
     """Generates up to 3 research questions for a claim."""
@@ -592,72 +668,124 @@ def generate_questions_for_claim(claim):
         return []
 
 def generate_model_verdict_and_questions(prompt, claim_text):
-    """Generate model verdict, questions and keywords from claim text"""
+    """
+    Generate verdict with robust fallback strategies.
+    1. Rotates models if 429 (Rate Limit) occurs.
+    2. Uses 'soft' regex parsing if strict parsing fails.
+    """
+
+    # Priority list of free models
+    models = [
+        "x-ai/grok-4.1-fast:free",
+        "google/gemini-2.0-flash-exp:free",
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "openai/gpt-oss-20b:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "mistralai/mistral-7b-instruct:free"
+    ]
+
     model_verdict_content = "Could not generate model verdict."
     questions = []
     search_keywords = []
 
-    max_retries = 3
-    retry_count = 0
+    # Valid verdict keywords for soft parsing
+    VALID_VERDICTS = [
+        "VERIFIED", "PARTIALLY_SUPPORTED", "INCONCLUSIVE", "CONTRADICTED",
+        "SUPPORTED", "NOT_SUPPORTED", "FEASIBLE", "POSSIBLE_BUT_UNPROVEN",
+        "UNLIKELY", "NONSENSE"
+    ]
 
-    while retry_count < max_retries:
+    for model in models:
         try:
-            res = call_openrouter(prompt, json_mode=False, temperature=0.0)
+            logging.info(f"Attempting verdict generation with model: {model}")
+
+            res = call_openrouter(prompt, json_mode=False, temperature=0.0, model=model)
             raw_llm_response = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             raw_llm_response = normalize_text_for_display(raw_llm_response)
 
             if not raw_llm_response.strip():
-                raise ValueError("Empty response from OpenRouter")
+                raise ValueError("Empty response")
 
-            # Parse text response with regex
-            verdict_match = re.search(r'Verdict:\s*(VERIFIED|PARTIALLY_SUPPORTED|INCONCLUSIVE|CONTRADICTED|SUPPORTED|NOT_SUPPORTED|FEASIBLE|POSSIBLE_BUT_UNPROVEN|UNLIKELY|NONSENSE)', raw_llm_response, re.IGNORECASE)
-            if not verdict_match:
-                logging.warning(f"Invalid verdict format in attempt {retry_count + 1}, retrying...")
-                retry_count += 1
-                continue
+            # --- 1. STRICT PARSING ---
+            verdict_match = re.search(
+                r'Verdict:\s*(VERIFIED|PARTIALLY_SUPPORTED|INCONCLUSIVE|CONTRADICTED|SUPPORTED|NOT_SUPPORTED|FEASIBLE|POSSIBLE_BUT_UNPROVEN|UNLIKELY|NONSENSE)',
+                raw_llm_response,
+                re.IGNORECASE
+            )
 
-            verdict = verdict_match.group(1).upper()
+            # --- 2. SOFT PARSING (Fallback) ---
+            # If the model forgot "Verdict:", just look for the keyword in the first 100 chars
+            verdict = None
+            if verdict_match:
+                verdict = verdict_match.group(1).upper()
+            else:
+                first_lines = raw_llm_response[:150].upper()
+                for v in VALID_VERDICTS:
+                    if v in first_lines:
+                        verdict = v
+                        # Inject the label so the UI parsing works later if needed
+                        raw_llm_response = f"Verdict: {v}\n" + raw_llm_response
+                        break
+
+            if not verdict:
+                logging.warning(f"Model {model} failed format check. Output start: {raw_llm_response[:100]}")
+                continue # Try next model
+
+            # Parse Justification
             justification_match = re.search(r'Justification:\s*([\s\S]{20,1000}?(?=\n\s*(?:Sources|Keywords|$)))', raw_llm_response, re.IGNORECASE | re.DOTALL)
-            justification = justification_match.group(1).strip()[:1000] if justification_match else 'Justification could not be parsed from response.'
+            if not justification_match:
+                # Fallback: Take everything after the verdict
+                parts = raw_llm_response.split(verdict, 1)
+                if len(parts) > 1:
+                    justification = parts[1].strip().split("Sources:")[0].split("Keywords:")[0].strip()[:1000]
+                else:
+                    justification = "Justification parsed via fallback."
+            else:
+                justification = justification_match.group(1).strip()
 
+            # Parse Sources
             sources_match = re.search(r'Sources:\s*([\s\S]*?)(?=\n\s*(?:Keywords|$))', raw_llm_response, re.IGNORECASE | re.DOTALL)
             sources = []
             if sources_match:
                 source_text = sources_match.group(1).strip()
                 sources = re.findall(r'(https?://[^\s,)]+)', source_text)[:2] or ['None']
 
+            # Parse Keywords
             keywords_match = re.search(r'Keywords:\s*([\w\s,-]{10,})', raw_llm_response, re.IGNORECASE | re.DOTALL)
             if keywords_match:
                 kw_text = keywords_match.group(1).strip()
                 search_keywords = [kw.strip().lower() for kw in re.split(r'[,;\s]+', kw_text) if len(kw.strip()) > 3][:5]
             else:
+                # Fallback keywords
                 words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
-                search_keywords = list(set(words[:5])) or [claim_text.lower()[:50]]
+                search_keywords = list(set(words[:5]))
 
             # Format for display
             model_verdict_content = f"Verdict: **{verdict}**\n\nJustification: {justification}"
             if sources and sources != ['None']:
                 model_verdict_content += f"\n\nSources:\n" + "\n".join(f"- {src}" for src in sources)
 
-            # Generate questions
+            # Generate questions (Attempt 1 time)
             try:
                 questions = generate_questions_for_claim(claim_text)
-            except Exception as e:
-                logging.error(f"Failed to generate questions: {e}")
+            except:
                 questions = ["Could not generate research questions"]
 
-            break  # Successful parse, exit retry loop
+            return model_verdict_content, questions, search_keywords
 
         except Exception as e:
-            logging.error(f"Failed to process LLM response in attempt {retry_count + 1}: {e}")
-            retry_count += 1
-            if retry_count == max_retries:
-                model_verdict_content = f"Error generating verdict after {max_retries} attempts: {str(e)}"
-                words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
-                search_keywords = list(set(words[:5])) or [claim_text.lower()[:50]]
-                questions = ["Could not generate research questions"]
+            logging.error(f"Model {model} failed: {e}")
+            time.sleep(1) # Short cool-off
+            continue # Loop to next model
 
-    return model_verdict_content, questions, search_keywords
+    # If all models fail
+    logging.error("All models failed to generate verdict.")
+
+    # Fallback to RegEx keywords if LLM failed
+    words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
+    search_keywords = list(set(words[:5])) or [claim_text.lower()[:50]]
+
+    return f"Error: Analysis timed out or failed. Please try again.", [], search_keywords
 
 def fetch_crossref(keywords):
     if not keywords:
@@ -1594,21 +1722,23 @@ def get_claim_details():
     payload = request.json or {}
     ordinal = payload.get("claim_idx")
     analysis_id = payload.get("analysis_id")
-    mode = payload.get("mode")  # optional; if omitted we’ll read from DB
+    mode = payload.get("mode")
 
     if analysis_id is None or ordinal is None:
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
-    # -------------------------------
-    # 1) Fetch claim text (use get_conn)
-    # -------------------------------
     conn = get_conn()
     try:
         c = conn.cursor()
-        c.execute(
-            "SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?",
-            (analysis_id, int(ordinal))
-        )
+
+        # 1) Fetch claim text AND full context text
+        c.execute("""
+            SELECT c.claim_text, a.canonical_text
+            FROM claims c
+            JOIN analyses a ON c.analysis_id = a.analysis_id
+            WHERE c.analysis_id=? AND c.ordinal=?
+        """, (analysis_id, int(ordinal)))
+
         row = c.fetchone()
     finally:
         conn.close()
@@ -1616,12 +1746,13 @@ def get_claim_details():
     if not row:
         return jsonify({"error": "Claim not found"}), 404
 
-    claim_text = row[0]
+    claim_text = row["claim_text"]
+    full_text_context = row["canonical_text"]  # <--- THIS IS THE MISSING KEY
+
+    # Create hash
     ch = sha256_str(claim_text.strip().lower())
 
-    # -------------------------------
     # 2) Check model_cache
-    # -------------------------------
     conn = get_conn()
     try:
         c = conn.cursor()
@@ -1642,20 +1773,25 @@ def get_claim_details():
             "cached": True
         })
 
-    # -------------------------------
-    # 3) Compute verdict + questions via existing logic
-    # -------------------------------
+    # 3) Compute verdict + questions WITH CONTEXT
     chosen_mode = mode if mode in verification_prompts else 'General Analysis of Testable Claims'
-    verdict_prompt = verification_prompts[chosen_mode].format(claim=claim_text)
+
+    # Truncate context if it's too huge (e.g., > 3000 chars) to save tokens,
+    # but keep enough for the model to understand "CERN", "Simulation", etc.
+    short_context = full_text_context[:4000]
+
+    # ✅ Pass context to the prompt
+    verdict_prompt = verification_prompts[chosen_mode].format(
+        claim=claim_text,
+        context=short_context
+    )
 
     model_verdict_content, questions, search_keywords = generate_model_verdict_and_questions(
         verdict_prompt,
         claim_text
     )
 
-    # -------------------------------
-    # 4) Store results via get_conn
-    # -------------------------------
+    # 4) Store results
     conn = get_conn()
     try:
         c = conn.cursor()
@@ -1684,27 +1820,29 @@ def get_claim_details():
         "cached": False
     })
 
-
-
 @app.route("/api/verify-external", methods=["POST"])
 def verify_external():
     payload = request.json or {}
     ordinal = payload.get("claim_idx")
     analysis_id = payload.get("analysis_id")
 
+    # 1. Capture sources sent from Frontend
+    client_sources = payload.get("client_sources", [])
+
     if analysis_id is None or ordinal is None:
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
-    # ------------------------------------------------------
-    # 1) Get claim text (using get_conn)
-    # ------------------------------------------------------
     conn = get_conn()
     try:
         c = conn.cursor()
-        c.execute(
-            "SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?",
-            (analysis_id, int(ordinal))
-        )
+        # ✅ SQL CHANGE: Fetch full context along with claim text
+        c.execute("""
+            SELECT c.claim_text, a.canonical_text
+            FROM claims c
+            JOIN analyses a ON c.analysis_id = a.analysis_id
+            WHERE c.analysis_id=? AND c.ordinal=?
+        """, (analysis_id, int(ordinal)))
+
         row = c.fetchone()
     finally:
         conn.close()
@@ -1712,12 +1850,11 @@ def verify_external():
     if not row:
         return jsonify({"error": "Claim not found"}), 404
 
-    claim_text = row[0]
+    claim_text = row["claim_text"]
+    full_text_context = row["canonical_text"]  # ✅ Context retrieved
     ch = sha256_str(claim_text.strip().lower())
 
-    # ------------------------------------------------------
-    # 2) Check external_cache
-    # ------------------------------------------------------
+    # --- Check Cache ---
     conn = get_conn()
     try:
         c = conn.cursor()
@@ -1736,10 +1873,7 @@ def verify_external():
             "cached": True
         })
 
-    # ------------------------------------------------------
-    # 3) Build keyword set
-    #    (Prefer model_cache keywords if available)
-    # ------------------------------------------------------
+    # --- Build Keywords ---
     conn = get_conn()
     try:
         c = conn.cursor()
@@ -1750,11 +1884,9 @@ def verify_external():
 
     search_keywords = json_loads(kw_row[0], []) if kw_row else []
 
-    # If no keywords from model, fallback to simple text heuristics
     if not search_keywords:
         import re
         words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
-        # limit to first 5 unique words
         search_keywords = list(set(words))[:5] or [claim_text.lower()[:50]]
 
     # ------------------------------------------------------
@@ -1762,13 +1894,19 @@ def verify_external():
     # ------------------------------------------------------
     all_sources = []
 
+    # Add Client Sources
+    if isinstance(client_sources, list):
+        for s in client_sources:
+            if isinstance(s, dict) and s.get('title') and s.get('abstract'):
+                all_sources.append(s)
+
     # Semantic Scholar
     try:
         all_sources.extend(fetch_semantic_scholar(search_keywords))
     except Exception as e:
         logging.error(f"Semantic Scholar error: {e}")
 
-    time.sleep(1.1)  # preserve existing pacing
+    time.sleep(1.1)
 
     # Crossref
     try:
@@ -1784,52 +1922,79 @@ def verify_external():
     except Exception as e:
         logging.error(f"PubMed error: {e}")
 
-    # Deduplicate by URL
+    # Deduplicate
     seen = set()
     unique_sources = []
     for s in all_sources:
         url = s.get("url") or ""
-        if url and url not in seen:
+        key = url if url else s.get("title", "").lower()[:50]
+        if key and key not in seen:
             unique_sources.append(s)
-            seen.add(url)
+            seen.add(key)
 
     # ------------------------------------------------------
     # 5) Generate external verdict using OpenRouter
     # ------------------------------------------------------
     if unique_sources:
+        try:
+            unique_sources.sort(key=lambda x: int(x.get('year') or 0), reverse=True)
+        except:
+            pass
+
         abstracts_and_titles = "\n\n".join(
             f"Title: {s.get('title','No title')}\n"
             f"Abstract: {s.get('abstract','Abstract not available')}\n"
             f"Authors: {s.get('authors','')}\n"
             f"Year: {s.get('year','')}\n"
-            f"Citations: {s.get('citation_count',0)}\n"
             f"Source: {s.get('source','Unknown')}"
-            for s in unique_sources if s.get('title')
+            for s in unique_sources[:10]
+            if s.get('title')
         )
+
+        # ✅ PROMPT CHANGE: Inject Context
+        short_context = full_text_context[:3000] # Limit context size
 
         prompt = f"""
 You are an AI assistant evaluating a claim based on provided scientific paper information.
 
+Context of the claim:
+"{short_context}..."
+
 Claim: "{claim_text}"
 
-Papers:
+Scientific Papers found:
 {abstracts_and_titles}
 
-Return a short verdict and concise justification.
+Based on the papers provided:
+1. Do these papers confirm the specific event/discovery described in the claim?
+2. If the papers discuss similar topics (e.g. CERN simulations) but do NOT mention the specific breakthrough claimed (e.g. "parallel universe"), point that out.
+
+Return a justified verdict (TRUE, FALSE, UNCERTAIN, or SUPPORTED/UNSUPPORTED) of up to 300 words.
 """
 
-        try:
-            verdict_res = call_openrouter(prompt)
-            external_verdict = verdict_res.json()["choices"][0]["message"]["content"]
-        except Exception as e:
-            logging.error(f"External verdict failed: {e}")
-            external_verdict = "Could not generate external verdict."
+        # ✅ NEW CODE (Robust with Fallback)
+        models = [
+            "x-ai/grok-4.1-fast:free",
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "meta-llama/llama-3.3-70b-instruct:free"
+        ]
+
+        external_verdict = "Could not generate external verdict."
+
+        for model in models:
+            try:
+                res = call_openrouter(prompt, model=model)
+                content = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                if content.strip():
+                    external_verdict = normalize_text_for_display(content)
+                    break # Success
+            except Exception as e:
+                logging.error(f"External verdict model {model} failed: {e}")
+                continue # Try next
     else:
         external_verdict = "No relevant scientific papers found for this claim."
 
-    # ------------------------------------------------------
-    # 6) Store result in external_cache using get_conn()
-    # ------------------------------------------------------
+    # --- Cache and Return ---
     conn = get_conn()
     try:
         c = conn.cursor()
@@ -1841,18 +2006,11 @@ Return a short verdict and concise justification.
                 verdict=excluded.verdict,
                 sources_json=excluded.sources_json,
                 updated_at=CURRENT_TIMESTAMP
-        """, (
-            ch,
-            external_verdict,
-            json_dumps(unique_sources)
-        ))
+        """, (ch, external_verdict, json_dumps(unique_sources)))
         conn.commit()
     finally:
         conn.close()
 
-    # ------------------------------------------------------
-    # 7) Return response
-    # ------------------------------------------------------
     return jsonify({
         "verdict": external_verdict,
         "sources": unique_sources,
@@ -2093,15 +2251,18 @@ def generate_report():
         )
 
     # ---------------------------------------------------------
-    # 1) Get claim text using get_conn()
+    # 1) Get claim text AND FULL CONTEXT using get_conn()
     # ---------------------------------------------------------
     conn = get_conn()
     try:
         c = conn.cursor()
-        c.execute(
-            "SELECT claim_text FROM claims WHERE analysis_id=? AND ordinal=?",
-            (analysis_id, int(claim_idx))
-        )
+        # ✅ FETCH CONTEXT
+        c.execute("""
+            SELECT c.claim_text, a.canonical_text
+            FROM claims c
+            JOIN analyses a ON c.analysis_id = a.analysis_id
+            WHERE c.analysis_id=? AND c.ordinal=?
+        """, (analysis_id, int(claim_idx)))
         row = c.fetchone()
     finally:
         conn.close()
@@ -2113,24 +2274,12 @@ def generate_report():
             status=404
         )
 
-    claim_text = row[0]
+    claim_text = row["claim_text"]
+    full_context = row["canonical_text"]  # ✅ Context retrieved
     claim_hash = sha256_str(claim_text.strip().lower())
 
     # ---------------------------------------------------------
-    # 2) Get mode from analyses (sessionless architecture)
-    # ---------------------------------------------------------
-    conn = get_conn()
-    try:
-        c = conn.cursor()
-        c.execute("SELECT mode FROM analyses WHERE analysis_id=?", (analysis_id,))
-        mode_row = c.fetchone()
-    finally:
-        conn.close()
-
-    mode = mode_row[0] if mode_row else "General Analysis of Testable Claims"
-
-    # ---------------------------------------------------------
-    # 3) Get selected research question
+    # 2) Get selected research question
     # ---------------------------------------------------------
     conn = get_conn()
     try:
@@ -2142,7 +2291,7 @@ def generate_report():
 
     if not questions_row:
         return Response(
-            json.dumps({"error": "Questions not found for this claim. Please generate model verdict first."}),
+            json.dumps({"error": "Questions not found. Please generate model verdict first."}),
             mimetype="application/json",
             status=400
         )
@@ -2150,7 +2299,7 @@ def generate_report():
     questions = json_loads(questions_row[0], [])
     if question_idx >= len(questions):
         return Response(
-            json.dumps({"error": f"Question index {question_idx} out of range. Only {len(questions)} questions available."}),
+            json.dumps({"error": "Question index out of range."}),
             mimetype="application/json",
             status=400
         )
@@ -2161,7 +2310,7 @@ def generate_report():
     )
 
     # ---------------------------------------------------------
-    # 4) Check report_cache
+    # 3) Check report_cache
     # ---------------------------------------------------------
     conn = get_conn()
     try:
@@ -2172,25 +2321,21 @@ def generate_report():
         conn.close()
 
     if hit and hit[0]:
-        # Stream cached content immediately
         def stream_cached():
             yield f"data: {json.dumps({'content': hit[0]})}\n\n"
             yield "data: [DONE]\n\n"
         return Response(stream_cached(), mimetype="text/event-stream")
 
     # ---------------------------------------------------------
-    # 5) Fetch model & external verdicts (from their caches)
+    # 4) Fetch verdicts
     # ---------------------------------------------------------
     conn = get_conn()
     try:
         c = conn.cursor()
-
-        # model_cache verdict
         c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
         row = c.fetchone()
         model_verdict_content = row[0] if row else "Verdict not yet generated by AI."
 
-        # external_cache verdict
         c.execute("SELECT verdict FROM external_cache WHERE claim_hash=?", (claim_hash,))
         row2 = c.fetchone()
         external_verdict_content = row2[0] if row2 else "Not yet externally verified."
@@ -2198,10 +2343,12 @@ def generate_report():
         conn.close()
 
     # ---------------------------------------------------------
-    # 6) Compose final report prompt
+    # 5) Compose prompt with CONTEXT + RECONCILIATION INSTRUCTIONS
     # ---------------------------------------------------------
+    short_context = full_context[:4000] # Limit context size
+
     prompt = f'''
-You are an AI assistant producing a structured research report.
+You are an AI assistant producing a structured research report of up to 3000 words.
 
 **CRITICAL FORMATTING REQUIREMENTS:**
 - Use ONLY plain text with basic formatting
@@ -2217,45 +2364,48 @@ You are an AI assistant producing a structured research report.
 ## 4. **Sources**
 
 ---
-**Claim:** {claim_text}
+**Context of the Claim:**
+"{short_context}..."
 
-**AI's Initial Verdict on Claim:** {model_verdict_content}
-**External Verification Verdict (if available):** {external_verdict_content}
+**Claim:** {claim_text}
 
 **Research Question:** {question_text}
 
+**AI's Initial Verdict:** {model_verdict_content}
+**External Verification Verdict:** {external_verdict_content}
+
 ---
+**INSTRUCTIONS:**
+1. Use the "Context" to understand specific entities (e.g. if the claim mentions "the team", check the context to see if it's CERN, NASA, etc.).
+2. **Compare the Initial Verdict vs External Verification.**
+   - If they agree, reinforce the conclusion with details.
+   - If they DISAGREE (e.g. Model says True, External says Unsupported), **you must reconcile them.**
+   - Prioritize the External Verification if it cites specific papers.
+   - If External Verification failed to find papers but the claim is famous (e.g. widely known science), you may rely on general scientific consensus but note the lack of direct papers.
+   - Explicitly state *why* there is a mismatch (e.g. "External search likely failed due to keywords," or "The claim is a viral hoax not found in literature").
+
 Generate the research report now.
 '''
 
     # ---------------------------------------------------------
-    # 7) Streamed SSE response
+    # 6) Streamed SSE response
     # ---------------------------------------------------------
     def stream_response():
         full_report = ""
-
         try:
             response = call_openrouter(prompt, stream=True)
             response.raise_for_status()
 
             for chunk in response.iter_content(chunk_size=1024, decode_unicode=True):
-                if not chunk:
-                    continue
-
+                if not chunk: continue
                 for line in chunk.split("\n"):
                     line = line.strip()
-                    if not line.startswith("data:"):
-                        continue
-
+                    if not line.startswith("data:"): continue
                     data_part = line[5:].strip()
-                    if data_part == "[DONE]":
-                        continue
-
+                    if data_part == "[DONE]": continue
                     try:
                         json_data = json.loads(data_part)
-                    except json.JSONDecodeError:
-                        continue
-
+                    except json.JSONDecodeError: continue
                     if "choices" in json_data and json_data["choices"]:
                         delta = json_data["choices"][0].get("delta", {})
                         content = delta.get("content", "")
@@ -2283,7 +2433,6 @@ Generate the research report now.
                     logging.error(f"Cache save error: {db_err}")
                 finally:
                     conn.close()
-
             yield "data: [DONE]\n\n"
 
     return Response(stream_response(), mimetype="text/event-stream")
