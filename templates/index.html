@@ -1989,27 +1989,19 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
   }
 }
 
-// ✅ 1. Add this helper function to fetch from CORE
 async function fetchCorePapers(claimText) {
-    const CORE_API_KEY = "YOUR_CORE_API_KEY_HERE"; // ⚠️ Replace with your Key
-    
-    // Simple keyword extraction (words > 4 chars)
+    // Extract keywords (words > 4 chars)
     const keywords = claimText.toLowerCase().match(/\b[a-z]{5,}\b/g) || [];
-    const query = keywords.slice(0, 5).join(" "); // Take top 5 long words
+    const query = keywords.slice(0, 5).join(" "); 
     
     if (!query) return [];
 
     try {
-        const response = await fetch(`https://api.core.ac.uk/v3/search/works`, {
+        // ✅ Calls your secure Vercel API (./api/core-proxy.js)
+        const response = await fetch('/api/core-proxy', {
             method: "POST",
-            headers: {
-                "Authorization": `Bearer ${CORE_API_KEY}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                q: query,
-                limit: 3
-            })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: query })
         });
 
         if (!response.ok) return [];
@@ -2028,12 +2020,11 @@ async function fetchCorePapers(claimText) {
         }));
 
     } catch (e) {
-        console.warn("CORE fetch failed (likely CORS or Key)", e);
+        console.warn("CORE proxy fetch failed", e);
         return [];
     }
 }
 
-// ✅ 2. Update your existing verifyExternal function
 async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false) {
     const verdictContainer = document.getElementById(verdictContainerId);
     const sourcesContainer = document.getElementById(sourcesContainerId);
@@ -2042,22 +2033,26 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
     const claimText = document.querySelector(`#claim-${claimIdx} .claim-text`)?.innerText || "";
 
     if (!autoLoad && button) toggleLoading(button, true, "Verifying...");
-    verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
-    sourcesContainer.innerHTML = '';
+    
+    // Only clear if not autoloading (prevents flashing on page reload)
+    if (!autoLoad) {
+        verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
+        sourcesContainer.innerHTML = '';
+    }
 
     try {
-        // 🚀 Fetch from CORE via Browser (Frontend)
+        // 🚀 1. Fetch from CORE via Vercel Proxy (Frontend)
+        // We do this BEFORE calling the backend so we can pass the data along
         const coreSources = await fetchCorePapers(claimText);
-        console.log("Client-side fetched sources:", coreSources);
-
-        // 🚀 Send claim index AND the extra sources to backend
+        
+        // 🚀 2. Send claim index AND the extra sources to backend
         const response = await fetch(`${API_BASE}/api/verify-external`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 analysis_id: analysisId,
                 claim_idx: claimIdx,
-                client_sources: coreSources // Sending them here
+                client_sources: coreSources // Sending CORE data to be analyzed
             })
         });
 
@@ -2066,29 +2061,33 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
             throw new Error(data.error || `External verification failed: ${response.status}`);
         }
 
-        verdictContainer.innerHTML = formatTextWithMarkdownAndLinks(data.verdict);
+        // 3. Display Verdict
+        let verdictHtml = formatTextWithMarkdownAndLinks(data.verdict);
         
-        // Handle Badge Logic
-        const parentCard = document.getElementById(`claim-${claimIdx}`);
-        const existingBadge = document.getElementById(`external-verdict-claim-${claimIdx}`).querySelector('.ep-badge');
-        
-        if (data.cached && !existingBadge) {
-             const vBox = document.getElementById(`external-verdict-claim-${claimIdx}`);
-             // Add badge logic here if you want dynamic badging
+        // ✅ Add Badge if Cached (Dynamic Update)
+        if (data.cached) {
+             verdictHtml += ` ${getBadgeHtml('db')}`;
         }
+        verdictContainer.innerHTML = verdictHtml;
 
+        // 4. Display Sources
         if (data.sources && data.sources.length > 0) {
             sourcesContainer.innerHTML = data.sources.map(s => {
                 const sourceInfo = s.source ? `[${s.source}]` : '';
                 const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
                 const yearInfo = s.year ? ` (${s.year})` : '';
                 const authorsInfo = s.authors ? ` - ${s.authors}` : '';
+                
+                // Add badge to source list item if it came from cache
+                const badge = data.cached ? getBadgeHtml('db') : '';
+                
                 return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
             }).join('');
         } else {
             sourcesContainer.innerHTML = `<li>No external sources found.</li>`;
         }
     } catch (error) {
+        console.error(error);
         verdictContainer.innerHTML = `<div class="alert alert-warning p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
         sourcesContainer.innerHTML = `<li>Could not fetch sources.</li>`;
     } finally {
@@ -2096,6 +2095,7 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
     }
 }
 
+  
 function showReportInModal(reportContent, claimIdx, questionIdx) {
 const modal = document.getElementById('researchReportModal');
 const modalTitle = document.getElementById('researchReportModalLabel');
