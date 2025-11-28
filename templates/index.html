@@ -887,7 +887,7 @@ Transcribe Video
 </div>
 <div class="mb-4 form-check form-switch">
 <input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
-<label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + PubMed data</label>
+<label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + PubMed data + CORE</label>
 </div>
 <div class="d-grid">
 <button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
@@ -1873,7 +1873,7 @@ function displayClaimsStructure(claims, isCached = false) {
             
             <hr>
             
-            <strong>External Verification (Semantic Scholar, Crossref & PubMed):</strong>
+            <strong>External Verification (Semantic Scholar, CORE, Crossref & PubMed):</strong>
             <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
                 ${usePapersToggle.checked ? '<span class="text-muted">Loading external verification...</span>' : 'External verification is toggled off.'}
             </div>
