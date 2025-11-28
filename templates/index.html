@@ -2123,10 +2123,6 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
         // 3. Display Verdict
         let verdictHtml = formatTextWithMarkdownAndLinks(data.verdict);
         
-        // ✅ Add Badge if Cached (Dynamic Update)
-        if (data.cached) {
-             verdictHtml += ` ${getBadgeHtml('db')}`;
-        }
         verdictContainer.innerHTML = verdictHtml;
 
         // 4. Display Sources
@@ -2137,8 +2133,6 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
                 const yearInfo = s.year ? ` (${s.year})` : '';
                 const authorsInfo = s.authors ? ` - ${s.authors}` : '';
                 
-                // Add badge to source list item if it came from cache
-                const badge = data.cached ? getBadgeHtml('db') : '';
                 
                 return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
             }).join('');
