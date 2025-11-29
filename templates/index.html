@@ -2073,37 +2073,60 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
 }
 
 async function fetchCorePapers(claimText) {
-    // Extract keywords (words > 4 chars)
-    const keywords = claimText.toLowerCase().match(/\b[a-z]{5,}\b/g) || [];
-    const query = keywords.slice(0, 5).join(" "); 
+    // 1. Improved Keyword Extraction (Allow numbers, 4+ chars)
+    // "CERN" is 4 chars, "2024" is numbers - previous regex missed these!
+    const cleanText = claimText.replace(/[^\w\s]/g, '');
+    const words = cleanText.split(/\s+/);
+    const keywords = words.filter(w => w.length >= 4 && !["that", "this", "with", "from", "have"].includes(w.toLowerCase()));
     
-    if (!query) return [];
+    // Take top 6 keywords to broaden search
+    const query = keywords.slice(0, 6).join(" "); 
+    
+    console.log("🔍 CORE Debug - Query:", query); // Check console to see this
+
+    if (!query) {
+        console.warn("🔍 CORE Debug - Query empty");
+        return [];
+    }
 
     try {
-        // ✅ Calls your secure Vercel API (./api/core-proxy.js)
         const response = await fetch('/api/core-proxy', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ q: query })
         });
 
-        if (!response.ok) return [];
+        if (!response.ok) {
+            console.error("🔍 CORE Debug - Proxy Error:", response.status, await response.text());
+            return [];
+        }
 
         const data = await response.json();
+        console.log("🔍 CORE Debug - Raw Results:", data);
+
+        if (!data.results || data.results.length === 0) {
+            console.warn("🔍 CORE Debug - No results found for query.");
+            return [];
+        }
         
-        // Map CORE format to Epistemiq format
-        return (data.results || []).map(item => ({
+        // Map to Epistemiq format
+        const mapped = data.results.map(item => ({
             title: item.title,
-            abstract: item.abstract || "No abstract available.",
-            url: item.downloadUrl || item.links?.[0]?.url || `https://core.ac.uk/outputs/${item.id}`,
+            // Ensure abstract is not empty, or backend might reject it
+            abstract: item.abstract || item.description || "Abstract not available from CORE.",
+            url: item.downloadUrl || (item.links && item.links[0] ? item.links[0].url : `https://core.ac.uk/outputs/${item.id}`),
             authors: (item.authors || []).map(a => a.name).join(", "),
-            year: item.yearPublished || "",
-            source: "CORE.ac.uk (Open Access)",
+            // Ensure year is a string for backend sorting
+            year: item.yearPublished ? String(item.yearPublished) : "2023", 
+            source: "CORE", // Short tag for UI
             citation_count: item.citationCount || 0
         }));
 
+        console.log("🔍 CORE Debug - Mapped:", mapped);
+        return mapped;
+
     } catch (e) {
-        console.warn("CORE proxy fetch failed", e);
+        console.error("🔍 CORE Debug - Fetch Failed:", e);
         return [];
     }
 }
