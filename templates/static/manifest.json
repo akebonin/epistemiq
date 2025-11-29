@@ -4,8 +4,9 @@
   "description": "Verify scientific claims directly from web articles and social media.",
   "start_url": "/analyze",
   "display": "standalone",
-  "background_color": "#f8f9fa",
-  "theme_color": "#0d6efd",
+  "orientation": "portrait", 
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff", 
   "icons": [
     {
       "src": "/static/icons/icon-192x192.png",
