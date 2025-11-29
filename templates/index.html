@@ -2108,35 +2108,40 @@ async function fetchCorePapers(claimText) {
     }
 }
 
-async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false) {
+// ✅ Added 'preferredModel' to arguments
+async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false, preferredModel = null) {
     const verdictContainer = document.getElementById(verdictContainerId);
     const sourcesContainer = document.getElementById(sourcesContainerId);
     
-    // Get claim text for the keyword extraction
+    // ✅ Safety: If preferredModel wasn't passed (e.g. manual click), grab it from DOM
+    if (!preferredModel) {
+        const selector = document.getElementById("preferredModel");
+        if (selector) preferredModel = selector.value;
+    }
+
+    // Get claim text
     const claimText = document.querySelector(`#claim-${claimIdx} .claim-text`)?.innerText || "";
 
     if (!autoLoad && button) toggleLoading(button, true, "Verifying...");
     
-    // Only clear if not autoloading (prevents flashing on page reload)
     if (!autoLoad) {
         verdictContainer.innerHTML = '<span class="text-muted">Verifying...</span>';
         sourcesContainer.innerHTML = '';
     }
 
     try {
-        // 🚀 1. Fetch from CORE via Vercel Proxy (Frontend)
-        // We do this BEFORE calling the backend so we can pass the data along
+        // 1. Fetch from CORE via Vercel Proxy
         const coreSources = await fetchCorePapers(claimText);
         
-        // 🚀 2. Send claim index AND the extra sources to backend
+        // 2. Send to Backend
         const response = await fetch(`${API_BASE}/api/verify-external`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 analysis_id: analysisId,
                 claim_idx: claimIdx,
-                client_sources: coreSources, // Sending CORE data to be analyzed
-                preferred_model: preferredModel // ✅ Send to backend
+                client_sources: coreSources,
+                preferred_model: preferredModel // ✅ Now this variable exists
             })
         });
 
@@ -2145,19 +2150,25 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
             throw new Error(data.error || `External verification failed: ${response.status}`);
         }
 
-        // 3. Display Verdict
+        // 3. Display Verdict (Handle cached badge if needed)
         let verdictHtml = formatTextWithMarkdownAndLinks(data.verdict);
+        
+        // Optional: Add cached badge here if you want it in the verdict box
+        // if (data.cached) verdictHtml += ` ${getBadgeHtml('db')}`;
         
         verdictContainer.innerHTML = verdictHtml;
 
         // 4. Display Sources
         if (data.sources && data.sources.length > 0) {
             sourcesContainer.innerHTML = data.sources.map(s => {
+                // ✅ This logic works PERFECTLY if backend sends "source" key
                 const sourceInfo = s.source ? `[${s.source}]` : '';
                 const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
                 const yearInfo = s.year ? ` (${s.year})` : '';
                 const authorsInfo = s.authors ? ` - ${s.authors}` : '';
                 
+                // Optional: Add badge to individual sources if cached
+                // const badge = data.cached ? getBadgeHtml('db') : '';
                 
                 return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
             }).join('');
