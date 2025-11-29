@@ -1989,7 +1989,7 @@ async function autoLoadClaimDetails(claims) {
                 if (claimElement && claimElement.dataset.hasExternalDetails) {
                     console.log(`Using cached external verification for claim ${index}`);
                 } else {
-                    await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true);
+                    await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true, preferredModel);
                 }
             }
         } catch (error) {
@@ -2135,7 +2135,8 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
             body: JSON.stringify({
                 analysis_id: analysisId,
                 claim_idx: claimIdx,
-                client_sources: coreSources // Sending CORE data to be analyzed
+                client_sources: coreSources, // Sending CORE data to be analyzed
+                preferred_model: preferredModel // ✅ Send to backend
             })
         });
 
