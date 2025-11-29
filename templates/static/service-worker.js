@@ -1,25 +1,24 @@
-// service-worker.js
-
-// This is a placeholder service worker.
-// For full PWA offline capabilities, you would add caching strategies here.
-// For now, it mainly enables PWA installability and share_target functionality.
+const CACHE_NAME = 'epistemiq-v1';
+const OFFLINE_URL = '/analyze'; // Or create a dedicated /offline.html
 
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installed');
-  self.skipWaiting(); // Forces the waiting service worker to become the active service worker.
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activated');
-  event.waitUntil(clients.claim()); // Takes control of clients (pages) within its scope immediately.
+  event.waitUntil(clients.claim());
 });
 
-// Basic fetch handler (you can expand this for caching assets)
 self.addEventListener('fetch', (event) => {
-  // console.log('Service Worker: Fetching', event.request.url);
-  // For now, we just let all network requests pass through.
-  // To enable offline capabilities, you'd add caching logic here.
-  event.respondWith(fetch(event.request));
-});
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
 
-// You might also add sync or push notification handlers here if needed in the future.
+  event.respondWith(
+    fetch(event.request)
+      .catch(() => {
+        // If network fails, return the offline page (or cache if you built one)
+        // For now, we simply try to return the cached main page if available
+        return caches.match(OFFLINE_URL);
+      })
+  );
+});
