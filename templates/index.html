@@ -2099,8 +2099,7 @@ async function fetchCorePapers(claimText) {
             authors: (item.authors || []).map(a => a.name).join(", "),
             year: item.yearPublished || "",
             source: "CORE.ac.uk (Open Access)",
-            citation_count: item.citationCount || 0,
-            source: "CORE"
+            citation_count: item.citationCount || 0
         }));
 
     } catch (e) {
