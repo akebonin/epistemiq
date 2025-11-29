@@ -877,6 +877,23 @@ Transcribe Video
 </button>
 </div>
 </div>
+
+<!-- ✅ Model Selector -->
+<div class="mb-3">
+  <label for="preferredModel" class="form-label">Verifier Model</label>
+  <select id="preferredModel" class="form-select">
+    <option value="x-ai/grok-4.1-fast:free" selected>⚡ Grok 4.1 (Fast & Smart)</option>
+    <option value="google/gemini-2.0-flash-exp:free">🧠 Gemini 2.0 Flash Exp (Deep reasoning, step‑by‑step)</option>
+    <option value="google/gemini-2.0-flash-lite-preview-02-05:free">🧠 Gemini 2.0 Flash Lite (Large Context)</option>
+    <option value="openai/gpt-oss-20b:free">🔮 GPT‑OSS 20B (OpenAI experimental, balanced power)</option>
+    <option value="meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B (Open Source, strong instruction following)</option>
+    <option value="mistralai/mistral-7b-instruct:free">🌪️ Mistral 7B (Lightweight, efficient, quick replies)</option>
+  </select>
+  <div class="form-text text-muted" style="font-size: 0.75rem;">
+    If your preferred model is busy (429 errors), the system will automatically fall back to the others.
+  </div>
+</div>
+  
 <div class="mb-4">
 <label for="promptMode" class="form-label">Analysis focus</label>
 <select id="promptMode" class="form-select">
@@ -1946,6 +1963,9 @@ function displayClaimsStructure(claims, isCached = false) {
 }
 
 async function autoLoadClaimDetails(claims) {
+    // 1. Capture the user's preferred model from the UI (default to null if missing)
+    const preferredModel = document.getElementById("preferredModel")?.value || null;
+
     const promises = claims.map(async (claim, index) => {
         const claimId = `claim-${index}`;
         const verdictContainerId = `model-verdict-${claimId}`;
@@ -1960,7 +1980,8 @@ async function autoLoadClaimDetails(claims) {
                 // Details already loaded, skip API call
                 console.log(`Using cached model details for claim ${index}`);
             } else {
-                await getModelDetails(index, verdictContainerId, questionsContainerId, null, true);
+                // 2. Pass preferredModel to the function (as the 6th argument)
+                await getModelDetails(index, verdictContainerId, questionsContainerId, null, true, preferredModel);
             }
 
             if (usePapersToggle.checked) {
@@ -1981,9 +2002,9 @@ async function autoLoadClaimDetails(claims) {
         await promises[i];
     }
     toggleLoading(runAnalysisBtn, false);
-    }
-
-async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false) {
+}
+// ✅ Added 'preferredModel' parameter (defaults to null)
+async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false, preferredModel = null) {
   const verdictContainer = document.getElementById(verdictContainerId);
   const questionsList = document.getElementById(questionsContainerId);
 
@@ -1995,13 +2016,14 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         analysis_id: analysisId,
-        claim_idx: claimIdx   // ← fix: use claimIdx, not idx
+        claim_idx: claimIdx,
+        preferred_model: preferredModel // ✅ Send to backend
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(errorData || `Failed to get claim details: ${response.status}`);
+        const errorData = await response.text();
+        throw new Error(errorData || `Failed to get claim details: ${response.status}`);
     }
 
     const data = await response.json();
@@ -2009,6 +2031,7 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
     const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
     verdictContainer.innerHTML = formattedVerdict;
 
+    // ... (Existing logic for questions rendering) ...
     questionsList.innerHTML = '';
     if (data.questions && data.questions.length > 0) {
       data.questions.forEach((q, q_idx) => {
@@ -2025,7 +2048,8 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
           <div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
         `;
         questionsList.appendChild(listItem);
-
+        
+        // ... (Existing report caching logic) ...
         const reportId = `claim-${claimIdx}-question-${q_idx}`;
         if (!generatedReports.find(r => r.id === reportId)) {
           generatedReports.push({
