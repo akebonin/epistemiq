@@ -29,7 +29,8 @@ import hashlib
 from flask_cors import CORS, cross_origin
 import subprocess
 from auth_module import auth_bp, get_current_user, require_user
-
+from reportlab.lib.colors import HexColor
+from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 
 
 
@@ -391,7 +392,6 @@ def store_media_cache(file_hash, media_type, extracted_text):
     conn.commit()
     conn.close()
 
-
 # ==============================================================
 #                       CLEANUP
 # ==============================================================
@@ -667,15 +667,16 @@ def generate_questions_for_claim(claim):
         logging.error(f"Failed to generate questions for claim '{claim}': {e}")
         return []
 
-def generate_model_verdict_and_questions(prompt, claim_text):
+def generate_model_verdict_and_questions(prompt, claim_text, preferred_model=None):
     """
     Generate verdict with robust fallback strategies.
     1. Rotates models if 429 (Rate Limit) occurs.
     2. Uses 'soft' regex parsing if strict parsing fails.
+    3. Prioritizes preferred_model if provided.
     """
 
     # Priority list of free models
-    models = [
+    default_models = [
         "x-ai/grok-4.1-fast:free",
         "google/gemini-2.0-flash-exp:free",
         "google/gemini-2.0-flash-lite-preview-02-05:free",
@@ -683,6 +684,14 @@ def generate_model_verdict_and_questions(prompt, claim_text):
         "meta-llama/llama-3.3-70b-instruct:free",
         "mistralai/mistral-7b-instruct:free"
     ]
+
+    # Reorder based on preference
+    models = list(default_models)
+    # Ensure preferred_model is a valid string before inserting
+    if preferred_model and isinstance(preferred_model, str) and preferred_model.strip():
+        if preferred_model in models:
+            models.remove(preferred_model)
+        models.insert(0, preferred_model)
 
     model_verdict_content = "Could not generate model verdict."
     questions = []
@@ -700,11 +709,17 @@ def generate_model_verdict_and_questions(prompt, claim_text):
             logging.info(f"Attempting verdict generation with model: {model}")
 
             res = call_openrouter(prompt, json_mode=False, temperature=0.0, model=model)
-            raw_llm_response = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            try:
+                raw_llm_response = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            except:
+                raw_llm_response = ""
+
             raw_llm_response = normalize_text_for_display(raw_llm_response)
 
             if not raw_llm_response.strip():
-                raise ValueError("Empty response")
+                logging.warning(f"Model {model} returned empty response.")
+                continue # Try next model
 
             # --- 1. STRICT PARSING ---
             verdict_match = re.search(
@@ -714,34 +729,33 @@ def generate_model_verdict_and_questions(prompt, claim_text):
             )
 
             # --- 2. SOFT PARSING (Fallback) ---
-            # If the model forgot "Verdict:", just look for the keyword in the first 100 chars
             verdict = None
             if verdict_match:
                 verdict = verdict_match.group(1).upper()
             else:
-                first_lines = raw_llm_response[:150].upper()
+                first_lines = raw_llm_response[:200].upper()
                 for v in VALID_VERDICTS:
-                    if v in first_lines:
+                    # Look for distinct word
+                    if re.search(rf'\b{v}\b', first_lines):
                         verdict = v
-                        # Inject the label so the UI parsing works later if needed
-                        raw_llm_response = f"Verdict: {v}\n" + raw_llm_response
+                        raw_llm_response = f"Verdict: {v}\n{raw_llm_response}"
                         break
 
             if not verdict:
-                logging.warning(f"Model {model} failed format check. Output start: {raw_llm_response[:100]}")
+                logging.warning(f"Model {model} failed format check.")
                 continue # Try next model
 
             # Parse Justification
             justification_match = re.search(r'Justification:\s*([\s\S]{20,1000}?(?=\n\s*(?:Sources|Keywords|$)))', raw_llm_response, re.IGNORECASE | re.DOTALL)
-            if not justification_match:
-                # Fallback: Take everything after the verdict
+            if justification_match:
+                justification = justification_match.group(1).strip()
+            else:
                 parts = raw_llm_response.split(verdict, 1)
                 if len(parts) > 1:
-                    justification = parts[1].strip().split("Sources:")[0].split("Keywords:")[0].strip()[:1000]
+                    raw_remains = parts[1].replace("Verdict:", "").strip()
+                    justification = raw_remains.split("Sources:")[0].split("Keywords:")[0].strip()[:1000]
                 else:
                     justification = "Justification parsed via fallback."
-            else:
-                justification = justification_match.group(1).strip()
 
             # Parse Sources
             sources_match = re.search(r'Sources:\s*([\s\S]*?)(?=\n\s*(?:Keywords|$))', raw_llm_response, re.IGNORECASE | re.DOTALL)
@@ -756,16 +770,14 @@ def generate_model_verdict_and_questions(prompt, claim_text):
                 kw_text = keywords_match.group(1).strip()
                 search_keywords = [kw.strip().lower() for kw in re.split(r'[,;\s]+', kw_text) if len(kw.strip()) > 3][:5]
             else:
-                # Fallback keywords
                 words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
                 search_keywords = list(set(words[:5]))
 
-            # Format for display
+            # SUCCESS
             model_verdict_content = f"Verdict: **{verdict}**\n\nJustification: {justification}"
             if sources and sources != ['None']:
                 model_verdict_content += f"\n\nSources:\n" + "\n".join(f"- {src}" for src in sources)
 
-            # Generate questions (Attempt 1 time)
             try:
                 questions = generate_questions_for_claim(claim_text)
             except:
@@ -775,13 +787,10 @@ def generate_model_verdict_and_questions(prompt, claim_text):
 
         except Exception as e:
             logging.error(f"Model {model} failed: {e}")
-            time.sleep(1) # Short cool-off
             continue # Loop to next model
 
     # If all models fail
     logging.error("All models failed to generate verdict.")
-
-    # Fallback to RegEx keywords if LLM failed
     words = re.findall(r'\b[a-zA-Z]{4,}\b', claim_text.lower())
     search_keywords = list(set(words[:5])) or [claim_text.lower()[:50]]
 
@@ -791,8 +800,8 @@ def fetch_crossref(keywords):
     if not keywords:
         return []
 
-    search_query = ' AND '.join([f'"{kw}"' if ' ' in kw else kw for kw in keywords])
-    url = f"https://api.crossref.org/works?query={quote_plus(search_query)}&rows=3&select=title,URL,author,abstract"
+    search_query = ' '.join(keywords)
+    url = f"https://api.crossref.org/works?query={quote_plus(search_query)}&rows=3&select=title,URL,author,abstract,published-print,published-online,is-referenced-by-count"
     headers = {"User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com)"}
 
     try:
@@ -801,14 +810,29 @@ def fetch_crossref(keywords):
         items = response.json().get("message", {}).get("items", [])
         results = []
         for item in items:
+            year = ""
+            if item.get("published-print"):
+                year = item["published-print"]["date-parts"][0][0]
+            elif item.get("published-online"):
+                year = item["published-online"]["date-parts"][0][0]
+
+            authors_list = [f"{a.get('given','')} {a.get('family','')}".strip() for a in item.get("author", [])]
+            authors_str = ", ".join(authors_list[:3])
+
             results.append({
                 "title": item.get("title", ["No title"])[0] if item.get("title") else "No title",
                 "abstract": item.get("abstract", "Abstract not available"),
-                "url": item.get("URL", "")
+                "url": item.get("URL", ""),
+                "authors": authors_str,
+                "year": str(year),
+                "citation_count": item.get("is-referenced-by-count", 0),
+
+                # ✅ ENSURE THIS IS PRESENT
+                "source": "Crossref"
             })
         return results
     except requests.exceptions.RequestException as e:
-        logging.warning(f"CrossRef API call failed for query '{search_query}': {e}")
+        logging.warning(f"CrossRef API call failed: {e}")
         return []
 
 def fetch_semantic_scholar(keywords, max_results=3):
@@ -821,7 +845,7 @@ def fetch_semantic_scholar(keywords, max_results=3):
     search_query = ' '.join(keywords)
     headers = {
         "x-api-key": SEMANTIC_SCHOLAR_API_KEY,
-        "User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com"
+        "User-Agent": "Epistemiq/1.0 (mailto:epistemiq.ai@gmail.com)"
     }
     params = {
         "query": search_query,
@@ -896,13 +920,27 @@ def fetch_pubmed(keywords):
         details_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
         details_response = requests.get(details_url, timeout=10)
         details_data = details_response.json()
+
         results = []
         for pubmed_id in id_list:
             article_data = details_data.get('result', {}).get(pubmed_id, {})
+
+            pubdate = article_data.get('pubdate', '')
+            year = pubdate.split(' ')[0] if pubdate else ""
+
+            authors_list = [a.get('name', '') for a in article_data.get('authors', [])]
+            authors_str = ", ".join(authors_list[:3])
+
             results.append({
                 "title": article_data.get('title', 'No title'),
-                "abstract": article_data.get('abstract', 'Abstract not available'),
-                "url": f"https://pubmed.ncbi.nlm.nih.gov/{pubmed_id}/"
+                "abstract": article_data.get('abstract', 'Abstract not available on PubMed API'),
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{pubmed_id}/",
+                "year": year,
+                "authors": authors_str,
+                "citation_count": 0,
+
+                # ✅ ENSURE THIS IS PRESENT
+                "source": "PubMed"
             })
         return results
     except Exception as e:
@@ -979,302 +1017,236 @@ def normalize_text_for_display(text):
 
     return normalized
 
-def normalize_text_for_pdf(text):
-    """Normalize text specifically for PDF generation with strict HTML cleaning"""
-    if not text:
-        return text
+# --- TEXT HELPERS ---
 
-    # First apply display normalization
-    text = normalize_text_for_display(text)
-
-    # Additional PDF-specific replacements
-    pdf_replacements = {
-        # Convert Greek letters to text for PDF compatibility
-        'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta',
-        'ε': 'epsilon', 'ζ': 'zeta', 'η': 'eta', 'θ': 'theta',
-        'ι': 'iota', 'κ': 'kappa', 'λ': 'lambda', 'μ': 'mu',
-        'ν': 'nu', 'ξ': 'xi', 'ο': 'omicron', 'π': 'pi',
-        'ρ': 'rho', 'σ': 'sigma', 'τ': 'tau', 'υ': 'upsilon',
-        'φ': 'phi', 'χ': 'chi', 'ψ': 'psi', 'ω': 'omega',
-        'Α': 'Alpha', 'Β': 'Beta', 'Γ': 'Gamma', 'Δ': 'Delta',
-        'Ε': 'Epsilon', 'Ζ': 'Zeta', 'Η': 'Eta', 'Θ': 'Theta',
-        'Ι': 'Iota', 'Κ': 'Kappa', 'Λ': 'Lambda', 'Μ': 'Mu',
-        'Ν': 'Nu', 'Ξ': 'Xi', 'Ο': 'Omicron', 'Π': 'Pi',
-        'Ρ': 'Rho', 'Σ': 'Sigma', 'Τ': 'Tau', 'Υ': 'Upsilon',
-        'Φ': 'Phi', 'Χ': 'Chi', 'Ψ': 'Psi', 'Ω': 'Omega',
-
-        # Fix common formatting issues
-        '<br>': '\n', '<br/>': '\n', '<br />': '\n',
-        '<b>': '**', '</b>': '**', '<i>': '*', '</i>': '*',
-        '<em>': '*', '</em>': '*', '<strong>': '**', '</strong>': '**',
-        '<p>': '\n', '</p>': '\n', '<para>': '', '</para>': '',
+def normalize_text(text):
+    """Cleans up encoding artifacts and controls."""
+    if not text: return ""
+    replacements = {
+        "â€“": "-", "â€”": "-", "â€": "'", "â€œ": '"', "â€": '"',
+        "â€™": "'", "â€˜": "'", "\u2013": "-", "\u2014": "-",
+        "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+        "&nbsp;": " "
     }
-
-    for old, new in pdf_replacements.items():
+    for old, new in replacements.items():
         text = text.replace(old, new)
-
-    # Clean up any remaining HTML tags
-    text = re.sub(r'<[^>]+>', '', text)
-
-    # Fix multiple newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)
-
-    return text
-
-def clean_html_for_reportlab(text):
-    """Clean HTML but preserve table structure for PDF"""
-    if not text:
-        return text
-
-    # First normalize
-    text = normalize_text_for_pdf(text)
-
-    # Remove problematic HTML but keep table-related structure
-    text = re.sub(r'<br\s*/?>', '\n', text)
-    text = re.sub(r'<[^>]+>', '', text)  # Remove all other HTML tags
-
-    # Fix common issues
-    text = re.sub(r'&[^;]+;', '', text)
-    text = re.sub(r'\xa0', ' ', text)
-
-    # Ensure proper spacing
-    text = re.sub(r'\n\s*\n', '\n\n', text)
-
+    text = "".join(ch for ch in text if ch == '\n' or ch == '\r' or ch == '\t' or ord(ch) >= 32)
     return text.strip()
 
-def process_report_content_for_pdf(content):
-    """Process report content, handling mixed text and tables"""
-    lines = content.split('\n')
-    processed_blocks = []
-    current_text_block = []
-    current_table_lines = []
-    in_table = False
+def clean_xml(text):
+    """Escapes characters for ReportLab XML parser."""
+    if not text: return ""
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+def clean_verdict_text(text):
+    """Removes 'Verdict:' labels to avoid duplication in PDF."""
+    if not text: return ""
+    # Strip markdown bold/italics markers
+    text = text.replace('**', '').replace('*', '')
+    # Strip prefixes case-insensitive
+    text = re.sub(r'^Verdict:\s*', '', text, flags=re.IGNORECASE)
+    return text.strip()
+
+def parse_markdown_to_reportlab(text):
+    """Converts basic Markdown to ReportLab XML tags."""
+    if not text: return ""
+    text = clean_xml(text) # Escape first
+
+    # Verdict cleanup inside reports
+    text = re.sub(r'\*\*Verdict:\*\*', '<b>Verdict:</b>', text, flags=re.IGNORECASE)
+    text = re.sub(r'Verdict:', '<b>Verdict:</b>', text, flags=re.IGNORECASE)
+
+    lines = text.split('\n')
+    processed_lines = []
 
     for line in lines:
         line = line.strip()
+        if not line:
+            processed_lines.append("")
+            continue
 
-        # Check if this line starts a table
-        if line.startswith('|') and ('---' in line or any(cell.strip() for cell in line.split('|')[1:-1])):
-            if current_text_block:
-                # Save the current text block
-                processed_blocks.append(('text', '\n'.join(current_text_block)))
-                current_text_block = []
+        # Headers
+        if line.startswith('###'):
+            line = f"<b>{line[3:].strip()}</b><br/>"
+        elif line.startswith('##'):
+            line = f"<b><font size='13' color='#0d6efd'>{line[2:].strip()}</font></b><br/>"
+        elif line.startswith('#'):
+            line = f"<b><font size='14' color='#0d6efd'>{line[1:].strip()}</font></b><br/>"
 
-            in_table = True
-            current_table_lines.append(line)
+        # Bullets
+        if line.startswith('* ') or line.startswith('- '):
+            line = f"<bullet>&bull;</bullet> {line[2:].strip()}"
 
-        elif in_table and line.startswith('|'):
-            # Continue collecting table lines
-            current_table_lines.append(line)
+        processed_lines.append(line)
 
-        elif in_table and not line.startswith('|'):
-            # Table ended, process it
-            if current_table_lines:
-                table_content = '\n'.join(current_table_lines)
-                processed_blocks.append(('table', table_content))
-                current_table_lines = []
-            in_table = False
-            current_text_block.append(line)
+    text = '\n'.join(processed_lines)
+    # Inline Bold/Italic
+    text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+    text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
+    text = text.replace('\n', '<br/>')
 
-        else:
-            # Regular text line
-            current_text_block.append(line)
+    return text
 
-    # Don't forget any remaining content
-    if current_text_block:
-        processed_blocks.append(('text', '\n'.join(current_text_block)))
-    if current_table_lines:
-        processed_blocks.append(('table', '\n'.join(current_table_lines)))
+# --- STYLES ---
 
-    return processed_blocks
+def get_pro_styles():
+    styles = getSampleStyleSheet()
+    brand_blue = HexColor("#0d6efd")
+    text_dark = HexColor("#212529")
+    text_grey = HexColor("#495057")
 
-def split_long_report(report_content, max_section_length=1500):
-    """Split very long reports into manageable sections"""
-    if len(report_content) <= max_section_length:
-        return [report_content]
+    styles.add(ParagraphStyle(
+        name='ClaimHeading', parent=styles['Heading2'],
+        fontName='Helvetica-Bold', fontSize=14, textColor=brand_blue,
+        spaceBefore=15, spaceAfter=8, leading=18, wordWrap='CJK'
+    ))
+    styles.add(ParagraphStyle(
+        name='SectionHeading', parent=styles['Heading3'],
+        fontName='Helvetica-Bold', fontSize=11, textColor=text_dark,
+        spaceBefore=10, spaceAfter=4, leading=14
+    ))
+    styles.add(ParagraphStyle(
+        name='ProBody', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=10, leading=14,
+        textColor=text_grey, spaceAfter=6, alignment=TA_LEFT,
+        wordWrap='CJK'
+    ))
+    styles.add(ParagraphStyle(
+        name='ProList', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=10, leading=14,
+        textColor=text_grey, leftIndent=12, firstLineIndent=0,
+        spaceAfter=3, bulletIndent=0, wordWrap='CJK'
+    ))
+    styles.add(ParagraphStyle(
+        name='ProLink', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=9, leading=12,
+        textColor=brand_blue, spaceAfter=2, wordWrap='CJK'
+    ))
+    return styles
 
-    # Try to split at natural boundaries
-    sections = []
-    current_section = ""
+# --- DRAWING HELPERS ---
 
-    # Split by lines and rebuild sections
-    lines = report_content.split('\n')
-    for line in lines:
-        if len(current_section + line) > max_section_length and current_section:
-            sections.append(current_section)
-            current_section = line + '\n'
-        else:
-            current_section += line + '\n'
+def draw_page_footer(pdf_canvas, page_width):
+    """Draws Page Number and Branding Footer"""
+    pdf_canvas.saveState()
+    pdf_canvas.setFont("Helvetica", 8)
+    pdf_canvas.setFillColor(colors.grey)
 
-    if current_section:
-        sections.append(current_section)
+    # Line
+    pdf_canvas.setLineWidth(0.5)
+    pdf_canvas.setStrokeColor(colors.lightgrey)
+    pdf_canvas.line(0.75 * inch, 0.75 * inch, page_width - 0.75 * inch, 0.75 * inch)
 
-    return sections
+    # Text
+    page_num = pdf_canvas.getPageNumber()
+    pdf_canvas.drawString(0.75 * inch, 0.5 * inch, f"Page {page_num}")
+    pdf_canvas.drawRightString(page_width - 0.75 * inch, 0.5 * inch, "epistemiq.vercel.app")
 
-def draw_paragraph(pdf_canvas, text_content, style, y_pos, page_width, left_margin=0.75*inch, right_margin=0.75*inch):
-    """Safe paragraph drawing with better page management"""
+    pdf_canvas.restoreState()
+
+def draw_paragraph(pdf_canvas, xml_content, style, y_pos, page_width):
+    """Draws text with page break handling."""
+    left_margin = 0.75 * inch
+    right_margin = 0.75 * inch
     available_width = page_width - left_margin - right_margin
 
-    # Clean the text but keep it simple - NO TABLE CONVERSION!
-    text_content = clean_html_for_reportlab(text_content)
-
-    # Replace newlines with <br/> for Paragraph
-    text_content = text_content.replace('\n', '<br/>')
-
     try:
-        para = Paragraph(text_content, style)
+        para = Paragraph(xml_content, style)
         w, h = para.wrapOn(pdf_canvas, available_width, 0)
 
-        # Check if we need a new page - be more conservative
-        if y_pos - h < 1.5 * inch:  # Increased bottom margin
+        # Page Break
+        if y_pos - h < 1.0 * inch:
+            draw_page_footer(pdf_canvas, page_width)
             pdf_canvas.showPage()
-            y_pos = A4[1] - 0.75 * inch
+            y_pos = A4[1] - 1.0 * inch
 
         para.drawOn(pdf_canvas, left_margin, y_pos - h)
         return y_pos - h - style.spaceAfter
 
     except Exception as e:
-        logging.warning(f"Paragraph drawing failed: {e}")
-        # Fallback to simple text
-        return draw_simple_text(pdf_canvas, text_content, y_pos, page_width, left_margin)
-
-def draw_simple_text(pdf_canvas, text_content, y_pos, page_width, left_margin):
-    """Fallback text drawing that ensures no content is lost"""
-    pdf_canvas.setFont("Helvetica", 9)
-    line_height = 11
-    lines = text_content.replace('<br/>', '\n').split('\n')
-
-    for line in lines:
-        # Simple line wrapping
-        if len(line) > 120:
-            words = line.split()
-            current_line = ""
-            for word in words:
-                test_line = current_line + word + " "
-                if len(test_line) < 120:
-                    current_line = test_line
-                else:
-                    # Draw current line
-                    if y_pos < 1.5 * inch:
-                        pdf_canvas.showPage()
-                        y_pos = A4[1] - 0.75 * inch
-                        pdf_canvas.setFont("Helvetica", 9)
-                    pdf_canvas.drawString(left_margin, y_pos, current_line.strip())
-                    y_pos -= line_height
-                    current_line = word + " "
-            # Draw remaining line
-            if current_line:
-                if y_pos < 1.5 * inch:
-                    pdf_canvas.showPage()
-                    y_pos = A4[1] - 0.75 * inch
-                    pdf_canvas.setFont("Helvetica", 9)
-                pdf_canvas.drawString(left_margin, y_pos, current_line.strip())
-                y_pos -= line_height
-        else:
-            # Draw single line
-            if y_pos < 1.5 * inch:
-                pdf_canvas.showPage()
-                y_pos = A4[1] - 0.75 * inch
-                pdf_canvas.setFont("Helvetica", 9)
-            pdf_canvas.drawString(left_margin, y_pos, line.strip())
-            y_pos -= line_height
-
-    return y_pos
+        logging.warning(f"Paragraph draw error: {e}")
+        # Fallback
+        raw = re.sub(r'<[^>]+>', '', xml_content)
+        pdf_canvas.setFont("Helvetica", 9)
+        pdf_canvas.drawString(left_margin, y_pos, raw[:80])
+        return y_pos - 12
 
 def parse_markdown_table(markdown_text):
-    """Parse markdown table and return data for ReportLab Table"""
     lines = [line.strip() for line in markdown_text.split('\n') if line.strip().startswith('|')]
-
-    if len(lines) < 2:
-        return None
-
+    if len(lines) < 2: return None
     table_data = []
     for line in lines:
-        cells = [cell.strip() for cell in line.split('|')[1:-1]]  # Remove empty first/last
+        cells = [cell.strip() for cell in line.split('|')[1:-1]]
         table_data.append(cells)
-
-    # Remove separator line if it exists
-    if len(table_data) > 1 and all(cell.replace('-', '').replace(':', '').replace(' ', '') == '' for cell in table_data[1]):
+    if len(table_data) > 1 and all(set(c).issubset({'-', ':', ' '}) for c in table_data[1]):
         table_data.pop(1)
-
     return table_data if table_data else None
 
 def create_table_from_data(table_data, available_width):
-    """Return a ReportLab Table that never exceeds available_width and wraps cell text."""
-    if not table_data:
-        return None
+    if not table_data: return None
+    cell_style = ParagraphStyle(name="Cell", fontName="Helvetica", fontSize=8, leading=10, wordWrap="CJK")
+    header_style = ParagraphStyle(name="CellHeader", parent=cell_style, fontName="Helvetica-Bold")
 
-    # ---- 1) Normalize rows & convert every cell to a Paragraph with wrapping ----
-    from reportlab.platypus import Table, TableStyle, Paragraph
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib import colors
-
-    # A small cell style: wrap long words/URLs; tight leading; no hyphenation needed
-    cell_style = ParagraphStyle(
-        name="Cell",
-        fontName="Helvetica",
-        fontSize=8,
-        leading=10,
-        wordWrap="CJK",     # <- forces wrapping even for long tokens/URLs
-    )
-    header_style = ParagraphStyle(
-        name="CellHeader",
-        parent=cell_style,
-        fontName="Helvetica-Bold",
-    )
-
-    # Make all rows the same length
     max_cols = max(len(r) for r in table_data)
     norm_rows = []
     for r_i, row in enumerate(table_data):
         row = list(row) + [""] * (max_cols - len(row))
         cells = []
         for c_i, cell in enumerate(row):
-            txt = (cell or "")
-            # basic cleanup: strip markdown stars and convert <br/> to real breaks
-            txt = re.sub(r"\*+", "", txt).replace("<br/>", "<br/>")
-            # header row = first row
+            txt = clean_xml(cell)
             p = Paragraph(txt, header_style if r_i == 0 else cell_style)
             cells.append(p)
         norm_rows.append(cells)
 
-    # ---- 2) Proportional initial widths, then force exact fit to available_width ----
-    # weight columns by rough content length of header (fallback to 1)
-    def _wlen(par):  # Paragraph -> text length
-        return max(1, len(par.getPlainText() or ""))
-    weights = [max(_wlen(norm_rows[r][i]) for r in range(len(norm_rows))) for i in range(max_cols)]
-    total_w = sum(weights) or max_cols
-    raw_widths = [max(36.0, available_width * (w / total_w)) for w in weights]  # min 36pt per col
-    # scale so the sum is EXACTLY available_width (prevents drift from padding/borders)
-    sum_raw = sum(raw_widths)
-    factor = available_width / sum_raw if sum_raw > 0 else 1.0
-    col_widths = [w * factor for w in raw_widths]
-
-    # ---- 3) Build the table and style it ----
-    table = Table(norm_rows, colWidths=col_widths, hAlign='LEFT')
+    col_w = available_width / max_cols
+    table = Table(norm_rows, colWidths=[col_w]*max_cols, hAlign='LEFT')
     table.setStyle(TableStyle([
         ('FONT', (0, 0), (-1, -1), 'Helvetica', 8),
-        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
-        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.grey),
-        ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-        # slightly tighter padding reduces overflow risk
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('padding', (0,0), (-1,-1), 4)
     ]))
-
-    # ---- 4) Final safety: if wrap still reports wider, shrink columns proportionally ----
-    tw, _ = table.wrap(available_width, 0)
-    if tw > available_width:
-        k = available_width / tw
-        table._argW = [w * k for w in table._argW]
-
     return table
+
+def process_full_report(report_text):
+    report_text = normalize_text(report_text)
+    lines = report_text.split('\n')
+    blocks = []
+    table_buffer = []
+    in_table = False
+
+    for line in lines:
+        line = line.strip()
+        if not line: continue
+
+        if line.startswith('|'):
+            table_buffer.append(line)
+            in_table = True
+            continue
+        elif in_table:
+            blocks.append(('TABLE', '\n'.join(table_buffer)))
+            table_buffer = []
+            in_table = False
+
+        if line.startswith('#'):
+            header_text = line.lstrip('#').strip()
+            xml = parse_markdown_to_reportlab(header_text)
+            blocks.append(('ReportHeader', xml))
+            continue
+
+        if line.startswith('* ') or line.startswith('- '):
+            list_text = line[2:].strip()
+            xml = f"<bullet>&bull;</bullet> {parse_markdown_to_reportlab(list_text)}"
+            blocks.append(('ProList', xml))
+            continue
+
+        xml = parse_markdown_to_reportlab(line)
+        blocks.append(('ProBody', xml))
+
+    if table_buffer:
+        blocks.append(('TABLE', '\n'.join(table_buffer)))
+    return blocks
 
 # API Endpoints
 
@@ -1324,6 +1296,7 @@ def analyze():
     data = request.json or {}
     text = data.get("text")
     mode = data.get("mode") or "General Analysis of Testable Claims"
+    source_url = data.get("source_url")
 
     if not text or not mode:
         return jsonify({"error": "Missing text or analysis mode."}), 400
@@ -1338,6 +1311,7 @@ def analyze():
     # Logged-in user?
     user = get_current_user()
     user_id = user["user_id"] if user else None
+
 
     conn = get_conn()
     analysis_id = None
@@ -1724,6 +1698,9 @@ def get_claim_details():
     analysis_id = payload.get("analysis_id")
     mode = payload.get("mode")
 
+    # ✅ Capture user preference
+    preferred_model = payload.get("preferred_model")
+
     if analysis_id is None or ordinal is None:
         return jsonify({"error": "Missing analysis or claim index"}), 400
 
@@ -1747,9 +1724,7 @@ def get_claim_details():
         return jsonify({"error": "Claim not found"}), 404
 
     claim_text = row["claim_text"]
-    full_text_context = row["canonical_text"]  # <--- THIS IS THE MISSING KEY
-
-    # Create hash
+    full_text_context = row["canonical_text"]
     ch = sha256_str(claim_text.strip().lower())
 
     # 2) Check model_cache
@@ -1773,22 +1748,21 @@ def get_claim_details():
             "cached": True
         })
 
-    # 3) Compute verdict + questions WITH CONTEXT
+    # 3) Compute verdict + questions
     chosen_mode = mode if mode in verification_prompts else 'General Analysis of Testable Claims'
 
-    # Truncate context if it's too huge (e.g., > 3000 chars) to save tokens,
-    # but keep enough for the model to understand "CERN", "Simulation", etc.
     short_context = full_text_context[:4000]
 
-    # ✅ Pass context to the prompt
     verdict_prompt = verification_prompts[chosen_mode].format(
         claim=claim_text,
         context=short_context
     )
 
+    # ✅ Pass preference to the generator
     model_verdict_content, questions, search_keywords = generate_model_verdict_and_questions(
         verdict_prompt,
-        claim_text
+        claim_text,
+        preferred_model=preferred_model
     )
 
     # 4) Store results
@@ -1826,7 +1800,10 @@ def verify_external():
     ordinal = payload.get("claim_idx")
     analysis_id = payload.get("analysis_id")
 
-    # 1. Capture sources sent from Frontend
+    # ✅ 1. Capture User Preference safely
+    preferred_model = payload.get("preferred_model")
+
+    # 2. Capture sources sent from Frontend
     client_sources = payload.get("client_sources", [])
 
     if analysis_id is None or ordinal is None:
@@ -1835,7 +1812,6 @@ def verify_external():
     conn = get_conn()
     try:
         c = conn.cursor()
-        # ✅ SQL CHANGE: Fetch full context along with claim text
         c.execute("""
             SELECT c.claim_text, a.canonical_text
             FROM claims c
@@ -1851,7 +1827,7 @@ def verify_external():
         return jsonify({"error": "Claim not found"}), 404
 
     claim_text = row["claim_text"]
-    full_text_context = row["canonical_text"]  # ✅ Context retrieved
+    full_text_context = row["canonical_text"]
     ch = sha256_str(claim_text.strip().lower())
 
     # --- Check Cache ---
@@ -1894,13 +1870,11 @@ def verify_external():
     # ------------------------------------------------------
     all_sources = []
 
-    # Add Client Sources
     if isinstance(client_sources, list):
         for s in client_sources:
             if isinstance(s, dict) and s.get('title') and s.get('abstract'):
                 all_sources.append(s)
 
-    # Semantic Scholar
     try:
         all_sources.extend(fetch_semantic_scholar(search_keywords))
     except Exception as e:
@@ -1908,7 +1882,6 @@ def verify_external():
 
     time.sleep(1.1)
 
-    # Crossref
     try:
         all_sources.extend(fetch_crossref(search_keywords))
     except Exception as e:
@@ -1916,13 +1889,11 @@ def verify_external():
 
     time.sleep(0.5)
 
-    # PubMed
     try:
         all_sources.extend(fetch_pubmed(search_keywords))
     except Exception as e:
         logging.error(f"PubMed error: {e}")
 
-    # Deduplicate
     seen = set()
     unique_sources = []
     for s in all_sources:
@@ -1933,7 +1904,7 @@ def verify_external():
             seen.add(key)
 
     # ------------------------------------------------------
-    # 5) Generate external verdict using OpenRouter
+    # 5) Generate external verdict
     # ------------------------------------------------------
     if unique_sources:
         try:
@@ -1951,8 +1922,7 @@ def verify_external():
             if s.get('title')
         )
 
-        # ✅ PROMPT CHANGE: Inject Context
-        short_context = full_text_context[:3000] # Limit context size
+        short_context = full_text_context[:3000]
 
         prompt = f"""
 You are an AI assistant evaluating a claim based on provided scientific paper information.
@@ -1972,25 +1942,39 @@ Based on the papers provided:
 Return a justified verdict (TRUE, FALSE, UNCERTAIN, or SUPPORTED/UNSUPPORTED) of up to 300 words.
 """
 
-        # ✅ NEW CODE (Robust with Fallback)
-        models = [
+        # ✅ FIXED: Strict Model List Definition
+        default_models = [
             "x-ai/grok-4.1-fast:free",
+            "google/gemini-2.0-flash-exp:free",
             "google/gemini-2.0-flash-lite-preview-02-05:free",
-            "meta-llama/llama-3.3-70b-instruct:free"
+            "openai/gpt-oss-20b:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "mistralai/mistral-7b-instruct:free"
         ]
+
+        models = list(default_models)
+
+        # ✅ Validate user preference string before using
+        if preferred_model and isinstance(preferred_model, str) and preferred_model.strip():
+            if preferred_model in models:
+                models.remove(preferred_model)
+            models.insert(0, preferred_model)
 
         external_verdict = "Could not generate external verdict."
 
         for model in models:
             try:
+                # Ensure model passed is a string
+                if not isinstance(model, str): continue
+
                 res = call_openrouter(prompt, model=model)
                 content = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
                 if content.strip():
                     external_verdict = normalize_text_for_display(content)
-                    break # Success
+                    break
             except Exception as e:
                 logging.error(f"External verdict model {model} failed: {e}")
-                continue # Try next
+                continue
     else:
         external_verdict = "No relevant scientific papers found for this claim."
 
@@ -2538,268 +2522,205 @@ def get_available_reports():
     return jsonify(available_reports)
 
 
+# ==============================================================
+#                 EXPORT PDF ROUTE (GROUPED LOGIC + WEB LOGO)
+# ==============================================================
 
 @app.route("/api/export-pdf", methods=["POST", "OPTIONS"])
-@cross_origin(
-    origins=["https://epistemiq.vercel.app"],
-    supports_credentials=True,
-    methods=["POST", "OPTIONS"],
-    allow_headers=["Content-Type"]
-)
+@cross_origin(origins=["https://epistemiq.vercel.app"], supports_credentials=True, methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
 def export_pdf():
     payload = request.json or {}
     selected_reports = payload.get("selected_reports", [])
     analysis_id = payload.get("analysis_id")
 
-    if not analysis_id:
-        return "Missing analysis_id. Please include it in the request body.", 400
+    if not analysis_id: return "Missing analysis_id", 400
 
-    # ---------------------------------------------------------
-    # 1) Fetch analysis + claims using get_conn()
-    # ---------------------------------------------------------
+    # 1. Fetch ALL data first to avoid DB locking later
     conn = get_conn()
     try:
         c = conn.cursor()
-
-        # Verify analysis exists
-        c.execute("SELECT mode FROM analyses WHERE analysis_id=?", (analysis_id,))
-        analysis_row = c.fetchone()
-        if not analysis_row:
-            return "Analysis session expired or not found.", 400
-
-        # Get claims
-        c.execute(
-            "SELECT ordinal, claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal",
-            (analysis_id,)
-        )
+        c.execute("SELECT ordinal, claim_text FROM claims WHERE analysis_id=? ORDER BY ordinal", (analysis_id,))
         claim_rows = c.fetchall()
+
+        # Pre-fetch cache data into a structured dict
+        claims_data = {}
+
+        for ordinal, text in claim_rows:
+            ch = sha256_str(text.strip().lower())
+
+            # Fetch Verdicts/Sources
+            c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (ch,))
+            mv = c.fetchone()
+            c.execute("SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?", (ch,))
+            ev = c.fetchone()
+
+            # Fetch Questions List
+            c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (ch,))
+            qr = c.fetchone()
+            q_list = json_loads(qr[0], []) if qr else []
+
+            claims_data[ordinal] = {
+                "text": text,
+                "model_verdict": mv[0] if mv else "",
+                "external_verdict": ev[0] if ev else "",
+                "sources": json_loads(ev[1], []) if ev else [],
+                "questions": q_list,
+                "reports": {}
+            }
+
+            # Fetch Cached Reports for this claim
+            for idx, q_text in enumerate(q_list):
+                rq_hash = sha256_str(text.strip().lower() + "||" + q_text.strip().lower())
+                c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
+                rr = c.fetchone()
+                if rr:
+                    claims_data[ordinal]["reports"][idx] = rr[0]
 
     finally:
         conn.close()
 
-    if not claim_rows:
-        return "No claims found for this analysis session.", 400
+    if not claims_data: return "No claims found.", 400
 
-    # Map ordinal → claim_text for fast lookup
-    claim_map = {ordinal: claim_text for ordinal, claim_text in claim_rows}
+    # 2. Determine what to print
+    claims_to_print = sorted(list(claims_data.keys()))
 
-    pdf_reports = []
-    added_ids = set()
-
-    # ---------------------------------------------------------
-    # 2) Process selected reports
-    # ---------------------------------------------------------
-    for report_id in selected_reports:
-        if report_id in added_ids:
-            continue
-
-        # -------------------------
-        # SUMMARY REPORTS
-        # -------------------------
-        if report_id.endswith("-summary"):
-            try:
-                claim_idx = int(report_id.split("-")[1])
-            except (IndexError, ValueError):
-                continue
-
-            if claim_idx not in claim_map:
-                continue
-
-            claim_text = claim_map[claim_idx]
-            claim_hash = sha256_str(claim_text.strip().lower())
-
-            # Fetch model + external data in one DB session
-            conn = get_conn()
-            try:
-                c = conn.cursor()
-
-                # model verdict
-                c.execute("SELECT verdict FROM model_cache WHERE claim_hash=?", (claim_hash,))
-                row = c.fetchone()
-                model_verdict = row[0] if row else ""
-
-                # external verdict + sources
-                c.execute(
-                    "SELECT verdict, sources_json FROM external_cache WHERE claim_hash=?",
-                    (claim_hash,)
-                )
-                row2 = c.fetchone()
-                external_verdict = row2[0] if row2 else "Not verified externally."
-                sources = json_loads(row2[1], []) if row2 else []
-
-            finally:
-                conn.close()
-
-            pdf_reports.append({
-                "id": report_id,
-                "claim_text": claim_text,
-                "model_verdict": model_verdict,
-                "external_verdict": external_verdict,
-                "sources": sources,
-                "question": "Model verdict + external verification",
-                "report": None
-            })
-            added_ids.add(report_id)
-            continue
-
-        # -------------------------
-        # QUESTION REPORTS
-        # -------------------------
-        if "question" in report_id:
-            try:
-                parts = report_id.split("-")
-                claim_idx = int(parts[1])
-                q_idx = int(parts[3])
-            except (IndexError, ValueError):
-                continue
-
-            if claim_idx not in claim_map:
-                continue
-
-            claim_text = claim_map[claim_idx]
-            claim_hash = sha256_str(claim_text.strip().lower())
-
-            # Fetch questions + report in one DB session
-            conn = get_conn()
-            try:
-                c = conn.cursor()
-
-                # Questions from model_cache
-                c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=?", (claim_hash,))
-                q_row = c.fetchone()
-                if not q_row:
-                    continue
-
-                questions = json_loads(q_row[0], [])
-                if q_idx >= len(questions):
-                    continue
-
-                question_text = questions[q_idx]
-                rq_hash = sha256_str(
-                    claim_text.strip().lower() +
-                    "||" +
-                    question_text.strip().lower()
-                )
-
-                # Report text
-                c.execute("SELECT report_text FROM report_cache WHERE rq_hash=?", (rq_hash,))
-                r_row = c.fetchone()
-                if not r_row:
-                    continue
-
-                report_text = r_row[0]
-
-            finally:
-                conn.close()
-
-            pdf_reports.append({
-                "id": report_id,
-                "claim_text": claim_text,
-                "model_verdict": "",
-                "external_verdict": "",
-                "sources": [],
-                "question": question_text,
-                "report": report_text
-            })
-            added_ids.add(report_id)
-            continue
-
-    if not pdf_reports:
-        return "No valid reports selected for export.", 400
-
-    # ---------------------------------------------------------
-    # 3) Generate PDF (IDENTICAL to your existing logic)
-    # ---------------------------------------------------------
+    # 3. Setup PDF
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
+    p.setTitle("Epistemiq Report")
     width, height = A4
+    styles = get_pro_styles()
 
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='ClaimHeading', parent=styles['h2'], fontName='Helvetica-Bold', fontSize=14, spaceAfter=6))
-    styles.add(ParagraphStyle(name='SectionHeading', parent=styles['h3'], fontName='Helvetica-Bold', fontSize=12, spaceAfter=4, textColor=colors.darkblue))
-    styles.add(ParagraphStyle(name='NormalParagraph', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=12, spaceAfter=8))
-    styles.add(ParagraphStyle(name='SourceLink', parent=styles['NormalParagraph'], textColor=colors.blue, fontName='Helvetica', fontSize=9, leading=10, spaceAfter=4))
-    styles.add(ParagraphStyle(name='ReportBody', parent=styles['NormalParagraph'], fontName='Helvetica', fontSize=10, leading=14, spaceAfter=10))
+    # --- HEADER LOGO (FIXED: Uses Remote URL) ---
+    header_x = 0.75 * inch
+    logo_url = "https://raw.githubusercontent.com/akebonin/epistemiq/refs/heads/main/templates/static/icons/logo.png"
 
-    y = height - inch
-    p.setFont("Helvetica-Bold", 20)
-    p.drawCentredString(width / 2.0, y, "Epistemiq Analysis Report")
-    y -= 40
+    # Import locally to ensure it doesn't break global imports
+    from reportlab.lib.utils import ImageReader
 
-    for item in pdf_reports:
+    try:
+        # Fetch image into memory
+        res = requests.get(logo_url, timeout=5)
+        if res.status_code == 200:
+            img_data = io.BytesIO(res.content)
+            logo_img = ImageReader(img_data)
+
+            # Draw Logo: Top Left
+            p.drawImage(logo_img, 0.75*inch, height-1.25*inch, width=50, height=50, mask='auto', preserveAspectRatio=True)
+
+            # Shift text to the right to make room for logo
+            header_x += 60
+    except Exception as e:
+        logging.warning(f"Logo fetch failed: {e}")
+        # If fetch fails, we just continue without the logo, text stays at margin.
+
+    p.setFont("Helvetica-Bold", 22)
+    p.setFillColor(colors.black)
+    p.drawString(header_x, height - 0.8*inch, "Epistemiq Analysis Report")
+    p.setFont("Helvetica", 10)
+    p.setFillColor(colors.darkgrey)
+    p.drawString(header_x, height - 0.8*inch - 18, "Your Compass in the Epistemic Fog")
+    p.drawRightString(width-0.75*inch, height-0.8*inch, "epistemiq.vercel.app")
+    p.drawRightString(width-0.75*inch, height-0.8*inch - 14, "epistemiq.ai@gmail.com")
+    p.setStrokeColor(colors.lightgrey)
+    p.setLineWidth(1)
+    p.line(0.75*inch, height-1.4*inch, width-0.75*inch, height-1.4*inch)
+
+    y = height - 1.8 * inch
+
+    # 4. Render Content Loop (Unchanged)
+    for claim_idx in claims_to_print:
+        claim_data = claims_data[claim_idx]
+
+        # Check selection
+        has_summary = f"claim-{claim_idx}-summary" in selected_reports
+        selected_q_indices = []
+        for i in range(len(claim_data["questions"])):
+            if f"claim-{claim_idx}-question-{i}" in selected_reports:
+                selected_q_indices.append(i)
+
+        if not has_summary and not selected_q_indices:
+            continue
+
+        # -- Draw Claim Header --
         if y < 1.5 * inch:
+            draw_page_footer(p, width)
             p.showPage()
-            y = height - inch
-        y -= 20
+            y = height - 1.0 * inch
 
-        # Claim heading
-        y = draw_paragraph(p, f"Claim: {item['claim_text']}", styles['ClaimHeading'], y, width)
+        y = draw_paragraph(p, f"Claim {claim_idx + 1}: {claim_data['text']}", styles['ClaimHeading'], y, width)
 
-        if item['model_verdict']:
-            y = draw_paragraph(p, f"<b>Model Verdict:</b> {item['model_verdict']}", styles['NormalParagraph'], y, width)
+        # -- Draw Summary --
+        if has_summary:
+            if claim_data['model_verdict']:
+                clean_mv = clean_verdict_text(claim_data['model_verdict'])
+                y = draw_paragraph(p, f"<b>Model Verdict:</b> {clean_mv}", styles['ProBody'], y, width)
 
-        if item['external_verdict']:
-            y = draw_paragraph(p, f"<b>External Verdict:</b> {item['external_verdict']}", styles['NormalParagraph'], y, width)
+            if claim_data['external_verdict']:
+                clean_ev = clean_verdict_text(claim_data['external_verdict'])
+                y = draw_paragraph(p, f"<b>External Verdict:</b> {clean_ev}", styles['ProBody'], y, width)
 
-        if item.get('sources'):
-            y = draw_paragraph(p, "<b>External Sources:</b>", styles['SectionHeading'], y, width)
-            for src in item.get('sources', []):
-                title = src.get("title", "")
-                url = src.get("url", "")
-                if url:
-                    escaped = (
-                        url.replace("&", "&amp;")
-                           .replace("<", "&lt;")
-                           .replace(">", "&gt;")
-                           .replace('"', "&quot;")
-                    )
-                    link_text = f'<link href="{escaped}">{title}</link>'
+            if claim_data['sources']:
+                y = draw_paragraph(p, "External Sources:", styles['SectionHeading'], y, width)
+                for src in claim_data['sources']:
+                    title = clean_xml(src.get("title", "Source Link"))
+                    url = src.get("url", "")
+                    tag = f"<b>[{clean_xml(src.get('source', 'Source'))}]</b>"
+
+                    if len(title) > 120: title = title[:117] + "..."
+
+                    if url:
+                        safe_url = url.replace('&', '&amp;').replace('"', '&quot;')
+                        link_html = f'{tag} <link href="{safe_url}"><u><font color="blue">{title}</font></u></link>'
+                    else:
+                        link_html = f"{tag} {title}"
+
+                    y = draw_paragraph(p, link_html, styles['ProLink'], y, width)
+
+            y -= 10
+
+        # -- Draw Question Reports --
+        for q_idx in selected_q_indices:
+            q_text = claim_data["questions"][q_idx]
+            report_text = claim_data["reports"].get(q_idx)
+
+            if not report_text: continue
+
+            y = draw_paragraph(p, f"<b>Research Question {q_idx+1}:</b> {clean_xml(q_text)}", styles['SectionHeading'], y, width)
+
+            blocks = process_full_report(report_text)
+            for block_type, content in blocks:
+                if block_type == 'TABLE':
+                    tdata = parse_markdown_table(content)
+                    if tdata:
+                        tbl = create_table_from_data(tdata, width - 1.5 * inch)
+                        if tbl:
+                            w, h = tbl.wrapOn(p, width - 1.5 * inch, y)
+                            if y - h < 1.0 * inch:
+                                draw_page_footer(p, width)
+                                p.showPage()
+                                y = height - 1.0 * inch
+                            try:
+                                tbl.drawOn(p, 0.75 * inch, y - h)
+                                y -= h + 12
+                            except: pass
                 else:
-                    link_text = title
+                    style = styles.get(block_type, styles['ProBody'])
+                    y = draw_paragraph(p, content, style, y, width)
 
-                y = draw_paragraph(p, f"- {link_text}", styles['SourceLink'], y, width)
+            y -= 10
 
-        # Research question
-        y = draw_paragraph(p, f"<b>Research Question:</b> {item['question']}", styles['SectionHeading'], y, width)
+        y -= 5
+        p.setStrokeColor(colors.lightgrey)
+        p.setLineWidth(0.5)
+        p.line(0.75*inch, y, width-0.75*inch, y)
+        y -= 15
 
-        # Full report handling (unchanged)
-        if item.get("report"):
-            sections = split_long_report(item["report"])
-            for si, section in enumerate(sections):
-                blocks = process_report_content_for_pdf(section)
-                for block_type, block_content in blocks:
-                    if block_type == "text":
-                        y = draw_paragraph(p, block_content, styles['ReportBody'], y, width)
-                    elif block_type == "table":
-                        table_data = parse_markdown_table(block_content)
-                        if table_data:
-                            tbl = create_table_from_data(table_data, width - 1.5 * inch)
-                            if tbl:
-                                w, h = tbl.wrapOn(p, width - 1.5 * inch, y)
-                                if y - h < 1.5 * inch:
-                                    p.showPage()
-                                    y = height - 0.75 * inch
-                                try:
-                                    tbl.drawOn(p, 0.75 * inch, y - h)
-                                except Exception as e:
-                                    logging.error(f"Error drawing table: {e}")
-                                y -= h + 10
-                if si < len(sections) - 1:
-                    y -= 10
-                if y < 2 * inch:
-                    p.showPage()
-                    y = height - 0.75 * inch
-            y -= 20
-
+    # Footer on last page
+    draw_page_footer(p, width)
     p.save()
     buffer.seek(0)
-    return send_file(
-        buffer,
-        mimetype="application/pdf",
-        as_attachment=True,
-        download_name="Epistemiq_AI_Report.pdf"
-    )
-
+    return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name="Epistemiq_AI_Report.pdf")
 
 
 @app.route("/api/cleanup-cache", methods=["POST"])
