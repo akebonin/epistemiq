@@ -2094,6 +2094,77 @@ async function autoLoadClaimDetails(claims) {
     toggleLoading(runAnalysisBtn, false);
 }
 
+
+// ✅ Added 'preferredModel' parameter (defaults to null)
+async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false, preferredModel = null) {
+  const verdictContainer = document.getElementById(verdictContainerId);
+  const questionsList = document.getElementById(questionsContainerId);
+
+  if (!autoLoad && button) toggleLoading(button, true, "Loading details...");
+
+  try {
+    const response = await fetch(`${API_BASE}/api/get-claim-details`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        claim_idx: claimIdx,
+        preferred_model: preferredModel // ✅ Send to backend
+      })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || `Failed to get claim details: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
+    verdictContainer.innerHTML = formattedVerdict;
+
+    // ... (Existing logic for questions rendering) ...
+    questionsList.innerHTML = '';
+    if (data.questions && data.questions.length > 0) {
+      data.questions.forEach((q, q_idx) => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item';
+        listItem.innerHTML = `
+          <span class="d-block mb-2"><b>Q${q_idx + 1}:</b> ${escapeHTML(q)}</span>
+          <button class="btn btn-primary btn-sm generate-report-btn"
+            data-claim-idx="${claimIdx}"
+            data-question-idx="${q_idx}"
+            data-report-container-id="report-claim-${claimIdx}-${q_idx}">
+            Generate Report
+          </button>
+          <div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
+        `;
+        questionsList.appendChild(listItem);
+        
+        // ... (Existing report caching logic) ...
+        const reportId = `claim-${claimIdx}-question-${q_idx}`;
+        if (!generatedReports.find(r => r.id === reportId)) {
+          generatedReports.push({
+            id: reportId,
+            claimIdx: claimIdx,
+            questionIdx: q_idx,
+            claimText: document.querySelector(`#claim-${claimIdx} .claim-text`).textContent,
+            questionText: q
+          });
+        }
+      });
+    } else {
+      questionsList.innerHTML = '<li class="list-group-item">No research questions generated.</li>';
+    }
+  } catch (error) {
+    verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
+    questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${escapeHTML(error.message)}</li>`;
+  } finally {
+    if (!autoLoad && button) toggleLoading(button, false);
+  }
+}
+  
+  
 async function fetchCorePapers(claimText) {
     // 1. Improved Keyword Extraction
     // Remove punctuation, split by space
