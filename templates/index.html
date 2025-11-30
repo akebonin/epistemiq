@@ -702,6 +702,26 @@ max-width: none;
     background-image: none;
     background-color: #fff; 
 }
+
+/* Toast Animations */
+.toast.show {
+    animation: slideInRight 0.3s ease-out forwards;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Custom Toast Colors */
+.toast-success .toast-header {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+.toast-error .toast-header {
+    background-color: #f8d7da;
+    color: #842029;
+}
   
 </style>
 </head>
@@ -1077,7 +1097,67 @@ let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
 
+/**
+ * Displays a non-blocking notification.
+ * @param {string} message - The text to display.
+ * @param {string} type - 'success' (green), 'error' (red), or 'info' (default).
+ */
+function showToast(message, type = 'info') {
+    const container = document.querySelector('.toast-container');
+    
+    // Icon & Header Config
+    let icon = 'bi-info-circle';
+    let headerClass = '';
+    let title = 'Notification';
+    let autoHide = true;
+    let delay = 3000; // 3 seconds
 
+    if (type === 'success') {
+        icon = 'bi-check-circle-fill text-success';
+        headerClass = 'toast-success';
+        title = 'Success';
+    } else if (type === 'error') {
+        icon = 'bi-exclamation-triangle-fill text-danger';
+        headerClass = 'toast-error';
+        title = 'Error';
+        autoHide = false; // Keep errors visible until clicked
+    }
+
+    // Create Toast HTML
+    const toastId = 'toast-' + Date.now();
+    const html = `
+      <div id="${toastId}" class="toast ${headerClass}" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+          <i class="bi ${icon} me-2"></i>
+          <strong class="me-auto">${title}</strong>
+          <small class="text-muted">Just now</small>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+          ${message}
+        </div>
+      </div>
+    `;
+
+    // Inject
+    const template = document.createElement('div');
+    template.innerHTML = html.trim();
+    const toastEl = template.firstChild;
+    container.appendChild(toastEl);
+
+    // Initialize Bootstrap Toast
+    const bsToast = new bootstrap.Toast(toastEl, {
+        autohide: autoHide,
+        delay: delay
+    });
+    bsToast.show();
+
+    // Cleanup DOM after hide
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        toastEl.remove();
+    });
+}
+  
 // ----------------------------------------------------
 // 1. Check login status on page load
 // ----------------------------------------------------
@@ -1301,7 +1381,7 @@ async function loadAnalysis(id) {
     });
 
     if (!res.ok) {
-      alert("Could not load analysis (status " + res.status + ").");
+      showToast("Could not load analysis (status " + res.status + ").", 'error');
       return;
     }
 
@@ -1375,7 +1455,7 @@ async function loadAnalysis(id) {
 
   } catch (err) {
     console.error("Error loading analysis:", err);
-    alert("Error loading analysis: " + err.message);
+    showToast("Error loading analysis: " + err.message, 'error');
   }
 }
 
@@ -1561,7 +1641,7 @@ imagePreview.innerHTML = `<img src="${e.target.result}" class="preview-image" al
 };
 reader.readAsDataURL(file);
 } else {
-alert('Please select a valid image file (JPG, PNG, GIF)');
+showToast('Please select a valid image file (JPG, PNG, GIF)', 'info');
 currentImageFile = null;
 processImageBtn.disabled = true;
 imagePreview.innerHTML = '';
@@ -1573,7 +1653,7 @@ if (file && file.type.startsWith('video/')) {
 currentVideoFile = file;
 processVideoBtn.disabled = false;
 } else {
-alert('Please select a valid video file (MP4, AVI, MOV)');
+showToast('Please select a valid video file (MP4, AVI, MOV)', 'info');
 currentVideoFile = null;
 processVideoBtn.disabled = true;
 }
@@ -1581,7 +1661,7 @@ processVideoBtn.disabled = true;
 
 async function processImage() {
 if (!currentImageFile) {
-alert('Please select an image first');
+showToast('Please select an image first.', 'info'); // or 'error'
 return;
 }
 toggleLoading(processImageBtn, true, 'Processing image...');
@@ -1599,9 +1679,9 @@ throw new Error(data.error || 'Failed to process image');
 textInput.value = data.extracted_text;
 inputMethodSelect.value = 'paste';
 inputMethodSelect.dispatchEvent(new Event('change'));
-alert('Text successfully extracted from image! Ready for analysis.');
+showToast('Text successfully extracted from image! Ready for analysis.', 'success');
 } catch (error) {
-alert(`Error processing image: ${error.message}`);
+showToast(`Error processing image: ${error.message}`, 'error');
 } finally {
 toggleLoading(processImageBtn, false);
 }
@@ -1724,11 +1804,11 @@ async function processVideo() {
     inputMethodSelect.value = 'paste';
     inputMethodSelect.dispatchEvent(new Event('change'));
 
-    alert('Transcription complete!');
+    showToast('Transcription complete!', 'success');
 
   } catch (err) {
     console.error("Transcription failed:", err);
-    alert('Error: ' + err.message);
+    showToast('Error: ' + err.message, 'error');
   } finally {
     toggleLoading(btn, false);
   }
@@ -1739,13 +1819,13 @@ async function transcribeVideoUrl() {
   const btn = document.getElementById("transcribe-video-url-btn");
   const url = urlInput.value.trim();
 
-  if (!url) return alert("Enter a YouTube URL");
+  if (!url) return showToast("Enter a YouTube URL", 'info');
 
   // 1. Extract Video ID
   // Handles: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID
   const ytMatch = url.match(/(?:youtu\.be\/|v=|\/embed\/)([\w-]+)/);
   if (!ytMatch) {
-    return alert("Invalid YouTube URL. Please use a standard link.");
+    return showToast("Invalid YouTube URL. Please use a standard link.", 'info');
   }
   const videoId = ytMatch[1];
 
@@ -1872,12 +1952,12 @@ async function transcribeVideoUrl() {
              setTimeout(() => chromeBtn.click(), 500);
          }
     } else {
-         alert("✅ Transcript imported!");
+         showToast("✅ Transcript imported!", 'success');
     }
 
   } catch (err) {
     console.error(err);
-    alert("Unable to fetch captions.\n\nTechnical reason: YouTube is blocking scraping requests from this browser/network.\n\nWorkaround: Please open the video description on YouTube, click 'Show Transcript', copy the text, and paste it here.");
+    showToast("Unable to fetch captions.\n\nTechnical reason: YouTube is blocking scraping requests from this browser/network.\n\nWorkaround: Please open the video description on YouTube, click 'Show Transcript', copy the text, and paste it here.", 'info');
   } finally {
     toggleLoading(btn, false);
     urlInput.disabled = false;
@@ -2232,7 +2312,7 @@ copyButton.innerHTML = originalText;
 }, 2000);
 }).catch(err => {
 console.error('Failed to copy: ', err);
-alert('Failed to copy report to clipboard');
+showToast('Failed to copy report to clipboard', 'error');
 });
 };
 }
@@ -2341,7 +2421,7 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
 async function openReportSelectionModal() {
   try {
     if (!analysisId) {
-      alert('No analysis found. Please run an analysis first.');
+      showToast('No analysis found. Please run an analysis first.', 'info');
       return;
     }
 
@@ -2372,7 +2452,7 @@ async function openReportSelectionModal() {
     const listForModal = [...summaries, ...sessionReports];
 
     if (!listForModal || listForModal.length === 0) {
-      alert('No reports or claim summaries found for this analysis.');
+      showToast('No reports or claim summaries found for this analysis.', 'info');
       return;
     }
 
@@ -2383,7 +2463,7 @@ async function openReportSelectionModal() {
 
   } catch (err) {
     console.error('Error opening report selection modal:', err);
-    alert(`Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
   } finally {
     toggleLoading(downloadPdfBtn, false);
   }
@@ -2445,7 +2525,7 @@ async function generatePdfFromSelections() {
   const checkboxes = document.querySelectorAll('.report-selection-checkbox:checked');
   
   if (checkboxes.length === 0) {
-    alert('Please select at least one report to include in the PDF.');
+    showToast('Please select at least one report to include in the PDF.', 'info');
     return;
   }
 
@@ -2500,7 +2580,7 @@ async function generatePdfFromSelections() {
     modal.hide();
   } catch (error) {
     console.error('Error generating PDF:', error);
-    alert(`Error generating PDF: ${error.message}`);
+    showToast(`Error generating PDF: ${error.message}`, 'error');
   } finally {
     toggleLoading(generatePdfBtn, false);
   }
@@ -2552,12 +2632,12 @@ transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
 fetchArticleBtn.addEventListener('click', async () => {
   let url = urlInput.value.trim();
   if (!url) {
-    alert('Please enter a valid URL.');
+    showToast('Please enter a valid URL.', 'info');
     return;
   }
 
   if (!url.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
-    alert('Invalid URL format. Please use http:// or https://.');
+    showToast('Invalid URL format. Please use http:// or https://.', 'info');
     return;
   }
 
@@ -2577,7 +2657,7 @@ fetchArticleBtn.addEventListener('click', async () => {
     }
 
     if (!data.content || typeof data.content !== 'string') {
-      alert('No readable content extracted. Try paste manually.');
+      showToast('No readable content extracted. Try paste manually.', 'info');
       return;
     }
 
@@ -2601,11 +2681,11 @@ fetchArticleBtn.addEventListener('click', async () => {
     inputMethodSelect.value = 'paste';
     inputMethodSelect.dispatchEvent(new Event('change'));
 
-    alert('Article text has been fetched and pasted.');
+    showToast('Article text has been fetched and pasted.', 'success');
 
   } catch (error) {
     console.error('Fetch error:', error);
-    alert(`Error fetching article: ${error.message}`);
+    showToast(`Error fetching article: ${error.message}`, 'error');
   } finally {
     toggleLoading(fetchArticleBtn, false);
   }
@@ -2616,7 +2696,7 @@ analysisForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const articleText = textInput.value.trim();
     if (!articleText) {
-        alert('Article text is empty. Please paste content or use one of the input methods.');
+        showToast('Article text is empty. Please paste content or use one of the input methods.', 'info');
         return;
     }
     toggleLoading(runAnalysisBtn, true, 'Analyzing...');
@@ -2942,7 +3022,7 @@ updateChromeAiState();
 
     let text = textInput.value.trim();
     if (!text) {
-      alert("No text present — paste/extract/fetch first.");
+      showToast("No text present — paste/extract/fetch first.", 'info');
       return;
     }
 
@@ -3046,7 +3126,7 @@ function clearNanoCache() {
         }
     }
 
-    alert("Chrome AI cache cleared.");
+    showToast("Chrome AI cache cleared.", 'success');
 }
 
 document.getElementById("clearNanoCacheBtn_LoggedOut")?.addEventListener("click", clearNanoCache);
@@ -3282,5 +3362,10 @@ document.getElementById("openFaqBtn_LoggedIn")?.addEventListener("click", () => 
   </div>
 </div>
 
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 3000;">
+  <!-- Toasts get injected here by JS -->
+</div>
+  
 </body>
 </html>
