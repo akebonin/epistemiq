@@ -2159,16 +2159,18 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
 }
 
 async function fetchCorePapers(claimText) {
-    // 1. Improved Keyword Extraction (Allow numbers, 4+ chars)
-    // "CERN" is 4 chars, "2024" is numbers - previous regex missed these!
+    // 1. Improved Keyword Extraction
+    // Remove punctuation, split by space
     const cleanText = claimText.replace(/[^\w\s]/g, '');
     const words = cleanText.split(/\s+/);
-    const keywords = words.filter(w => w.length >= 4 && !["that", "this", "with", "from", "have"].includes(w.toLowerCase()));
+    
+    // Filter: 4+ chars, ignore common stop words
+    const keywords = words.filter(w => w.length >= 4 && !["that", "this", "with", "from", "have", "were", "what"].includes(w.toLowerCase()));
     
     // Take top 6 keywords to broaden search
     const query = keywords.slice(0, 6).join(" "); 
     
-    console.log("🔍 CORE Debug - Query:", query); // Check console to see this
+    console.log("🔍 CORE Debug - Query:", query);
 
     if (!query) {
         console.warn("🔍 CORE Debug - Query empty");
@@ -2179,7 +2181,8 @@ async function fetchCorePapers(claimText) {
         const response = await fetch('/api/core-proxy', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ q: query })
+            // 🟢 FIX: Send key 'query' to match backend expectation (not 'q')
+            body: JSON.stringify({ query: query }) 
         });
 
         if (!response.ok) {
@@ -2198,13 +2201,13 @@ async function fetchCorePapers(claimText) {
         // Map to Epistemiq format
         const mapped = data.results.map(item => ({
             title: item.title,
-            // Ensure abstract is not empty, or backend might reject it
+            // Fallback for abstract
             abstract: item.abstract || item.description || "Abstract not available from CORE.",
             url: item.downloadUrl || (item.links && item.links[0] ? item.links[0].url : `https://core.ac.uk/outputs/${item.id}`),
             authors: (item.authors || []).map(a => a.name).join(", "),
-            // Ensure year is a string for backend sorting
-            year: item.yearPublished ? String(item.yearPublished) : "2023", 
-            source: "CORE", // Short tag for UI
+            // Ensure year is string
+            year: item.yearPublished ? String(item.yearPublished) : "", 
+            source: "CORE", 
             citation_count: item.citationCount || 0
         }));
 
@@ -2216,7 +2219,7 @@ async function fetchCorePapers(claimText) {
         return [];
     }
 }
-
+  
 // ✅ Added 'preferredModel' to arguments
 async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false, preferredModel = null) {
     const verdictContainer = document.getElementById(verdictContainerId);
