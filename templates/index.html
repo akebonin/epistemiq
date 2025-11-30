@@ -2443,24 +2443,43 @@ freshGeneratePdfBtn.addEventListener('click', generatePdfFromSelections);
 async function generatePdfFromSelections() {
   const generatePdfBtn = document.getElementById('generate-pdf-from-modal');
   const checkboxes = document.querySelectorAll('.report-selection-checkbox:checked');
+  
   if (checkboxes.length === 0) {
     alert('Please select at least one report to include in the PDF.');
     return;
   }
-  const selectedReportIds = Array.from(checkboxes).map(checkbox => checkbox.value);
+
+  // ✅ SORTING FIX: Ensure backend receives claims in order (0, 1, 2...)
+  // and summaries before questions.
+  const selectedReportIds = Array.from(checkboxes)
+    .map(cb => cb.value)
+    .sort((a, b) => {
+        // Parse "claim-X..."
+        const claimA = parseInt(a.split('-')[1]);
+        const claimB = parseInt(b.split('-')[1]);
+        if (claimA !== claimB) return claimA - claimB;
+        
+        // If claims match, put summary first
+        if (a.includes('summary')) return -1;
+        if (b.includes('summary')) return 1;
+        
+        // If both questions, sort by question index
+        const qA = parseInt(a.split('-')[3] || 0);
+        const qB = parseInt(b.split('-')[3] || 0);
+        return qA - qB;
+    });
 
   try {
     toggleLoading(generatePdfBtn, true, 'Generating PDF...');
     const response = await fetch(`${API_BASE}/api/export-pdf`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    analysis_id: analysisId,
-    selected_reports: selectedReportIds
-  }),
-  credentials: "include"
-});
-
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        selected_reports: selectedReportIds
+      }),
+      credentials: "include"
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
