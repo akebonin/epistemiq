@@ -2629,9 +2629,7 @@ setupFileUploadDragAndDrop(videoUploadArea, videoInput, handleVideoSelect);
 processImageBtn.addEventListener('click', processImage);
 processVideoBtn.addEventListener('click', processVideo);
 transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
-
-// ✅ ADD THIS at the very top of your file with your other variables:
-let currentSourceUrl = null;
+  
 
 fetchArticleBtn.addEventListener('click', async () => {
   let url = urlInput.value.trim();
