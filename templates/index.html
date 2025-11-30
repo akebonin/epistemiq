@@ -1096,7 +1096,6 @@ let analysisId = null;
 let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
-let currentSourceUrl = null;
 
 /**
  * Displays a non-blocking notification.
@@ -2629,7 +2628,6 @@ setupFileUploadDragAndDrop(videoUploadArea, videoInput, handleVideoSelect);
 processImageBtn.addEventListener('click', processImage);
 processVideoBtn.addEventListener('click', processVideo);
 transcribeVideoUrlBtn.addEventListener('click', transcribeVideoUrl);
-  
 
 fetchArticleBtn.addEventListener('click', async () => {
   let url = urlInput.value.trim();
@@ -2679,9 +2677,6 @@ fetchArticleBtn.addEventListener('click', async () => {
     // ✅ Insert into textarea
     textInput.value = cleaned;
 
-    // ✅ STORE THE URL IN MEMORY BEFORE SWITCHING UI
-    currentSourceUrl = url;
-
     // ✅ Switch UI to paste mode
     inputMethodSelect.value = 'paste';
     inputMethodSelect.dispatchEvent(new Event('change'));
@@ -2696,14 +2691,10 @@ fetchArticleBtn.addEventListener('click', async () => {
   }
 });
 
-
+  
 analysisForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const articleText = textInput.value.trim();
-    
-    // ✅ Logic: Use the captured URL if available, otherwise check the input box
-    const finalSourceUrl = currentSourceUrl || (urlInput ? urlInput.value.trim() : null);
-
     if (!articleText) {
         showToast('Article text is empty. Please paste content or use one of the input methods.', 'info');
         return;
@@ -2719,9 +2710,7 @@ analysisForm.addEventListener('submit', async (e) => {
             body: JSON.stringify({
                 text: articleText,
                 mode: promptModeSelect.value,
-                usePapers: usePapersToggle.checked,
-                // ✅ Send the source URL to backend
-                source_url: finalSourceUrl
+                usePapers: usePapersToggle.checked
             }),
         });
         const data = await response.json();
