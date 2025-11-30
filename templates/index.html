@@ -2052,110 +2052,46 @@ async function autoLoadClaimDetails(claims) {
     // 1. Capture the user's preferred model from the UI (default to null if missing)
     const preferredModel = document.getElementById("preferredModel")?.value || null;
 
-    const promises = claims.map(async (claim, index) => {
+    // ✅ SEQUENTIAL LOOP: Processes one claim at a time to prevent server crash
+    for (let index = 0; index < claims.length; index++) {
         const claimId = `claim-${index}`;
         const verdictContainerId = `model-verdict-${claimId}`;
         const questionsContainerId = `questions-list-${claimId}`;
         const externalVerdictContainerId = `external-verdict-${claimId}`;
         const externalSourcesContainerId = `external-sources-${claimId}`;
 
+        // Update button text to show progress (e.g., "Analyzing Claim 1 of 5")
+        toggleLoading(runAnalysisBtn, true, 'Analyzing', `Claim ${index + 1} of ${claims.length}`);
+
         try {
             // Check if we already have model details
             const claimElement = document.getElementById(claimId);
+            
+            // --- 1. Model Verdict ---
             if (claimElement && claimElement.dataset.hasModelDetails) {
-                // Details already loaded, skip API call
                 console.log(`Using cached model details for claim ${index}`);
             } else {
-                // 2. Pass preferredModel to the function (as the 6th argument)
+                // 🛑 AWAIT ensures we wait for this to finish before moving on
                 await getModelDetails(index, verdictContainerId, questionsContainerId, null, true, preferredModel);
             }
 
+            // --- 2. External Verification ---
             if (usePapersToggle.checked) {
-                // Check if we already have external verification
                 if (claimElement && claimElement.dataset.hasExternalDetails) {
                     console.log(`Using cached external verification for claim ${index}`);
                 } else {
+                    // 🛑 AWAIT here too
                     await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true, preferredModel);
                 }
             }
         } catch (error) {
-            console.error(`Error loading details for claim ${index}:`, error);
+            console.error(`Error processing claim ${index}:`, error);
+            // We catch the error here so the loop continues to the next claim instead of stopping completely
         }
-    });
-
-    for (let i = 0; i < claims.length; i++) {
-        toggleLoading(runAnalysisBtn, true, 'Analyzing', `Claim ${i + 1} of ${claims.length}`);
-        await promises[i];
     }
+
+    // All claims processed
     toggleLoading(runAnalysisBtn, false);
-}
-// ✅ Added 'preferredModel' parameter (defaults to null)
-async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false, preferredModel = null) {
-  const verdictContainer = document.getElementById(verdictContainerId);
-  const questionsList = document.getElementById(questionsContainerId);
-
-  if (!autoLoad && button) toggleLoading(button, true, "Loading details...");
-
-  try {
-    const response = await fetch(`${API_BASE}/api/get-claim-details`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        analysis_id: analysisId,
-        claim_idx: claimIdx,
-        preferred_model: preferredModel // ✅ Send to backend
-      })
-    });
-
-    if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || `Failed to get claim details: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
-    verdictContainer.innerHTML = formattedVerdict;
-
-    // ... (Existing logic for questions rendering) ...
-    questionsList.innerHTML = '';
-    if (data.questions && data.questions.length > 0) {
-      data.questions.forEach((q, q_idx) => {
-        const listItem = document.createElement('li');
-        listItem.className = 'list-group-item';
-        listItem.innerHTML = `
-          <span class="d-block mb-2"><b>Q${q_idx + 1}:</b> ${escapeHTML(q)}</span>
-          <button class="btn btn-primary btn-sm generate-report-btn"
-            data-claim-idx="${claimIdx}"
-            data-question-idx="${q_idx}"
-            data-report-container-id="report-claim-${claimIdx}-${q_idx}">
-            Generate Report
-          </button>
-          <div id="report-claim-${claimIdx}-${q_idx}" class="report-placeholder mt-2 w-100"></div>
-        `;
-        questionsList.appendChild(listItem);
-        
-        // ... (Existing report caching logic) ...
-        const reportId = `claim-${claimIdx}-question-${q_idx}`;
-        if (!generatedReports.find(r => r.id === reportId)) {
-          generatedReports.push({
-            id: reportId,
-            claimIdx: claimIdx,
-            questionIdx: q_idx,
-            claimText: document.querySelector(`#claim-${claimIdx} .claim-text`).textContent,
-            questionText: q
-          });
-        }
-      });
-    } else {
-      questionsList.innerHTML = '<li class="list-group-item">No research questions generated.</li>';
-    }
-  } catch (error) {
-    verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
-    questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${escapeHTML(error.message)}</li>`;
-  } finally {
-    if (!autoLoad && button) toggleLoading(button, false);
-  }
 }
 
 async function fetchCorePapers(claimText) {
