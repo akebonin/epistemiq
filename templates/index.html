@@ -1433,7 +1433,6 @@ async function loadAnalysis(id) {
 
     // 1. Inject Verify All Bar (if needed)
     if (data.claims.length > 1) {
-         // Check if all are already verified to determine button state
          const allDone = data.claims.every(c => c.model_verdict);
          const btnClass = allDone ? "btn-success" : "btn-primary";
          const btnText = allDone ? `<i class="bi bi-check-all"></i> All Verified` : `<i class="bi bi-robot"></i> Verify All Claims`;
@@ -1452,7 +1451,6 @@ async function loadAnalysis(id) {
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
       
-      // Determine if this specific claim is already verified
       const isVerified = !!claim.model_verdict;
       
       let buttonHtml = '';
@@ -1460,6 +1458,31 @@ async function loadAnalysis(id) {
           buttonHtml = `<button class="btn btn-sm btn-success disabled"><i class="bi bi-check-lg"></i> Verified</button>`;
       } else {
           buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
+      }
+
+      // --- Prepare Model Verdict HTML with Badge ---
+      let modelVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
+      if (claim.model_verdict) {
+          let badge = "";
+          if (claim.used_model) {
+              const clean = claim.used_model.replace(":free", "").replace("/", " / ");
+              badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
+          }
+          modelVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.model_verdict);
+      }
+
+      // --- Prepare External Verdict HTML with Badge ---
+      let externalVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
+      if (claim.external_verdict) {
+          let badge = "";
+          if (claim.external_model) { // Check specific external model
+              const clean = claim.external_model.replace(":free", "").replace("/", " / ");
+              badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
+          }
+          externalVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.external_verdict);
+      } else if (!document.getElementById("usePapersToggle")?.checked) {
+          // If toggle is off (and no data), show disabled text. 
+          // Note: In history view we usually just show what's in DB.
       }
 
       const claimHtml = `
@@ -1473,11 +1496,7 @@ async function loadAnalysis(id) {
 
           <strong>Model Verdict:</strong>
           <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
-            ${
-              claim.model_verdict
-                ? formatTextWithMarkdownAndLinks(claim.model_verdict)
-                : '<span class="text-muted fst-italic">Waiting for verification...</span>'
-            }
+            ${modelVerdictHtml}
           </div>
 
           <strong>Suggested Research Questions:</strong>
@@ -1500,11 +1519,7 @@ async function loadAnalysis(id) {
 
           <strong>External Verification:</strong>
           <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
-            ${
-              claim.external_verdict
-                ? formatTextWithMarkdownAndLinks(claim.external_verdict)
-                : '<span class="text-muted fst-italic">Waiting for verification...</span>'
-            }
+            ${externalVerdictHtml}
           </div>
           <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3">
              ${(claim.external_sources || []).map(s => `
