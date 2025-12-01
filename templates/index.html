@@ -2372,7 +2372,6 @@ async function fetchCorePapers(claimText) {
     }
 }
   
-// ✅ Added 'preferredModel' to arguments
 async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, button, autoLoad = false, preferredModel = null) {
     const verdictContainer = document.getElementById(verdictContainerId);
     const sourcesContainer = document.getElementById(sourcesContainerId);
@@ -2405,7 +2404,7 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
                 analysis_id: analysisId,
                 claim_idx: claimIdx,
                 client_sources: coreSources,
-                preferred_model: preferredModel // ✅ Now this variable exists
+                preferred_model: preferredModel 
             })
         });
 
@@ -2414,25 +2413,26 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
             throw new Error(data.error || `External verification failed: ${response.status}`);
         }
 
-        // 3. Display Verdict (Handle cached badge if needed)
+        // 3. Display Verdict
         let verdictHtml = formatTextWithMarkdownAndLinks(data.verdict);
         
-        // Optional: Add cached badge here if you want it in the verdict box
-        // if (data.cached) verdictHtml += ` ${getBadgeHtml('db')}`;
+        // ✅ NEW: Add Model Badge if available
+        if (data.used_model) {
+            // Clean up model name for display (e.g. "x-ai/grok-4.1..." -> "x-ai / grok-4.1")
+            const cleanModel = data.used_model.replace(":free", "").replace("/", " / ");
+            const badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(cleanModel)}</span><br>`;
+            verdictHtml = badge + verdictHtml;
+        }
         
         verdictContainer.innerHTML = verdictHtml;
 
         // 4. Display Sources
         if (data.sources && data.sources.length > 0) {
             sourcesContainer.innerHTML = data.sources.map(s => {
-                // ✅ This logic works PERFECTLY if backend sends "source" key
                 const sourceInfo = s.source ? `[${s.source}]` : '';
                 const citationInfo = s.citation_count ? ` (${s.citation_count} citations)` : '';
                 const yearInfo = s.year ? ` (${s.year})` : '';
                 const authorsInfo = s.authors ? ` - ${s.authors}` : '';
-                
-                // Optional: Add badge to individual sources if cached
-                // const badge = data.cached ? getBadgeHtml('db') : '';
                 
                 return `<li>📄 ${sourceInfo} <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title)}</a>${authorsInfo}${yearInfo}${citationInfo}</li>`;
             }).join('');
@@ -2491,10 +2491,10 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
       { withCredentials: true }
     );
 
-    // Don't clear spinner yet! Wait for data.
     let fullContent = '';
     let isFirstChunk = true;
     let reportBox = null;
+    let detectedModel = null; // ✅ NEW: Track the model used
 
     es.onmessage = (event) => {
       // 3. Handle Completion
@@ -2508,16 +2508,26 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
         }
 
         if (fullContent && fullContent.trim().length > 0) {
-          if (reportBox) reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
+          // Final render to ensure formatting is perfect
+          let finalHtml = formatTextWithMarkdownAndLinks(fullContent);
+          
+          // Re-attach badge if model was detected
+          if (detectedModel) {
+              const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
+              const badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
+              finalHtml = badge + finalHtml;
+          }
+          
+          if (reportBox) reportBox.innerHTML = finalHtml;
 
-          // ✅ View full report button
+          // View full report button
           const viewBtn = document.createElement('button');
           viewBtn.className = 'btn btn-outline-primary btn-sm mt-2';
           viewBtn.textContent = '📖 View Full Report';
           viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
           reportContainer.appendChild(viewBtn);
 
-          // ✅ Register as “generated this session”
+          // Register as “generated this session”
           markReportGenerated(claimIdx, questionIdx);
         } else {
           reportContainer.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
@@ -2535,15 +2545,34 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
       // 5. Accumulate and Render Data
       try {
         const data = JSON.parse(event.data);
+        
         if (data.content) {
           fullContent += data.content;
-          reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
         }
+        
+        // ✅ NEW: Capture model name if sent
+        if (data.used_model) {
+            detectedModel = data.used_model;
+        }
+
         if (data.error) {
           reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(data.error)}</strong>`;
+        } else {
+            // Render text
+            let currentHtml = formatTextWithMarkdownAndLinks(fullContent);
+            
+            // ✅ NEW: Prepend Badge if model known
+            if (detectedModel) {
+                const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
+                const badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
+                currentHtml = badge + currentHtml;
+            }
+            
+            reportBox.innerHTML = currentHtml;
         }
+
       } catch {
-        // cached or non-JSON chunk
+        // Fallback for non-JSON chunks (rare)
         fullContent += event.data;
         reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
       }
@@ -2552,7 +2581,6 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
     es.onerror = () => {
       es.close();
       reportContainer.innerHTML = `<div class="alert alert-danger">Stream error or unsupported media type.</div>`;
-      // Re-enable button on error
       if (button) { 
           button.disabled = false; 
           button.innerHTML = 'Generate Report'; 
@@ -2561,13 +2589,11 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
   } catch (error) {
     console.error('Report generation error:', error);
     reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
-    // Re-enable button on sync error
     if (button) { 
         button.disabled = false; 
         button.innerHTML = 'Generate Report'; 
     }
   }
-  // ⚠️ Removed 'finally' block to prevent button resetting early
 }
 
 
