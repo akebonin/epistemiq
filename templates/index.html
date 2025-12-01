@@ -2228,6 +2228,9 @@ async function runBatchVerification(totalClaims) {
     batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
     batchBtn.className = "btn btn-success btn-sm";
 }
+
+window.runSingleVerification = runSingleVerification;
+window.runBatchVerification = runBatchVerification;
   
 // ✅ Added 'preferredModel' parameter (defaults to null)
 async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false, preferredModel = null) {
