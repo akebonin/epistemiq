@@ -1111,7 +1111,7 @@ function showToast(message, type = 'info') {
     let headerClass = '';
     let title = 'Notification';
     let autoHide = true;
-    let delay = 3000; // 3 seconds
+    let delay = 10000; // 10 seconds
 
     if (type === 'success') {
         icon = 'bi-check-circle-fill text-success';
@@ -2695,7 +2695,7 @@ fetchArticleBtn.addEventListener('click', async () => {
     inputMethodSelect.value = 'paste';
     inputMethodSelect.dispatchEvent(new Event('change'));
 
-    showToast('Article text has been fetched and pasted.', 'success');
+    showToast('Article text has been fetched and pasted. If the text is long and Chrome AI mode is on, we suggest you summarize with Gemini Nano before Run Analysis', 'success');
 
   } catch (error) {
     console.error('Fetch error:', error);
