@@ -84,6 +84,7 @@ def get_conn():
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA busy_timeout=10000;")  # 10 seconds
+    conn.execute("PRAGMA foreign_keys = ON;")
 
     return conn
 
@@ -186,7 +187,7 @@ def init_db():
         analysis_id TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (analysis_id) REFERENCES analyses(analysis_id)
+        FOREIGN KEY (analysis_id) REFERENCES analyses(analysis_id) ON DELETE CASCADE
     )
     """)
     # ✅ NEW: Prevent Duplicate User Links
@@ -358,6 +359,39 @@ def get_claims_for_analysis(analysis_id: str):
     conn.close()
     return [row[0] for row in rows]
 
+@with_retry_db
+def save_pasted_text_to_db(text_content):
+    """Saves raw text to the cache table."""
+    # 1. Calculate hash
+    t_hash = text_hash(text_content)
+
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        # 2. Insert or Ignore (if it exists, do nothing)
+        c.execute("""
+        INSERT OR IGNORE INTO pasted_texts (text_hash, text_content, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        """, (t_hash, text_content))
+        conn.commit()
+    finally:
+        conn.close()
+
+@with_retry_db
+def save_article_to_cache_db(url, text):
+    """Manually saves client-fetched text to the article cache."""
+    url_hash = sha256_str(url)
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        # We don't have raw_html from client, so we pass None or empty string
+        c.execute("""
+        INSERT OR REPLACE INTO article_cache (url_hash, url, raw_html, article_text, fetched_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (url_hash, url, "", text))
+        conn.commit()
+    finally:
+        conn.close()
 
 # ==============================================================
 #               MEDIA CACHE HELPERS
@@ -408,7 +442,7 @@ def cleanup_old_cache():
         media_deleted = c.rowcount
 
         # 7-day analyses
-        c.execute('DELETE FROM analyses WHERE last_accessed < ?', (datetime.now() - timedelta(days=7),))
+        c.execute('DELETE FROM analyses WHERE last_accessed < ?', (datetime.now() - timedelta(days=30),))
         analyses_deleted = c.rowcount
 
         # pasted texts
@@ -493,7 +527,8 @@ STRICT RULES:
 # Prompt templates
 extraction_templates = {
     "General Analysis of Testable Claims": f'''
-You will be given a text. Extract a **numbered list** of explicit, scientifically testable claims.
+You will be given a text. Extract a **numbered list** of the **top up to 7** most scientifically significant and testable claims.
+Prioritize controversial, specific, or verifiable assertions over general statements.
 
 {BASE_EXTRACTION_RULES}
 
@@ -504,7 +539,8 @@ TEXT:
 OUTPUT:
 ''',
     "Specific Focus on Scientific Claims": f'''
-You will be given a text. Extract a **numbered list** of explicit, scientifically testable claims related to science.
+You will be given a text. Extract a **numbered list** of the **top up to 7** most significant, scientifically testable claims related to science.
+Prioritize controversial, data-driven or specific experimental assertions.
 
 {BASE_EXTRACTION_RULES}
 
@@ -515,7 +551,8 @@ TEXT:
 OUTPUT:
 ''',
     "Technology-Focused Extraction": f'''
-You will be given a text. Extract a **numbered list** of explicit, testable claims related to technology.
+You will be given a text. Extract a **numbered list** of the **top up to 7** most significant, testable claims related to technology.
+Prioritize specific capabilities, benchmarks, or innovation claims.
 
 {BASE_EXTRACTION_RULES}
 
@@ -1308,9 +1345,18 @@ def analyze():
 
     txt_hash = text_hash(text)
 
+    # Save the raw text to cache immediately
+    save_pasted_text_to_db(text)
+
+    # there is a URL, also save to article_cache
+    if source_url:
+        save_article_to_cache_db(source_url, text)
+
     # Logged-in user?
     user = get_current_user()
     user_id = user["user_id"] if user else None
+
+    current_source_type = "url" if source_url else "pasted_text"
 
 
     conn = get_conn()
@@ -1333,7 +1379,7 @@ def analyze():
                     mode, source_type, source_meta, created_at, last_accessed
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
-                (new_id, user_id, txt_hash, canonical, mode, "pasted_text", None),
+                (new_id, user_id, txt_hash, canonical, mode, current_source_type, source_url),
             )
             # Success - it's new
             analysis_id = new_id
