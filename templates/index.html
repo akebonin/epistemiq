@@ -722,6 +722,45 @@ max-width: none;
     background-color: #f8d7da;
     color: #842029;
 }
+
+/* Verify Button Styles */
+.verify-actions-bar {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.btn-verify-single {
+    border: 1px solid #0d6efd;
+    color: #0d6efd;
+    background: #fff;
+    padding: 5px 15px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-verify-single:hover {
+    background: #0d6efd;
+    color: #fff;
+}
+
+.btn-verify-single:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.status-indicator {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
   
 </style>
 </head>
@@ -1089,6 +1128,8 @@ const usePapersToggle = document.getElementById('usePapersToggle');
 const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
+const activeVerifications = new Set();
+
 const API_BASE = "";
 
 
@@ -1382,7 +1423,7 @@ async function loadAnalysis(id) {
     });
 
     if (!res.ok) {
-      showToast("Could not load analysis (status " + res.status + ").", 'error');
+      showToast("Could not load analysis.", 'error');
       return;
     }
 
@@ -1390,34 +1431,58 @@ async function loadAnalysis(id) {
     analysisId = data.analysis_id;
     resultsContainer.innerHTML = "";
 
-    if (!data.claims || data.claims.length === 0) {
-      resultsContainer.innerHTML = '<div class="alert alert-info mt-3">No claims stored for this analysis.</div>';
-      return;
+    // 1. Inject Verify All Bar (if needed)
+    if (data.claims.length > 1) {
+         // Check if all are already verified to determine button state
+         const allDone = data.claims.every(c => c.model_verdict);
+         const btnClass = allDone ? "btn-success" : "btn-primary";
+         const btnText = allDone ? `<i class="bi bi-check-all"></i> All Verified` : `<i class="bi bi-robot"></i> Verify All Claims`;
+         const disabled = allDone ? "disabled" : "";
+
+         resultsContainer.innerHTML = `
+        <div class="verify-actions-bar sticky-top" style="top: 10px; z-index: 100;">
+            <div><strong>${data.claims.length} Claims Loaded</strong></div>
+            <button id="verify-all-btn" class="btn ${btnClass} btn-sm" onclick="runBatchVerification(${data.claims.length})" ${disabled}>
+                ${btnText}
+            </button>
+        </div>`;
     }
 
-    // Badge HTML (Only used in Title now)
-    const cachedBadgeStr = getBadgeHtml('db'); 
-
+    // 2. Render Cards
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
       
+      // Determine if this specific claim is already verified
+      const isVerified = !!claim.model_verdict;
+      
+      let buttonHtml = '';
+      if (isVerified) {
+          buttonHtml = `<button class="btn btn-sm btn-success disabled"><i class="bi bi-check-lg"></i> Verified</button>`;
+      } else {
+          buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
+      }
+
       const claimHtml = `
-        <div class="claim-card" id="${claimId}" data-has-model-details="true" data-has-external-details="true">
-          <h5>Claim ${idx + 1} ${cachedBadgeStr}</h5> 
+        <div class="claim-card" id="${claimId}">
+          <div class="d-flex justify-content-between align-items-start">
+            <h5>Claim ${idx + 1} ${getBadgeHtml('db')}</h5> 
+            ${buttonHtml}
+          </div>
+
           <p class="claim-text mb-3">${escapeHTML(claim.claim_text)}</p>
 
           <strong>Model Verdict:</strong>
-          <div class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
+          <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
             ${
               claim.model_verdict
                 ? formatTextWithMarkdownAndLinks(claim.model_verdict)
-                : '<span class="text-muted">No model verdict cached yet.</span>'
+                : '<span class="text-muted fst-italic">Waiting for verification...</span>'
             }
           </div>
 
           <strong>Suggested Research Questions:</strong>
-          <ul class="question-list list-group list-group-flush mb-3">
-            ${(claim.questions || []).map((q, qIdx) => `
+          <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
+            ${(claim.questions && claim.questions.length > 0) ? claim.questions.map((q, qIdx) => `
                 <li class="list-group-item">
                     <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
                     <button class="btn btn-primary btn-sm generate-report-btn"
@@ -1428,25 +1493,23 @@ async function loadAnalysis(id) {
                     </button>
                     <div id="report-claim-${idx}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
                 </li>
-            `).join('')}
-             ${(!claim.questions || claim.questions.length === 0) ? '<li class="list-group-item">No cached research questions.</li>' : ''}
+            `).join('') : '<li class="list-group-item text-muted fst-italic">Generated after verification.</li>'}
           </ul>
 
           <hr>
 
-          <strong>External Verification (Semantic Scholar, Crossref, CORE & PubMed):</strong>
-          <div class="verdict-box mb-2" style="min-height: 50px;">
+          <strong>External Verification:</strong>
+          <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
             ${
               claim.external_verdict
                 ? formatTextWithMarkdownAndLinks(claim.external_verdict)
-                : '<span class="text-muted">No external verification cached yet.</span>'
+                : '<span class="text-muted fst-italic">Waiting for verification...</span>'
             }
           </div>
-          <ul class="source-list list-unstyled ps-3 mb-3">
+          <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3">
              ${(claim.external_sources || []).map(s => `
                 <li>📄 [${s.source || 'Ref'}] <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title || 'Source')}</a></li>
              `).join('')}
-             ${(!claim.external_sources || claim.external_sources.length === 0) ? '<li>No cached external sources.</li>' : ''}
           </ul>
         </div>
       `;
@@ -2017,33 +2080,56 @@ function toggleLoading(btn, isLoading, msg = "") {
 }
 
 function displayClaimsStructure(claims, isCached = false) {
-    // Generate the badge string once if cached
     const badgeHtml = isCached ? getBadgeHtml('db') : '';
+    
+    // 1. Inject the "Verify All" Control Bar at the top
+    let controlBar = '';
+    if (claims.length > 1) {
+        controlBar = `
+        <div class="verify-actions-bar sticky-top" style="top: 10px; z-index: 100;">
+            <div>
+                <strong>${claims.length} Claims Extracted</strong>
+            </div>
+            <button id="verify-all-btn" class="btn btn-primary btn-sm" onclick="runBatchVerification(${claims.length})">
+                <i class="bi bi-robot"></i> Verify All Claims
+            </button>
+        </div>`;
+    }
 
+    resultsContainer.innerHTML = controlBar;
+
+    // 2. Render each claim card with "Verify" buttons
     claims.forEach((claimText, index) => {
         const claimId = `claim-${index}`;
         const claimHtml = `
         <div class="claim-card" id="${claimId}">
-            <h5>Claim ${index + 1} ${badgeHtml}</h5>
-            <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
-            
-            <strong>Model Verdict:</strong>
-            <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
-                <span class="text-muted">Loading model verdict...</span>
+            <div class="d-flex justify-content-between align-items-start">
+                <h5>Claim ${index + 1} ${badgeHtml}</h5>
+                <button id="btn-verify-${index}" class="btn-verify-single" onclick="runSingleVerification(${index})">
+                    Verify This Claim
+                </button>
             </div>
             
+            <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
+            
+            <!-- MODEL VERDICT SECTION -->
+            <strong>Model Verdict:</strong>
+            <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
+                <span class="text-muted fst-italic">Waiting for verification...</span>
+            </div>
+            
+            <!-- QUESTIONS SECTION -->
             <strong>Suggested Research Questions:</strong>
             <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
-                <li class="list-group-item">
-                    <span class="text-muted">Loading questions...</span>
-                </li>
+                 <li class="list-group-item text-muted fst-italic">Generated after verification.</li>
             </ul>
             
             <hr>
             
+            <!-- EXTERNAL VERIFICATION SECTION -->
             <strong>External Verification (Semantic Scholar, CORE, Crossref & PubMed):</strong>
             <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
-                ${usePapersToggle.checked ? '<span class="text-muted">Loading external verification...</span>' : 'External verification is toggled off.'}
+                <span class="text-muted fst-italic">Waiting for verification...</span>
             </div>
             <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3"></ul>
         </div>
@@ -2051,60 +2137,98 @@ function displayClaimsStructure(claims, isCached = false) {
         resultsContainer.innerHTML += claimHtml;
     });
 
-    autoLoadClaimDetails(claims);
+    // NOTE: We REMOVED autoLoadClaimDetails(claims).
+    // The user now controls the flow.
+    
+    toggleLoading(runAnalysisBtn, false); // Reset main button
 }
 
-async function autoLoadClaimDetails(claims) {
-    // 1. Capture the user's preferred model from the UI (default to null if missing)
+async function runSingleVerification(index) {
+    if (activeVerifications.has(index)) return;
+    activeVerifications.add(index);
+
+    const btn = document.getElementById(`btn-verify-${index}`);
+    const originalText = btn.innerText;
+    
+    // UI Loading State
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying...`;
+
+    // Gather IDs
+    const verdictId = `model-verdict-claim-${index}`;
+    const questionsId = `questions-list-claim-${index}`;
+    const extVerdictId = `external-verdict-claim-${index}`;
+    const extSourcesId = `external-sources-claim-${index}`;
+    
+    // Capture Preferences
     const preferredModel = document.getElementById("preferredModel")?.value || null;
+    const usePapers = document.getElementById("usePapersToggle")?.checked;
 
-    // ✅ SEQUENTIAL LOOP: Processes one claim at a time to prevent server crash
-    for (let index = 0; index < claims.length; index++) {
-        const claimId = `claim-${index}`;
-        const verdictContainerId = `model-verdict-${claimId}`;
-        const questionsContainerId = `questions-list-${claimId}`;
-        const externalVerdictContainerId = `external-verdict-${claimId}`;
-        const externalSourcesContainerId = `external-sources-${claimId}`;
+    try {
+        // 1. Run AI Verification
+        // We pass 'false' for autoload so getModelDetails doesn't try to manage the button loading state (we do it here)
+        await getModelDetails(index, verdictId, questionsId, null, true, preferredModel);
 
-        // Update button text to show progress (e.g., "Analyzing Claim 1 of 5")
-        toggleLoading(runAnalysisBtn, true, 'Analyzing', `Claim ${index + 1} of ${claims.length}`);
-
-        try {
-            // Check if we already have model details
-            const claimElement = document.getElementById(claimId);
-            
-            // --- 1. Model Verdict ---
-            if (claimElement && claimElement.dataset.hasModelDetails) {
-                console.log(`Using cached model details for claim ${index}`);
-            } else {
-                // 🛑 AWAIT ensures we wait for this to finish before moving on
-                await getModelDetails(index, verdictContainerId, questionsContainerId, null, true, preferredModel);
-            }
-
-            // --- 2. External Verification ---
-            if (usePapersToggle.checked) {
-                if (claimElement && claimElement.dataset.hasExternalDetails) {
-                    console.log(`Using cached external verification for claim ${index}`);
-                } else {
-                    // 🛑 AWAIT here too
-                    await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true, preferredModel);
-                }
-            }
-
-            // Optional: Scroll to the claim being analyzed so user sees progress
-            document.getElementById(claimId).scrollIntoView({ behavior: 'smooth', block: 'center' });
-          
-        } catch (error) {
-            console.error(`Error processing claim ${index}:`, error);
-            // We catch the error here so the loop continues to the next claim instead of stopping completely
+        // 2. Run External Verification (if toggled)
+        if (usePapers) {
+            await verifyExternal(index, extVerdictId, extSourcesId, null, true, preferredModel);
+        } else {
+            document.getElementById(extVerdictId).innerHTML = '<span class="text-muted">External verification disabled.</span>';
         }
+
+        // Success State
+        btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+        btn.classList.remove('btn-verify-single');
+        btn.classList.add('btn-success', 'btn-sm');
+        
+    } catch (error) {
+        console.error(error);
+        btn.innerHTML = `Retry Verification`;
+        btn.disabled = false; // Allow retry
+        showToast(`Verification failed for Claim ${index + 1}`, 'error');
+    } finally {
+        activeVerifications.delete(index);
+    }
+}
+
+async function runBatchVerification(totalClaims) {
+    const batchBtn = document.getElementById('verify-all-btn');
+    if (!batchBtn) return;
+
+    batchBtn.disabled = true;
+    const originalHtml = batchBtn.innerHTML;
+    batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing...`;
+
+    let processedCount = 0;
+
+    for (let i = 0; i < totalClaims; i++) {
+        // Check if already verified (button has success class)
+        const singleBtn = document.getElementById(`btn-verify-${i}`);
+        if (singleBtn && singleBtn.classList.contains('btn-success')) {
+            processedCount++;
+            continue; 
+        }
+
+        // Update Batch Button Progress
+        batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying ${i + 1}/${totalClaims}...`;
+
+        // Scroll to claim (nice UX touch)
+        const card = document.getElementById(`claim-${i}`);
+        if(card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Run Verification and Wait
+        await runSingleVerification(i);
+        
+        // Small pause to let the browser breathe/render
+        await new Promise(r => setTimeout(r, 500));
+        processedCount++;
     }
 
-    // All claims processed
-    toggleLoading(runAnalysisBtn, false);
+    // Finish
+    batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
+    batchBtn.className = "btn btn-success btn-sm";
 }
-
-
+  
 // ✅ Added 'preferredModel' parameter (defaults to null)
 async function getModelDetails(claimIdx, verdictContainerId, questionsContainerId, button, autoLoad = false, preferredModel = null) {
   const verdictContainer = document.getElementById(verdictContainerId);
