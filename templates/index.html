@@ -2085,6 +2085,10 @@ async function autoLoadClaimDetails(claims) {
                     await verifyExternal(index, externalVerdictContainerId, externalSourcesContainerId, null, true, preferredModel);
                 }
             }
+
+            // Optional: Scroll to the claim being analyzed so user sees progress
+            // document.getElementById(claimId).scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
         } catch (error) {
             console.error(`Error processing claim ${index}:`, error);
             // We catch the error here so the loop continues to the next claim instead of stopping completely
