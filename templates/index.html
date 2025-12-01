@@ -1506,23 +1506,28 @@ function markReportGenerated(claimIdx, questionIdx) {
 }
   
 function toggleLoading(button, isLoading, loadingText = '', progress = '') {
-const spinner = button.querySelector('.spinner-border');
-const originalText = button.dataset.originalText || button.textContent.trim();
-if (!button.dataset.originalText) {
-button.dataset.originalText = originalText;
-}
-if (isLoading) {
-button.disabled = true;
-if(spinner) spinner.classList.remove('d-none');
-const progressText = progress ? ` (${progress})` : '';
-const textNode = Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
-if(textNode) textNode.textContent = ` ${loadingText}${progressText}`;
-} else {
-button.disabled = false;
-if(spinner) spinner.classList.add('d-none');
-const textNode = Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
-if(textNode) textNode.textContent = ` ${originalText}`;
-}
+  // 1. Store the original HTML content (icon + text) on the first call
+  if (!button.dataset.originalHtml) {
+    button.dataset.originalHtml = button.innerHTML;
+  }
+
+  if (isLoading) {
+    button.disabled = true;
+    
+    const progressStr = progress ? ` <span class="fw-normal opacity-75">(${progress})</span>` : '';
+    
+    // 2. Rebuild the button content cleanly
+    // We force the spinner to be visible (d-inline-block) and append the new text
+    button.innerHTML = `
+      <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      ${loadingText}${progressStr}
+    `;
+    
+  } else {
+    button.disabled = false;
+    // 3. Restore the exact original HTML (hiding spinner, restoring original text)
+    button.innerHTML = button.dataset.originalHtml;
+  }
 }
 
 function escapeHTML(str) {
@@ -2087,7 +2092,7 @@ async function autoLoadClaimDetails(claims) {
             }
 
             // Optional: Scroll to the claim being analyzed so user sees progress
-            // document.getElementById(claimId).scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById(claimId).scrollIntoView({ behavior: 'smooth', block: 'center' });
           
         } catch (error) {
             console.error(`Error processing claim ${index}:`, error);
