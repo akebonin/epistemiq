@@ -2257,8 +2257,16 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
 
     const data = await response.json();
 
+    // ✅ NEW: Extract Model Name
+    const modelName = data.used_model || "Unknown Model";
+    // Clean it up (e.g. remove "free" suffix or provider prefix for cleaner UI)
+    const displayModel = modelName.replace(":free", "").replace("/", " / ");
+
+    // ✅ NEW: Add Badge to Verdict
+    const modelBadge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(displayModel)}</span><br>`;
+
     const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
-    verdictContainer.innerHTML = formattedVerdict;
+    verdictContainer.innerHTML = modelBadge + formattedVerdict;
 
     // ... (Existing logic for questions rendering) ...
     questionsList.innerHTML = '';
