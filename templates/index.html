@@ -1621,58 +1621,138 @@ return {
 });
 }
 
+// 1. Robust Table Parser (Replaces your Regex version)
 function convertMarkdownTablesToHTML(text) {
-const tableRegex = /(\|.*\|\s*\n\|[-:\s|]+\|\s*\n(?:\|.*\|\s*\n)*)/g;
-return text.replace(tableRegex, (tableMatch) => {
-const lines = tableMatch.trim().split('\n').filter(line => line.trim().startsWith('|'));
-if (lines.length < 2) return tableMatch;
-let htmlTable = '<table class="table table-bordered table-sm mt-2 mb-3" style="font-size: 0.9rem;">';
-lines.forEach((line, index) => {
-const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-if (index === 0) {
-htmlTable += '<thead><tr>';
-cells.forEach(cell => {
-htmlTable += `<th style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</th>`;
-});
-htmlTable += '</tr></thead><tbody>';
-} else if (index === 1 && cells.every(cell => cell.replace(/[-:\s]/g, '') === '')) {
-return;
-} else {
-htmlTable += '<tr>';
-cells.forEach(cell => {
-const isHeader = index === 1 && lines[0].replace(/[-:\s|]/g, '') === '';
-if (isHeader) {
-htmlTable += `<th style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</th>`;
-} else {
-htmlTable += `<td style="padding: 4px 8px; border: 1px solid #dee2e6;">${cell}</td>`;
-}
-});
-htmlTable += '</tr>';
-}
-});
-htmlTable += '</tbody></table>';
-return htmlTable;
-});
+    if (!text) return "";
+    
+    const lines = text.split('\n');
+    let inTable = false;
+    let htmlOut = [];
+    let headerBuffer = null;
+
+    // Helper to split rows cleanly (handles missing outer pipes)
+    const parseTableLine = (line) => {
+        let content = line.trim();
+        if (content.startsWith('|')) content = content.substring(1);
+        if (content.endsWith('|')) content = content.substring(0, content.length - 1);
+        return content.split('|').map(c => c.trim());
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Detect separator line (e.g., |---| or |:---| or ---|---)
+        // We remove pipes, dashes, colons and spaces. If nothing is left, it's a separator.
+        const isSeparator = line.length > 0 && line.replace(/[| \-:]/g, '') === '' && line.includes('-');
+
+        if (isSeparator && headerBuffer) {
+            // FOUND A TABLE START!
+            inTable = true;
+            
+            // 1. Start Table Wrapper (Bootstrap responsive)
+            htmlOut.push('<div class="table-responsive mb-3"><table class="table table-bordered table-sm table-hover table-striped">');
+            
+            // 2. Process the buffered header
+            const headerCells = parseTableLine(headerBuffer);
+            htmlOut.push('<thead class="table-light"><tr>');
+            headerCells.forEach(cell => htmlOut.push(`<th>${cell}</th>`));
+            htmlOut.push('</tr></thead><tbody>');
+            
+            headerBuffer = null; // Clear buffer
+            continue; // Skip the separator line itself
+        }
+
+        if (inTable) {
+            // We are inside a table. 
+            if (!line.includes('|')) {
+                // End of table detected
+                inTable = false;
+                htmlOut.push('</tbody></table></div>');
+                htmlOut.push(line); // Print the current non-table line
+            } else {
+                // It's a data row
+                const cells = parseTableLine(line);
+                htmlOut.push('<tr>');
+                cells.forEach(cell => htmlOut.push(`<td>${cell}</td>`));
+                htmlOut.push('</tr>');
+            }
+        } else {
+            // We are NOT in a table.
+            // If we have a buffer from the previous loop, it turned out NOT to be a header. Flush it.
+            if (headerBuffer) {
+                htmlOut.push(headerBuffer);
+                headerBuffer = null;
+            }
+
+            // Does this line LOOK like a potential header? (Has pipes)
+            if (line.includes('|')) {
+                headerBuffer = line; // Store it, wait for next line to confirm (separator)
+            } else {
+                htmlOut.push(line);
+            }
+        }
+    }
+
+    // Cleanup: Close table if text ended inside one
+    if (inTable) htmlOut.push('</tbody></table></div>');
+    // Cleanup: Flush hanging header buffer
+    if (headerBuffer) htmlOut.push(headerBuffer);
+
+    return htmlOut.join('\n');
 }
 
+// 2. Updated Formatter (Smart Newline Handling)
 function formatTextWithMarkdownAndLinks(text) {
-let normalizedText = text.normalize('NFKD');
-normalizedText = normalizedText.replace(/[–—]/g, '-');
-normalizedText = normalizedText.replace(/[â€"â€"]/g, '-');
-normalizedText = normalizedText.replace(/[â€™]/g, "'");
-normalizedText = normalizedText.replace(/[â€œâ€]/g, '"');
-normalizedText = normalizedText.replace(/[¯]/g, ' ');
-normalizedText = normalizedText.replace(/[­]/g, '');
-normalizedText = normalizedText.replace(/Î²/g, 'beta');
-normalizedText = normalizedText.replace(/Î±/g, 'alpha');
-normalizedText = normalizedText.replace(/Î³/g, 'gamma');
-let formattedText = escapeHTML(normalizedText);
-formattedText = convertMarkdownTablesToHTML(formattedText);
-formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-formattedText = formattedText.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-formattedText = formattedText.replace(/\n/g, '<br>');
-return formattedText;
+    if (!text) return "";
+
+    // Normalize characters (Your original cleanup logic)
+    let normalizedText = text.normalize('NFKD');
+    normalizedText = normalizedText.replace(/[–—]/g, '-');
+    normalizedText = normalizedText.replace(/[â€"â€"]/g, '-');
+    normalizedText = normalizedText.replace(/[â€™]/g, "'");
+    normalizedText = normalizedText.replace(/[â€œâ€]/g, '"');
+    
+    // Escape HTML to prevent injection
+    let formattedText = escapeHTML(normalizedText);
+
+    // ✅ Apply the new Table Parser FIRST
+    formattedText = convertMarkdownTablesToHTML(formattedText);
+
+    // Apply Bold (**text**)
+    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Apply Links [Title](URL)
+    formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    
+    // Apply Raw URLs (https://...)
+    formattedText = formattedText.replace(/(https?:\/\/[^\s<"']+)/g, (match) => {
+        // Avoid double-linking if already in an <a> tag (simple check)
+        if (match.includes('</a>')) return match; 
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer">$1</a>`;
+    });
+
+    // ✅ SMART NEWLINE HANDLING
+    // Convert newlines to <br>, but ONLY if not inside a table tag we just generated.
+    // This prevents breaking the table HTML structure.
+    const lines = formattedText.split('\n');
+    const finalLines = lines.map(line => {
+        const trimmed = line.trim();
+        // If the line looks like HTML table tags, don't add <br>
+        if (trimmed.startsWith('<div class="table') || 
+            trimmed.startsWith('<table') || 
+            trimmed.startsWith('<thead') ||
+            trimmed.startsWith('<tbody') || 
+            trimmed.startsWith('<tr') || 
+            trimmed.startsWith('<td') || 
+            trimmed.startsWith('<th') ||
+            trimmed.startsWith('</') ||
+            trimmed === '') {
+            return line;
+        }
+        return line + '<br>';
+    });
+
+    return finalLines.join('');
 }
 
 function setupFileUploadDragAndDrop(uploadArea, fileInput, onFileSelect) {
