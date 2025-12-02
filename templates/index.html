@@ -2272,6 +2272,14 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
 
     const data = await response.json();
 
+    if (data.model_verdict && (
+        data.model_verdict.startsWith("Error:") || 
+        data.model_verdict.includes("System Busy") ||
+        data.model_verdict.includes("Rate Limit")
+    )) {
+        throw new Error(data.model_verdict); // Throwing triggers the 'catch' block in runSingleVerification
+    }
+
     // ✅ NEW: Extract Model Name
     const modelName = data.used_model || "Unknown Model";
     // Clean it up (e.g. remove "free" suffix or provider prefix for cleaner UI)
@@ -2424,8 +2432,12 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
         });
 
         const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || `External verification failed: ${response.status}`);
+        if (data.verdict && (
+            data.verdict.startsWith("Error:") || 
+            data.verdict.includes("System Busy") ||
+            data.verdict.includes("Rate Limit")
+        )) {
+            throw new Error(data.verdict); 
         }
 
         // 3. Display Verdict
