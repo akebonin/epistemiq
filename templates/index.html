@@ -1433,7 +1433,7 @@ async function loadAnalysis(id) {
 
     // 1. Inject Verify All Bar (if needed)
     if (data.claims.length > 1) {
-         const allDone = data.claims.every(c => c.model_verdict);
+         const allDone = data.claims.every(c => c.model_verdict && c.external_verdict);
          const btnClass = allDone ? "btn-success" : "btn-primary";
          const btnText = allDone ? `<i class="bi bi-check-all"></i> All Verified` : `<i class="bi bi-robot"></i> Verify All Claims`;
          const disabled = allDone ? "disabled" : "";
@@ -1448,15 +1448,23 @@ async function loadAnalysis(id) {
     }
 
     // 2. Render Cards
+    const wantPapers = document.getElementById("usePapersToggle")?.checked;
+
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
       
-      const isVerified = !!claim.model_verdict;
+      // ✅ FIX: Check if BOTH are present if papers are toggled on
+      const hasModel = !!claim.model_verdict;
+      const hasExternal = !!claim.external_verdict;
+      
+      // It is verified only if we have what the user asked for
+      const isVerified = wantPapers ? (hasModel && hasExternal) : hasModel;
       
       let buttonHtml = '';
       if (isVerified) {
           buttonHtml = `<button class="btn btn-sm btn-success disabled"><i class="bi bi-check-lg"></i> Verified</button>`;
       } else {
+          // If missing external, this stays active so you can click it to "fill in the blanks"
           buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
       }
 
@@ -1480,9 +1488,6 @@ async function loadAnalysis(id) {
               badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
           }
           externalVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.external_verdict);
-      } else if (!document.getElementById("usePapersToggle")?.checked) {
-          // If toggle is off (and no data), show disabled text. 
-          // Note: In history view we usually just show what's in DB.
       }
 
       const claimHtml = `
