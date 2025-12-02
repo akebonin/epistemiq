@@ -1701,23 +1701,21 @@ function convertMarkdownTablesToHTML(text) {
     return htmlOut.join('\n');
 }
 
-// 2. Updated Formatter (Smart Newline Handling)
 function formatTextWithMarkdownAndLinks(text) {
     if (!text) return "";
 
-    // Normalize characters (Your original cleanup logic)
+    // Normalize characters
     let normalizedText = text.normalize('NFKD');
     normalizedText = normalizedText.replace(/[–—]/g, '-');
-    normalizedText = normalizedText.replace(/[â€"â€"]/g, '-');
-    normalizedText = normalizedText.replace(/[â€™]/g, "'");
-    normalizedText = normalizedText.replace(/[â€œâ€]/g, '"');
     
     // Escape HTML to prevent injection
     let formattedText = escapeHTML(normalizedText);
 
-    // ✅ Apply the new Table Parser FIRST
+    // 1. Extract and Protect Tables First
+    // We parse the tables into HTML strings
     formattedText = convertMarkdownTablesToHTML(formattedText);
 
+    // 2. Apply Formatting to the Rest
     // Apply Bold (**text**)
     formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
@@ -1726,29 +1724,28 @@ function formatTextWithMarkdownAndLinks(text) {
     
     // Apply Raw URLs (https://...)
     formattedText = formattedText.replace(/(https?:\/\/[^\s<"']+)/g, (match) => {
-        // Avoid double-linking if already in an <a> tag (simple check)
         if (match.includes('</a>')) return match; 
-        return `<a href="${match}" target="_blank" rel="noopener noreferrer">$1</a>`;
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer">${match}</a>`;
     });
 
-    // ✅ SMART NEWLINE HANDLING
-    // Convert newlines to <br>, but ONLY if not inside a table tag we just generated.
-    // This prevents breaking the table HTML structure.
+    // 3. Smart Newline Conversion
+    // We split by newline, then check if the line is part of an HTML tag we just created (like a table).
+    // If it IS an HTML tag, we leave it alone. If it's text, we append <br>.
+    
     const lines = formattedText.split('\n');
     const finalLines = lines.map(line => {
         const trimmed = line.trim();
-        // If the line looks like HTML table tags, don't add <br>
-        if (trimmed.startsWith('<div class="table') || 
-            trimmed.startsWith('<table') || 
-            trimmed.startsWith('<thead') ||
-            trimmed.startsWith('<tbody') || 
-            trimmed.startsWith('<tr') || 
-            trimmed.startsWith('<td') || 
-            trimmed.startsWith('<th') ||
-            trimmed.startsWith('</') ||
+        
+        // Check if this line is part of an HTML structure (Table, headers, divs)
+        // If it starts with < and ends with >, or looks like a table row/cell, DON'T add <br>
+        // This regex checks for common block-level tags start
+        if (trimmed.match(/^<(div|table|thead|tbody|tr|th|td|ul|li|p|h[1-6])/i) || 
+            trimmed.match(/<\/(div|table|thead|tbody|tr|th|td|ul|li|p|h[1-6])>$/i) ||
             trimmed === '') {
             return line;
         }
+        
+        // It's a normal text line -> Add break
         return line + '<br>';
     });
 
