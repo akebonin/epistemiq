@@ -2489,6 +2489,8 @@ showToast('Failed to copy report to clipboard', 'error');
 
 async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
   const reportContainer = document.getElementById(reportContainerId);
+
+  const preferredModel = document.getElementById("preferredModel")?.value || "";
   
   // 1. Show Spinner
   reportContainer.innerHTML =
@@ -2502,7 +2504,7 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
 
   try {
     const es = new EventSource(
-      `${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}`,
+      `${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}&preferred_model=${encodeURIComponent(preferredModel)}`,
       { withCredentials: true }
     );
 
