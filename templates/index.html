@@ -1709,15 +1709,32 @@ function convertMarkdownTablesToHTML(text) {
 function formatTextWithMarkdownAndLinks(text) {
     if (!text) return "";
 
-    // 1. Normalize & Escape
-    let normalizedText = text.normalize('NFKD').replace(/[–—]/g, '-');
+    // 1. Aggressive Normalization (Fixes encoding artifacts)
+    let normalizedText = text.normalize('NFKD');
+    
+    // Map common encoding garbage to clean characters
+    const charMap = {
+        'â\u0080\u0093': '-', // En dash
+        'â\u0080\u0094': '-', // Em dash
+        'â\u0080\u0099': "'", // Smart quote
+        'â\u0080\u009c': '"', // Left quote
+        'â\u0080\u009d': '"', // Right quote
+        'â\u0080\u00af': ' ', // Non-breaking space
+        'Â': '',             // Random A hat
+        'â': '-',            // Often replaces bullets
+        '–': '-',
+        '—': '-'
+    };
+    
+    for (const [bad, good] of Object.entries(charMap)) {
+        normalizedText = normalizedText.split(bad).join(good);
+    }
+    
     let formattedText = escapeHTML(normalizedText);
 
-    // ✅ FIX 1: Force separation for glued Verdicts (The "tissuesAI's" bug)
-    // Looks for lowercase letter immediately followed by "AI's Initial" or "External Verification"
+    // Fix Glued Verdicts
     formattedText = formattedText.replace(/([a-z])(AI's Initial Verdict:)/g, '$1<br><br><strong>$2</strong>');
     formattedText = formattedText.replace(/([a-z])(External Verification Verdict:)/g, '$1<br><br><strong>$2</strong>');
-    formattedText = formattedText.replace(/([a-z])(Reconciled Verdict:)/g, '$1<br><br><strong>$2</strong>');
 
     // 2. Convert Tables to HTML
     formattedText = convertMarkdownTablesToHTML(formattedText);
@@ -1729,7 +1746,7 @@ function formatTextWithMarkdownAndLinks(text) {
     const finalLines = lines.map(line => {
         let trimmed = line.trim();
         
-        // A. Handle HTML Table Protection
+        // A. HTML Table Protection
         if (trimmed.startsWith('<div class="table-responsive')) inHtmlBlock = true;
         if (inHtmlBlock) {
             if (trimmed.includes('</table></div>')) inHtmlBlock = false;
@@ -1738,47 +1755,41 @@ function formatTextWithMarkdownAndLinks(text) {
 
         // B. Format Normal Text
         
-        // ✅ FIX 2: Flexible Header Detection
-        // Catches: "## Title", "1. **Title**", "**1. Title**", or just "**Title**" (if it's short)
-        // This turns "1. **Introduction**" into a proper Blue Header
+        // ✅ Smaller Headers (h6 + uppercase)
         const headerMatch = trimmed.match(/^(?:##\s*|)(\d+\.\s+)?\*\*(.*?)\*\*$/);
         if (headerMatch) {
-            // content is group 2 (keyword)
-            const numbering = headerMatch[1] || ""; // e.g. "1. "
-            const content = headerMatch[2];       // e.g. "Introduction"
-            return `<h5 class="mt-4 mb-2 text-primary fw-bold">${numbering}${content}</h5>`;
+            const numbering = headerMatch[1] || ""; 
+            const content = headerMatch[2];       
+            return `<h6 class="mt-4 mb-2 text-primary fw-bold text-uppercase" style="font-size: 0.9rem; letter-spacing: 0.5px;">${numbering}${content}</h6>`;
         }
         
-        // Fallback for standard markdown headers (## Title)
         if (trimmed.startsWith('##')) {
             const headerContent = trimmed.replace(/^#+\s*/, '');
-            return `<h5 class="mt-4 mb-2 text-primary fw-bold">${headerContent}</h5>`;
+            return `<h6 class="mt-4 mb-2 text-primary fw-bold text-uppercase" style="font-size: 0.9rem; letter-spacing: 0.5px;">${headerContent}</h6>`;
         }
         
-        // 2. Bold (**text**)
+        // Bold
         line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         
-        // 3. Links [Title](URL) and raw URLs
+        // Links
         line = line.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
         line = line.replace(/(https?:\/\/[^\s<"']+)/g, (match) => {
             if (match.includes('</a>') || match.includes('">')) return match; 
             return `<a href="${match}" target="_blank" rel="noopener noreferrer">${match}</a>`;
         });
 
-        // 4. Bullets (- item)
+        // Bullets
         if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
             return `<li class="ms-3">${line.substring(2)}</li>`;
         }
 
-        // 5. Standard Newlines
+        // Standard Newlines
         if (trimmed === '') return '<br>';
-        
         return line + '<br>';
     });
 
     return finalLines.join('');
 }
-
   
 function setupFileUploadDragAndDrop(uploadArea, fileInput, onFileSelect) {
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
