@@ -1114,7 +1114,54 @@ Generate PDF
   </div>
 </div>
 
+<!-- WELCOME / ONBOARDING MODAL -->
+<div class="modal fade" id="welcomeModal" tabindex="-1" aria-labelledby="welcomeModalLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold text-primary" id="welcomeModalLabel">
+          <img src="/static/icons/logo.png" width="24" height="24" class="me-2" alt="">
+          Welcome to Epistemiq
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="lead fs-6 text-muted mb-4">
+          Epistemiq is an <strong>evidence engine</strong> that helps you verify scientific claims using AI and real-time academic data.
+        </p>
 
+        <div class="d-flex align-items-start mb-3">
+          <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 me-3" style="width: 32px; height: 32px; font-weight: bold;">1</div>
+          <div>
+            <h6 class="fw-bold mb-1">Input Content</h6>
+            <p class="small text-muted m-0">Paste text, enter a URL, or upload a PDF/Image/Video to extract claims.</p>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-start mb-3">
+          <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 me-3" style="width: 32px; height: 32px; font-weight: bold;">2</div>
+          <div>
+            <h6 class="fw-bold mb-1">Analyze & Verify</h6>
+            <p class="small text-muted m-0">Our AI extracts testable claims. You can then verify them individually or in bulk against scientific consensus.</p>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-start">
+          <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 me-3" style="width: 32px; height: 32px; font-weight: bold;">3</div>
+          <div>
+            <h6 class="fw-bold mb-1">Get the Evidence</h6>
+            <p class="small text-muted m-0">We cross-reference claims with <strong>Semantic Scholar, PubMed & CrossRef</strong> to find real papers.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-primary w-100" id="dismissWelcomeBtn">
+          Get Started 🚀
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
   
 <script>
 
@@ -1164,6 +1211,33 @@ let generatedReports = [];
 let currentImageFile = null;
 let currentVideoFile = null;
 let currentSourceUrl = null;
+
+
+// --- WELCOME MODAL LOGIC ---
+    const hasSeenWelcome = localStorage.getItem('ep_welcome_seen_v1');
+    
+    if (!hasSeenWelcome) {
+        // Show the modal with a slight delay for better UX
+        setTimeout(() => {
+            const welcomeModal = new bootstrap.Modal(document.getElementById('welcomeModal'));
+            welcomeModal.show();
+        }, 800);
+    }
+
+    // Handle Dismissal
+    document.getElementById('dismissWelcomeBtn').addEventListener('click', () => {
+        // Mark as seen in local storage
+        localStorage.setItem('ep_welcome_seen_v1', 'true');
+        
+        // Hide modal
+        const modalEl = document.getElementById('welcomeModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+    });
+    
+    // Optional: Reset logic for testing (Run this in console to see it again)
+    // localStorage.removeItem('ep_welcome_seen_v1');
+  
 
 /**
  * Displays a non-blocking notification.
