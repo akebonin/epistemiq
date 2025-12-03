@@ -2294,10 +2294,23 @@ function displayClaimsStructure(claims, isCached = false) {
 }
 
 async function runSingleVerification(index) {
+    // 1. Check global lock
     if (activeVerifications.has(index)) return;
+
+    // 2. Get the button
+    const btn = document.getElementById(`btn-verify-${index}`);
+
+    // ✅ FIX: CRITICAL SAFETY CHECK
+    // If the button is missing (e.g., already verified and replaced by green badge), stop immediately.
+    if (!btn) {
+        console.warn(`Button btn-verify-${index} not found. Skipping.`);
+        return;
+    }
+
+    // 3. Lock it
     activeVerifications.add(index);
 
-    const btn = document.getElementById(`btn-verify-${index}`);
+    // 4. Now it is safe to read properties
     const originalText = btn.innerText;
     
     // UI Loading State
@@ -2315,26 +2328,30 @@ async function runSingleVerification(index) {
     const usePapers = document.getElementById("usePapersToggle")?.checked;
 
     try {
-        // 1. Run AI Verification
-        // We pass 'false' for autoload so getModelDetails doesn't try to manage the button loading state (we do it here)
+        // AI Verification
         await getModelDetails(index, verdictId, questionsId, null, true, preferredModel);
 
-        // 2. Run External Verification (if toggled)
+        // External Verification (if toggled)
         if (usePapers) {
             await verifyExternal(index, extVerdictId, extSourcesId, null, true, preferredModel);
         } else {
-            document.getElementById(extVerdictId).innerHTML = '<span class="text-muted">External verification disabled.</span>';
+            const extContainer = document.getElementById(extVerdictId);
+            if(extContainer) extContainer.innerHTML = '<span class="text-muted">External verification disabled.</span>';
         }
 
         // Success State
-        btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
-        btn.classList.remove('btn-verify-single');
-        btn.classList.add('btn-success', 'btn-sm');
+        if (btn) {
+            btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+            btn.classList.remove('btn-verify-single');
+            btn.classList.add('btn-success', 'btn-sm');
+        }
         
     } catch (error) {
         console.error(error);
-        btn.innerHTML = `Retry Verification`;
-        btn.disabled = false; // Allow retry
+        if (btn) {
+            btn.innerHTML = `Retry Verification`;
+            btn.disabled = false; 
+        }
         showToast(`Verification failed for Claim ${index + 1}`, 'error');
     } finally {
         activeVerifications.delete(index);
@@ -2346,15 +2363,16 @@ async function runBatchVerification(totalClaims) {
     if (!batchBtn) return;
 
     batchBtn.disabled = true;
-    const originalHtml = batchBtn.innerHTML;
     batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing...`;
 
     let processedCount = 0;
 
     for (let i = 0; i < totalClaims; i++) {
-        // Check if already verified (button has success class)
+        // Check if this specific claim needs verification
         const singleBtn = document.getElementById(`btn-verify-${i}`);
-        if (singleBtn && singleBtn.classList.contains('btn-success')) {
+        
+        // ✅ Logic: If button is missing (already verified UI) or has success class, skip it.
+        if (!singleBtn || singleBtn.classList.contains('btn-success')) {
             processedCount++;
             continue; 
         }
@@ -2362,14 +2380,14 @@ async function runBatchVerification(totalClaims) {
         // Update Batch Button Progress
         batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying ${i + 1}/${totalClaims}...`;
 
-        // Scroll to claim (nice UX touch)
+        // Scroll to claim
         const card = document.getElementById(`claim-${i}`);
         if(card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Run Verification and Wait
+        // Run Verification
         await runSingleVerification(i);
         
-        // Small pause to let the browser breathe/render
+        // Pause to prevent browser stutter
         await new Promise(r => setTimeout(r, 500));
         processedCount++;
     }
@@ -2379,6 +2397,7 @@ async function runBatchVerification(totalClaims) {
     batchBtn.className = "btn btn-success btn-sm";
 }
 
+// Attach to window so HTML can see them
 window.runSingleVerification = runSingleVerification;
 window.runBatchVerification = runBatchVerification;
   
