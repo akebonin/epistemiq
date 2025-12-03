@@ -1174,6 +1174,7 @@ function getBadgeHtml(type = 'db') {
     return `<span class="ep-badge ep-badge-db" tabindex="0" data-reason="Data retrieved from prior analysis for performance optimization."><i class="bi bi-database-check"></i> CACHED</span>`;
 }
 
+const API_BASE = "";
   
 document.addEventListener('DOMContentLoaded', () => {
 const inputMethodSelect = document.getElementById('inputMethod');
@@ -1201,7 +1202,7 @@ const usePapersToggle = document.getElementById('usePapersToggle');
 const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
-const API_BASE = "";
+
 const activeVerifications = new Set();
 
 
