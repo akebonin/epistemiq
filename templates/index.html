@@ -761,6 +761,32 @@ max-width: none;
     font-weight: 600;
     margin-left: 10px;
 }
+
+/* ✅ NEW: Mobile-friendly Model Badge */
+.model-attribution-badge {
+    white-space: normal !important;       /* Force text wrapping */
+    text-align: left;                     /* Align left for multi-line readability */
+    word-break: break-word;               /* Prevent long model IDs from overflowing */
+    max-width: 100%;                      /* Ensure it fits in the card */
+    line-height: 1.3;
+    display: inline-flex;                 /* Flex to align icon */
+    align-items: flex-start;              /* Align icon to top line of text */
+    gap: 6px;                             /* Space between icon and text */
+    
+    /* Styling to match Bootstrap 'badge bg-light text-secondary border' but safer */
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+}
+
+.model-attribution-badge i {
+    margin-top: 2px; /* Micro-adjustment for icon alignment on multi-line text */
+}
   
 </style>
 </head>
@@ -1431,7 +1457,6 @@ async function loadAnalysis(id) {
     analysisId = data.analysis_id;
     resultsContainer.innerHTML = "";
 
-    // 1. Inject Verify All Bar (if needed)
     if (data.claims.length > 1) {
          const allDone = data.claims.every(c => c.model_verdict && c.external_verdict);
          const btnClass = allDone ? "btn-success" : "btn-primary";
@@ -1447,45 +1472,39 @@ async function loadAnalysis(id) {
         </div>`;
     }
 
-    // 2. Render Cards
     const wantPapers = document.getElementById("usePapersToggle")?.checked;
 
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
-      
-      // ✅ FIX: Check if BOTH are present if papers are toggled on
       const hasModel = !!claim.model_verdict;
       const hasExternal = !!claim.external_verdict;
-      
-      // It is verified only if we have what the user asked for
       const isVerified = wantPapers ? (hasModel && hasExternal) : hasModel;
       
       let buttonHtml = '';
       if (isVerified) {
           buttonHtml = `<button class="btn btn-sm btn-success disabled"><i class="bi bi-check-lg"></i> Verified</button>`;
       } else {
-          // If missing external, this stays active so you can click it to "fill in the blanks"
           buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
       }
 
-      // --- Prepare Model Verdict HTML with Badge ---
       let modelVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
       if (claim.model_verdict) {
           let badge = "";
           if (claim.used_model) {
               const clean = claim.used_model.replace(":free", "").replace("/", " / ");
-              badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
+              // ✅ FIX: New badge
+              badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
           }
           modelVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.model_verdict);
       }
 
-      // --- Prepare External Verdict HTML with Badge ---
       let externalVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
       if (claim.external_verdict) {
           let badge = "";
-          if (claim.external_model) { // Check specific external model
+          if (claim.external_model) { 
               const clean = claim.external_model.replace(":free", "").replace("/", " / ");
-              badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
+              // ✅ FIX: New badge
+              badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
           }
           externalVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.external_verdict);
       }
@@ -2377,37 +2396,30 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
       body: JSON.stringify({
         analysis_id: analysisId,
         claim_idx: claimIdx,
-        preferred_model: preferredModel // ✅ Send to backend
+        preferred_model: preferredModel
       })
     });
 
-    if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || `Failed to get claim details: ${response.status}`);
-    }
-
     const data = await response.json();
 
+    // Check for Logic Errors
     if (data.model_verdict && (
         data.model_verdict.startsWith("Error:") || 
         data.model_verdict.includes("System Busy") ||
         data.model_verdict.includes("Rate Limit")
     )) {
-        throw new Error(data.model_verdict); // Throwing triggers the 'catch' block in runSingleVerification
+        throw new Error(data.model_verdict); 
     }
 
-    // ✅ NEW: Extract Model Name
+    // ✅ FIX: Use new mobile-friendly badge class
     const modelName = data.used_model || "Unknown Model";
-    // Clean it up (e.g. remove "free" suffix or provider prefix for cleaner UI)
     const displayModel = modelName.replace(":free", "").replace("/", " / ");
-
-    // ✅ NEW: Add Badge to Verdict
-    const modelBadge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(displayModel)}</span><br>`;
+    const modelBadge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(displayModel)}</span><br>`;
 
     const formattedVerdict = formatTextWithMarkdownAndLinks(data.model_verdict);
     verdictContainer.innerHTML = modelBadge + formattedVerdict;
 
-    // ... (Existing logic for questions rendering) ...
+    // ... (Questions logic remains exactly the same) ...
     questionsList.innerHTML = '';
     if (data.questions && data.questions.length > 0) {
       data.questions.forEach((q, q_idx) => {
@@ -2425,7 +2437,6 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
         `;
         questionsList.appendChild(listItem);
         
-        // ... (Existing report caching logic) ...
         const reportId = `claim-${claimIdx}-question-${q_idx}`;
         if (!generatedReports.find(r => r.id === reportId)) {
           generatedReports.push({
@@ -2443,6 +2454,8 @@ async function getModelDetails(claimIdx, verdictContainerId, questionsContainerI
   } catch (error) {
     verdictContainer.innerHTML = `<div class="alert alert-danger p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
     questionsList.innerHTML = `<li class="list-group-item text-danger">Could not load questions: ${escapeHTML(error.message)}</li>`;
+    // Re-throw so runSingleVerification knows it failed
+    throw error; 
   } finally {
     if (!autoLoad && button) toggleLoading(button, false);
   }
@@ -2515,13 +2528,11 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
     const verdictContainer = document.getElementById(verdictContainerId);
     const sourcesContainer = document.getElementById(sourcesContainerId);
     
-    // ✅ Safety: If preferredModel wasn't passed (e.g. manual click), grab it from DOM
     if (!preferredModel) {
         const selector = document.getElementById("preferredModel");
         if (selector) preferredModel = selector.value;
     }
 
-    // Get claim text
     const claimText = document.querySelector(`#claim-${claimIdx} .claim-text`)?.innerText || "";
 
     if (!autoLoad && button) toggleLoading(button, true, "Verifying...");
@@ -2532,10 +2543,8 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
     }
 
     try {
-        // 1. Fetch from CORE via Vercel Proxy
         const coreSources = await fetchCorePapers(claimText);
         
-        // 2. Send to Backend
         const response = await fetch(`${API_BASE}/api/verify-external`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2548,6 +2557,8 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
         });
 
         const data = await response.json();
+        
+        // Check for Logic Errors
         if (data.verdict && (
             data.verdict.startsWith("Error:") || 
             data.verdict.includes("System Busy") ||
@@ -2555,21 +2566,22 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
         )) {
             throw new Error(data.verdict); 
         }
+        
+        if (!response.ok) {
+            throw new Error(data.error || `External verification failed: ${response.status}`);
+        }
 
-        // 3. Display Verdict
         let verdictHtml = formatTextWithMarkdownAndLinks(data.verdict);
         
-        // ✅ NEW: Add Model Badge if available
+        // ✅ FIX: Use new mobile-friendly badge class
         if (data.used_model) {
-            // Clean up model name for display (e.g. "x-ai/grok-4.1..." -> "x-ai / grok-4.1")
             const cleanModel = data.used_model.replace(":free", "").replace("/", " / ");
-            const badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(cleanModel)}</span><br>`;
+            const badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(cleanModel)}</span><br>`;
             verdictHtml = badge + verdictHtml;
         }
         
         verdictContainer.innerHTML = verdictHtml;
 
-        // 4. Display Sources
         if (data.sources && data.sources.length > 0) {
             sourcesContainer.innerHTML = data.sources.map(s => {
                 const sourceInfo = s.source ? `[${s.source}]` : '';
@@ -2586,6 +2598,8 @@ async function verifyExternal(claimIdx, verdictContainerId, sourcesContainerId, 
         console.error(error);
         verdictContainer.innerHTML = `<div class="alert alert-warning p-2 mt-2">Error: ${escapeHTML(error.message)}</div>`;
         sourcesContainer.innerHTML = `<li>Could not fetch sources.</li>`;
+        // Re-throw for button status
+        throw error;
     } finally {
         if (!autoLoad && button) toggleLoading(button, false);
     }
@@ -2617,14 +2631,11 @@ showToast('Failed to copy report to clipboard', 'error');
 
 async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
   const reportContainer = document.getElementById(reportContainerId);
-
   const preferredModel = document.getElementById("preferredModel")?.value || "";
-  
-  // 1. Show Spinner
+
   reportContainer.innerHTML =
     '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
   
-  // 2. Disable Button
   if (button) { 
       button.disabled = true; 
       button.innerHTML = 'Generating...'; 
@@ -2639,40 +2650,32 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
     let fullContent = '';
     let isFirstChunk = true;
     let reportBox = null;
-    let detectedModel = null; // ✅ NEW: Track the model used
+    let detectedModel = null;
 
     es.onmessage = (event) => {
-      // 3. Handle Completion
       if (event.data === '[DONE]') {
         es.close();
-        
-        // Re-enable button
         if (button) { 
             button.disabled = false; 
             button.innerHTML = 'Generate Report'; 
         }
 
         if (fullContent && fullContent.trim().length > 0) {
-          // Final render to ensure formatting is perfect
           let finalHtml = formatTextWithMarkdownAndLinks(fullContent);
-          
-          // Re-attach badge if model was detected
           if (detectedModel) {
               const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
-              const badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
+              // ✅ FIX: New badge
+              const badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
               finalHtml = badge + finalHtml;
           }
-          
           if (reportBox) reportBox.innerHTML = finalHtml;
 
-          // View full report button
           const viewBtn = document.createElement('button');
           viewBtn.className = 'btn btn-outline-primary btn-sm mt-2';
           viewBtn.textContent = '📖 View Full Report';
           viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
           reportContainer.appendChild(viewBtn);
 
-          // Register as “generated this session”
           markReportGenerated(claimIdx, questionIdx);
         } else {
           reportContainer.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
@@ -2680,44 +2683,30 @@ async function generateReport(claimIdx, questionIdx, reportContainerId, button) 
         return;
       }
 
-      // 4. Handle First Chunk (Remove Spinner -> Show Box)
       if (isFirstChunk) {
           reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
           reportBox = reportContainer.querySelector('.report-box');
           isFirstChunk = false;
       }
 
-      // 5. Accumulate and Render Data
       try {
         const data = JSON.parse(event.data);
-        
-        if (data.content) {
-          fullContent += data.content;
-        }
-        
-        // ✅ NEW: Capture model name if sent
-        if (data.used_model) {
-            detectedModel = data.used_model;
-        }
+        if (data.content) fullContent += data.content;
+        if (data.used_model) detectedModel = data.used_model;
 
         if (data.error) {
           reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(data.error)}</strong>`;
         } else {
-            // Render text
             let currentHtml = formatTextWithMarkdownAndLinks(fullContent);
-            
-            // ✅ NEW: Prepend Badge if model known
             if (detectedModel) {
                 const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
-                const badge = `<span class="badge bg-light text-secondary border mb-2" style="font-weight: normal; font-size: 0.75rem;"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
+                // ✅ FIX: New badge
+                const badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
                 currentHtml = badge + currentHtml;
             }
-            
             reportBox.innerHTML = currentHtml;
         }
-
       } catch {
-        // Fallback for non-JSON chunks (rare)
         fullContent += event.data;
         reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
       }
