@@ -1532,6 +1532,8 @@ async function loadAnalysis(id) {
     analysisId = data.analysis_id;
     resultsContainer.innerHTML = "";
 
+    // 1. Inject Verify All Bar
+    // We set a default state here, but updateAllClaimButtons() at the end will correct it if needed
     if (data.claims.length > 1) {
          const allDone = data.claims.every(c => c.model_verdict && c.external_verdict);
          const btnClass = allDone ? "btn-success" : "btn-primary";
@@ -1551,8 +1553,12 @@ async function loadAnalysis(id) {
 
     data.claims.forEach((claim, idx) => {
       const claimId = `claim-${idx}`;
+      
+      // Determine existence of data
       const hasModel = !!claim.model_verdict;
       const hasExternal = !!claim.external_verdict;
+      
+      // Determine initial visual state based on current toggle
       const isVerified = wantPapers ? (hasModel && hasExternal) : hasModel;
       
       let buttonHtml = '';
@@ -1562,30 +1568,34 @@ async function loadAnalysis(id) {
           buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
       }
 
+      // --- Prepare Model Verdict HTML with Badge ---
       let modelVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
       if (claim.model_verdict) {
           let badge = "";
           if (claim.used_model) {
               const clean = claim.used_model.replace(":free", "").replace("/", " / ");
-              // ✅ FIX: New badge
               badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
           }
           modelVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.model_verdict);
       }
 
+      // --- Prepare External Verdict HTML with Badge ---
       let externalVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
       if (claim.external_verdict) {
           let badge = "";
           if (claim.external_model) { 
               const clean = claim.external_model.replace(":free", "").replace("/", " / ");
-              // ✅ FIX: New badge
               badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
           }
           externalVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.external_verdict);
       }
 
+      // ✅ FIX: Add data attributes to the card so the toggle listener works
       const claimHtml = `
-        <div class="claim-card" id="${claimId}">
+        <div class="claim-card" id="${claimId}" 
+             data-has-model="${hasModel}" 
+             data-has-external="${hasExternal}">
+             
           <div class="d-flex justify-content-between align-items-start">
             <h5>Claim ${idx + 1} ${getBadgeHtml('db')}</h5> 
             ${buttonHtml}
@@ -1631,12 +1641,15 @@ async function loadAnalysis(id) {
       resultsContainer.innerHTML += claimHtml;
     });
 
+    // ✅ FIX: Ensure button states match the toggle immediately
+    updateAllClaimButtons();
+
   } catch (err) {
     console.error("Error loading analysis:", err);
     showToast("Error loading analysis: " + err.message, 'error');
   }
 }
-
+  
 window.loadAnalysis = loadAnalysis;
 window.deleteAnalysis = deleteAnalysis;
 
@@ -2304,17 +2317,64 @@ function toggleLoading(btn, isLoading, msg = "") {
   }
 }
 
+// ✅ NEW: Updates button states based on Toggle + Data Attributes
+function updateAllClaimButtons() {
+    const wantPapers = document.getElementById("usePapersToggle").checked;
+    const cards = document.querySelectorAll('.claim-card');
+    let allVerified = true;
+
+    cards.forEach((card, index) => {
+        const btn = document.getElementById(`btn-verify-${index}`);
+        if (!btn) return; 
+
+        // Read state from DOM
+        const hasModel = card.getAttribute('data-has-model') === 'true';
+        const hasExternal = card.getAttribute('data-has-external') === 'true';
+
+        // Logic: Verified if Model exists AND (External exists OR we don't want external)
+        const isVerified = hasModel && (hasExternal || !wantPapers);
+
+        if (isVerified) {
+            btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+            btn.className = "btn btn-success btn-sm disabled"; // Visual consistency
+            // We don't set btn.disabled = true here to allow manual re-clicks if needed, 
+            // but the class makes it look done.
+        } else {
+            // Revert to Blue
+            btn.innerHTML = `Verify This Claim`;
+            btn.className = "btn-verify-single";
+            btn.disabled = false;
+            allVerified = false;
+        }
+    });
+
+    // Update "Verify All" Button State
+    const batchBtn = document.getElementById('verify-all-btn');
+    if (batchBtn && !batchBtn.disabled) { // Don't change text if currently processing
+        if (allVerified && cards.length > 0) {
+            batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
+            batchBtn.className = "btn btn-success btn-sm";
+        } else {
+            batchBtn.innerHTML = `<i class="bi bi-robot"></i> Verify All Claims`;
+            batchBtn.className = "btn btn-primary btn-sm";
+        }
+    }
+}
+
+// ✅ ADD LISTENER: Run update when toggle changes
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById("usePapersToggle");
+    if(toggle) toggle.addEventListener('change', updateAllClaimButtons);
+});
+
 function displayClaimsStructure(claims, isCached = false) {
     const badgeHtml = isCached ? getBadgeHtml('db') : '';
     
-    // 1. Inject the "Verify All" Control Bar at the top
     let controlBar = '';
     if (claims.length > 1) {
         controlBar = `
         <div class="verify-actions-bar sticky-top" style="top: 10px; z-index: 100;">
-            <div>
-                <strong>${claims.length} Claims Extracted</strong>
-            </div>
+            <div><strong>${claims.length} Claims Extracted</strong></div>
             <button id="verify-all-btn" class="btn btn-primary btn-sm" onclick="runBatchVerification(${claims.length})">
                 <i class="bi bi-robot"></i> Verify All Claims
             </button>
@@ -2323,11 +2383,12 @@ function displayClaimsStructure(claims, isCached = false) {
 
     resultsContainer.innerHTML = controlBar;
 
-    // 2. Render each claim card with "Verify" buttons
     claims.forEach((claimText, index) => {
         const claimId = `claim-${index}`;
+        
+        // ✅ FIX: Add data attributes initialized to false (since this is a fresh run)
         const claimHtml = `
-        <div class="claim-card" id="${claimId}">
+        <div class="claim-card" id="${claimId}" data-has-model="false" data-has-external="false">
             <div class="d-flex justify-content-between align-items-start">
                 <h5>Claim ${index + 1} ${badgeHtml}</h5>
                 <button id="btn-verify-${index}" class="btn-verify-single" onclick="runSingleVerification(${index})">
@@ -2337,13 +2398,13 @@ function displayClaimsStructure(claims, isCached = false) {
             
             <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
             
-            <!-- MODEL VERDICT SECTION -->
+            <!-- MODEL VERDICT -->
             <strong>Model Verdict:</strong>
             <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
                 <span class="text-muted fst-italic">Waiting for verification...</span>
             </div>
             
-            <!-- QUESTIONS SECTION -->
+            <!-- QUESTIONS -->
             <strong>Suggested Research Questions:</strong>
             <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
                  <li class="list-group-item text-muted fst-italic">Generated after verification.</li>
@@ -2351,7 +2412,7 @@ function displayClaimsStructure(claims, isCached = false) {
             
             <hr>
             
-            <!-- EXTERNAL VERIFICATION SECTION -->
+            <!-- EXTERNAL -->
             <strong>External Verification (Semantic Scholar, CORE, Crossref & PubMed):</strong>
             <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
                 <span class="text-muted fst-italic">Waiting for verification...</span>
@@ -2362,71 +2423,54 @@ function displayClaimsStructure(claims, isCached = false) {
         resultsContainer.innerHTML += claimHtml;
     });
 
-    // NOTE: We REMOVED autoLoadClaimDetails(claims).
-    // The user now controls the flow.
-    
-    toggleLoading(runAnalysisBtn, false); // Reset main button
+    toggleLoading(runAnalysisBtn, false);
 }
 
 async function runSingleVerification(index) {
-    // 1. Check global lock
     if (activeVerifications.has(index)) return;
-
-    // 2. Get the button
     const btn = document.getElementById(`btn-verify-${index}`);
+    if (!btn) return;
 
-    // ✅ FIX: CRITICAL SAFETY CHECK
-    // If the button is missing (e.g., already verified and replaced by green badge), stop immediately.
-    if (!btn) {
-        console.warn(`Button btn-verify-${index} not found. Skipping.`);
-        return;
-    }
-
-    // 3. Lock it
     activeVerifications.add(index);
-
-    // 4. Now it is safe to read properties
-    const originalText = btn.innerText;
     
-    // UI Loading State
+    // UI Loading
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying...`;
 
-    // Gather IDs
     const verdictId = `model-verdict-claim-${index}`;
     const questionsId = `questions-list-claim-${index}`;
     const extVerdictId = `external-verdict-claim-${index}`;
     const extSourcesId = `external-sources-claim-${index}`;
     
-    // Capture Preferences
     const preferredModel = document.getElementById("preferredModel")?.value || null;
     const usePapers = document.getElementById("usePapersToggle")?.checked;
+    const card = document.getElementById(`claim-${index}`);
 
     try {
-        // AI Verification
+        // 1. AI Verification
         await getModelDetails(index, verdictId, questionsId, null, true, preferredModel);
+        
+        // ✅ Update State
+        card.setAttribute('data-has-model', 'true');
 
-        // External Verification (if toggled)
+        // 2. External Verification
         if (usePapers) {
             await verifyExternal(index, extVerdictId, extSourcesId, null, true, preferredModel);
+            // ✅ Update State
+            card.setAttribute('data-has-external', 'true');
         } else {
             const extContainer = document.getElementById(extVerdictId);
             if(extContainer) extContainer.innerHTML = '<span class="text-muted">External verification disabled.</span>';
         }
 
-        // Success State
-        if (btn) {
-            btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
-            btn.classList.remove('btn-verify-single');
-            btn.classList.add('btn-success', 'btn-sm');
-        }
+        // ✅ Final UI Refresh: This decides if the button turns Green or stays Blue
+        updateAllClaimButtons();
         
     } catch (error) {
         console.error(error);
-        if (btn) {
-            btn.innerHTML = `Retry Verification`;
-            btn.disabled = false; 
-        }
+        btn.innerHTML = `Retry Verification`;
+        btn.className = "btn-verify-single"; // Ensure it looks clickable
+        btn.disabled = false; 
         showToast(`Verification failed for Claim ${index + 1}`, 'error');
     } finally {
         activeVerifications.delete(index);
@@ -2437,39 +2481,37 @@ async function runBatchVerification(totalClaims) {
     const batchBtn = document.getElementById('verify-all-btn');
     if (!batchBtn) return;
 
+    // Ensure button states are fresh before starting
+    updateAllClaimButtons();
+
     batchBtn.disabled = true;
     batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing...`;
 
     let processedCount = 0;
 
     for (let i = 0; i < totalClaims; i++) {
-        // Check if this specific claim needs verification
         const singleBtn = document.getElementById(`btn-verify-${i}`);
         
-        // ✅ Logic: If button is missing (already verified UI) or has success class, skip it.
+        // ✅ Logic: If button is Green (btn-success), it means it satisfies the CURRENT toggle state.
+        // So we skip it. If it's Blue, we click it.
         if (!singleBtn || singleBtn.classList.contains('btn-success')) {
             processedCount++;
             continue; 
         }
 
-        // Update Batch Button Progress
+        // Update Batch Progress
         batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying ${i + 1}/${totalClaims}...`;
 
-        // Scroll to claim
         const card = document.getElementById(`claim-${i}`);
         if(card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Run Verification
         await runSingleVerification(i);
-        
-        // Pause to prevent browser stutter
         await new Promise(r => setTimeout(r, 500));
         processedCount++;
     }
 
-    // Finish
-    batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
-    batchBtn.className = "btn btn-success btn-sm";
+    // Final State Check
+    updateAllClaimButtons();
 }
 
 // Attach to window so HTML can see them
