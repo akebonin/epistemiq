@@ -1214,6 +1214,56 @@ let currentVideoFile = null;
 let currentSourceUrl = null;
 
 
+// ✅ NEW: Updates button states based on Toggle + Data Attributes
+function updateAllClaimButtons() {
+    const wantPapers = document.getElementById("usePapersToggle").checked;
+    const cards = document.querySelectorAll('.claim-card');
+    let allVerified = true;
+
+    cards.forEach((card, index) => {
+        const btn = document.getElementById(`btn-verify-${index}`);
+        if (!btn) return; 
+
+        // Read state from DOM
+        const hasModel = card.getAttribute('data-has-model') === 'true';
+        const hasExternal = card.getAttribute('data-has-external') === 'true';
+
+        // Logic: Verified if Model exists AND (External exists OR we don't want external)
+        const isVerified = hasModel && (hasExternal || !wantPapers);
+
+        if (isVerified) {
+            btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+            btn.className = "btn btn-success btn-sm disabled"; // Visual consistency
+            // We don't set btn.disabled = true here to allow manual re-clicks if needed, 
+            // but the class makes it look done.
+        } else {
+            // Revert to Blue
+            btn.innerHTML = `Verify This Claim`;
+            btn.className = "btn-verify-single";
+            btn.disabled = false;
+            allVerified = false;
+        }
+    });
+
+    // Update "Verify All" Button State
+    const batchBtn = document.getElementById('verify-all-btn');
+    if (batchBtn && !batchBtn.disabled) { // Don't change text if currently processing
+        if (allVerified && cards.length > 0) {
+            batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
+            batchBtn.className = "btn btn-success btn-sm";
+        } else {
+            batchBtn.innerHTML = `<i class="bi bi-robot"></i> Verify All Claims`;
+            batchBtn.className = "btn btn-primary btn-sm";
+        }
+    }
+}
+
+// ✅ ADD LISTENER: Run update when toggle changes
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById("usePapersToggle");
+    if(toggle) toggle.addEventListener('change', updateAllClaimButtons);
+});
+  
 // --- WELCOME MODAL LOGIC ---
     const hasSeenWelcome = localStorage.getItem('ep_welcome_seen_v1');
     
@@ -2317,55 +2367,7 @@ function toggleLoading(btn, isLoading, msg = "") {
   }
 }
 
-// ✅ NEW: Updates button states based on Toggle + Data Attributes
-function updateAllClaimButtons() {
-    const wantPapers = document.getElementById("usePapersToggle").checked;
-    const cards = document.querySelectorAll('.claim-card');
-    let allVerified = true;
 
-    cards.forEach((card, index) => {
-        const btn = document.getElementById(`btn-verify-${index}`);
-        if (!btn) return; 
-
-        // Read state from DOM
-        const hasModel = card.getAttribute('data-has-model') === 'true';
-        const hasExternal = card.getAttribute('data-has-external') === 'true';
-
-        // Logic: Verified if Model exists AND (External exists OR we don't want external)
-        const isVerified = hasModel && (hasExternal || !wantPapers);
-
-        if (isVerified) {
-            btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
-            btn.className = "btn btn-success btn-sm disabled"; // Visual consistency
-            // We don't set btn.disabled = true here to allow manual re-clicks if needed, 
-            // but the class makes it look done.
-        } else {
-            // Revert to Blue
-            btn.innerHTML = `Verify This Claim`;
-            btn.className = "btn-verify-single";
-            btn.disabled = false;
-            allVerified = false;
-        }
-    });
-
-    // Update "Verify All" Button State
-    const batchBtn = document.getElementById('verify-all-btn');
-    if (batchBtn && !batchBtn.disabled) { // Don't change text if currently processing
-        if (allVerified && cards.length > 0) {
-            batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
-            batchBtn.className = "btn btn-success btn-sm";
-        } else {
-            batchBtn.innerHTML = `<i class="bi bi-robot"></i> Verify All Claims`;
-            batchBtn.className = "btn btn-primary btn-sm";
-        }
-    }
-}
-
-// ✅ ADD LISTENER: Run update when toggle changes
-document.addEventListener('DOMContentLoaded', () => {
-    const toggle = document.getElementById("usePapersToggle");
-    if(toggle) toggle.addEventListener('change', updateAllClaimButtons);
-});
 
 function displayClaimsStructure(claims, isCached = false) {
     const badgeHtml = isCached ? getBadgeHtml('db') : '';
