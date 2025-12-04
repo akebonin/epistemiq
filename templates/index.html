@@ -1173,6 +1173,63 @@ function getBadgeHtml(type = 'db') {
     return `<span class="ep-badge ep-badge-db" tabindex="0" data-reason="Data retrieved from prior analysis for performance optimization."><i class="bi bi-database-check"></i> CACHED</span>`;
 }
 
+// ✅ GLOBAL FUNCTION: Updates button states based on Toggle + Data Attributes
+window.updateAllClaimButtons = function() {
+    const toggle = document.getElementById("usePapersToggle");
+    if (!toggle) return;
+
+    const wantPapers = toggle.checked;
+    const cards = document.querySelectorAll('.claim-card');
+    let allVerified = true;
+
+    cards.forEach((card, index) => {
+        // Try to find the button. 
+        // Note: If you verify a claim, the button might be removed or disabled. 
+        // We need to select it by ID to be sure.
+        const btn = document.getElementById(`btn-verify-${index}`);
+        
+        if (!btn) {
+            // If button is missing, maybe it was replaced by a static badge? 
+            // If so, we can't "un-verify" it easily without reloading HTML.
+            // But in our current logic, we keep the button and just make it green.
+            return; 
+        }
+
+        // Read state from DOM
+        const hasModel = card.getAttribute('data-has-model') === 'true';
+        const hasExternal = card.getAttribute('data-has-external') === 'true';
+
+        // Logic: Verified if Model exists AND (External exists OR we don't want external)
+        const isVerified = hasModel && (hasExternal || !wantPapers);
+
+        if (isVerified) {
+            // Turn GREEN
+            btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+            btn.className = "btn btn-success btn-sm disabled"; 
+            // Note: We rely on CSS .disabled { pointer-events: none } or similar, 
+            // or we effectively treat it as done.
+        } else {
+            // Turn BLUE (Revert to verify state)
+            btn.innerHTML = `Verify This Claim`;
+            btn.className = "btn-verify-single"; // Your custom blue class
+            btn.disabled = false;
+            allVerified = false;
+        }
+    });
+
+    // Update "Verify All" Button State
+    const batchBtn = document.getElementById('verify-all-btn');
+    if (batchBtn && !batchBtn.disabled) { 
+        if (allVerified && cards.length > 0) {
+            batchBtn.innerHTML = `<i class="bi bi-check-all"></i> All Verified`;
+            batchBtn.className = "btn btn-success btn-sm";
+        } else {
+            batchBtn.innerHTML = `<i class="bi bi-robot"></i> Verify All Claims`;
+            batchBtn.className = "btn btn-primary btn-sm";
+        }
+    }
+};
+  
 const API_BASE = "";
   
 document.addEventListener('DOMContentLoaded', () => {
@@ -1214,7 +1271,14 @@ let currentVideoFile = null;
 let currentSourceUrl = null;
 
 
-
+ // ✅ FIX: Explicitly attach the listener
+    const toggle = document.getElementById("usePapersToggle");
+    if(toggle) {
+        toggle.addEventListener('change', () => {
+            console.log("Toggle changed, updating buttons..."); // Debug log
+            window.updateAllClaimButtons();
+        });
+    }
   
 // --- WELCOME MODAL LOGIC ---
     const hasSeenWelcome = localStorage.getItem('ep_welcome_seen_v1');
