@@ -1198,6 +1198,8 @@ const pdfDownloadSection = document.getElementById('pdf-download-section');
 const downloadPdfBtn = document.getElementById('download-pdf-btn');
 const promptModeSelect = document.getElementById('promptMode');
 const usePapersToggle = document.getElementById('usePapersToggle');
+  if(toggle) toggle.addEventListener('change', updateAllClaimButtons);
+});
 const imageUploadArea = document.getElementById('image-upload-area');
 const videoUploadArea = document.getElementById('video-upload-area');
 const imagePreview = document.getElementById('image-preview');
@@ -2361,12 +2363,7 @@ function updateAllClaimButtons() {
         }
     }
 }
-
-// ✅ ADD LISTENER: Run update when toggle changes
-document.addEventListener('DOMContentLoaded', () => {
-    const toggle = document.getElementById("usePapersToggle");
-    if(toggle) toggle.addEventListener('change', updateAllClaimButtons);
-});
+    
   
 function displayClaimsStructure(claims, isCached = false) {
     const badgeHtml = isCached ? getBadgeHtml('db') : '';
