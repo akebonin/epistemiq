@@ -1,95 +1,15 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Epistemiq Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f4f6f9; font-size: 0.9rem; }
-        .sidebar { height: 100vh; overflow-y: auto; background: #fff; border-right: 1px solid #dee2e6; }
-        .nav-link { color: #333; font-weight: 500; padding: 10px 20px; cursor: pointer; }
-        .nav-link:hover { background-color: #f8f9fa; color: #0d6efd; }
-        .nav-link.active { background-color: #e7f1ff; color: #0d6efd; border-right: 3px solid #0d6efd; }
-        .cell-truncate { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .modal-pre { white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 5px; max-height: 60vh; overflow-y: auto; }
-    </style>
-</head>
-<body>
-
-<div class="container-fluid">
-    <div class="row">
-        <!-- Sidebar -->
-        <div class="col-md-2 sidebar p-0 pt-3">
-            <h5 class="px-3 mb-3 text-primary fw-bold">⚡ Admin</h5>
-            <nav class="nav flex-column" id="tableNav">
-                <!-- Tables injected here -->
-                <span class="text-muted px-3">Loading...</span>
-            </nav>
-            <div class="mt-4 px-3">
-                <a href="/" class="btn btn-outline-secondary btn-sm w-100">← Back to App</a>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="col-md-10 p-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 id="currentTableName">Dashboard</h3>
-                <div class="d-flex gap-2" id="actionsDiv" style="display:none !important;">
-                    <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search..." style="width: 250px;">
-                    <button class="btn btn-danger btn-sm" onclick="confirmClearTable()">⚠️ Clear Table</button>
-                </div>
-            </div>
-
-            <div class="card shadow-sm">
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-striped mb-0" id="dataTable">
-                            <thead class="table-light" id="tableHead"></thead>
-                            <tbody id="tableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="card-footer d-flex justify-content-between align-items-center" id="paginationDiv" style="display:none;">
-                    <span id="pageInfo" class="text-muted">Page 1</span>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary" onclick="changePage(-1)">Previous</button>
-                        <button class="btn btn-sm btn-outline-primary" onclick="changePage(1)">Next</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal -->
-<div class="modal fade" id="viewModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <pre id="modalContent" class="modal-pre"></pre>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // ✅ CONFIG: Point to your Vercel Proxy path
-    // If your vercel.json rewrites /api/admin/:path* -> pythonanywhere/admin/api/:path*
-    // Then this base is correct.
     const API_BASE = "/api/admin/api"; 
     
     let currentTable = '';
     let currentPage = 1;
     let currentSearch = '';
+    
+    // ✅ NEW: Store the raw data globally so we don't stuff it into HTML attributes
+    let currentData = []; 
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // 1. Fetch Table List
         try {
             const res = await fetch(`${API_BASE}/get_tables`);
             if (res.status === 403) {
@@ -124,7 +44,6 @@
         document.getElementById('paginationDiv').style.display = 'flex';
         
         document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-        // Highlight active (simple check)
         [...document.querySelectorAll('.nav-link')].forEach(el => {
             if(el.innerText === tableName) el.classList.add('active');
         });
@@ -135,7 +54,12 @@
     async function fetchData() {
         const res = await fetch(`${API_BASE}/fetch_table?table=${currentTable}&page=${currentPage}&search=${currentSearch}`);
         const json = await res.json();
+        
         if (json.error) return alert(json.error);
+
+        // ✅ STORE DATA GLOBALLY
+        currentData = json.data;
+
         renderTable(json.data);
         document.getElementById('pageInfo').innerText = `Page ${json.page} of ${json.total_pages} (${json.total} rows)`;
     }
@@ -157,25 +81,42 @@
         headRow += '<th style="width: 100px;">Actions</th></tr>';
         thead.innerHTML = headRow;
 
-        data.forEach(row => {
+        // ✅ FIX: Loop with Index
+        data.forEach((row, index) => {
             let tr = '<tr>';
             keys.forEach(k => {
                 let val = row[k];
                 if (val && String(val).length > 50) {
-                    tr += `<td><div class="cell-truncate" title="Expand to view">${String(val).replace(/</g,'&lt;')}</div></td>`;
+                    // Basic HTML escape for display
+                    const safeVal = String(val).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+                    tr += `<td><div class="cell-truncate" title="Expand to view">${safeVal}</div></td>`;
                 } else {
                     tr += `<td>${val !== null ? val : ''}</td>`;
                 }
             });
-            const rowJson = encodeURIComponent(JSON.stringify(row, null, 2));
+            
+            // ✅ FIX: Pass only the INDEX, not the giant JSON object
             tr += `
                 <td>
-                    <button class="btn btn-sm btn-light border" onclick="viewRow('${rowJson}')">👁</button>
+                    <button class="btn btn-sm btn-light border" onclick="viewRow(${index})">👁</button>
                     <button class="btn btn-sm btn-light border text-danger" onclick="deleteRow('${row._pk_val}')">🗑</button>
                 </td>`;
             tr += '</tr>';
             tbody.innerHTML += tr;
         });
+    }
+
+    // ✅ FIX: Look up the data from the global array using the index
+    function viewRow(index) {
+        const rowData = currentData[index];
+        if (!rowData) return;
+        
+        // Clone to avoid modifying the table data
+        const displayData = {...rowData};
+        delete displayData._pk_val; // Hide internal key from view
+        
+        document.getElementById('modalContent').innerText = JSON.stringify(displayData, null, 2);
+        new bootstrap.Modal(document.getElementById('viewModal')).show();
     }
 
     document.getElementById('searchInput').addEventListener('keyup', (e) => {
@@ -192,13 +133,6 @@
         fetchData();
     }
 
-    function viewRow(encodedJson) {
-        const data = JSON.parse(decodeURIComponent(encodedJson));
-        delete data._pk_val;
-        document.getElementById('modalContent').innerText = JSON.stringify(data, null, 2);
-        new bootstrap.Modal(document.getElementById('viewModal')).show();
-    }
-
     async function deleteRow(pkVal) {
         if (!confirm('Delete row?')) return;
         const res = await fetch(`${API_BASE}/delete_row`, {
@@ -207,17 +141,17 @@
             body: JSON.stringify({ table: currentTable, pk_val: pkVal })
         });
         if (res.ok) fetchData();
+        else alert("Delete failed");
     }
 
     async function confirmClearTable() {
-        if (!confirm(`Clear ALL data in ${currentTable}?`)) return;
+        if (!confirm(`⚠️ DANGER: Are you sure you want to delete ALL data in ${currentTable}? This cannot be undone.`)) return;
         const res = await fetch(`${API_BASE}/clear_table`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ table: currentTable })
         });
         if (res.ok) fetchData();
+        else alert("Clear failed");
     }
 </script>
-</body>
-</html>
