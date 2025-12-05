@@ -1044,6 +1044,43 @@ Generate PDF
 </div>
 </div>
 </div>
+
+<!-- 📊 KPI Stats Card (Hidden by default, shown via JS) -->
+<div id="kpi-stats-container" class="container mt-5 d-none">
+    <div class="card border-0 shadow-sm" style="background: #f8f9fa; border-radius: 12px;">
+        <div class="card-body py-4">
+            <div class="row text-center">
+                
+                <!-- Metric 1: Analyses -->
+                <div class="col-md-4 mb-3 mb-md-0">
+                    <div class="text-uppercase text-muted small fw-bold mb-1">Total Analyses</div>
+                    <div class="h2 fw-bold text-primary mb-0" id="kpi-analyses">0</div>
+                </div>
+
+                <!-- Metric 2: Claims -->
+                <div class="col-md-4 mb-3 mb-md-0 border-start-md">
+                    <div class="text-uppercase text-muted small fw-bold mb-1">Claims Verified</div>
+                    <div class="h2 fw-bold text-success mb-0" id="kpi-claims">0</div>
+                </div>
+
+                <!-- Metric 3: Top Model -->
+                <div class="col-md-4 border-start-md">
+                    <div class="text-uppercase text-muted small fw-bold mb-1">Top AI Model</div>
+                    <div class="h4 fw-bold text-dark mb-0 mt-1" id="kpi-model" style="word-break: break-word;">-</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CSS adjustment for vertical dividers on desktop -->
+<style>
+    @media (min-width: 768px) {
+        .border-start-md { border-left: 1px solid #dee2e6; }
+    }
+</style>
+  
 <!-- Research Report Modal (Vanilla Implementation) -->
 <div id="researchReportModal" class="custom-modal" aria-hidden="true">
 <div class="custom-modal-overlay" id="custom-modal-overlay"></div>
@@ -1262,7 +1299,7 @@ const imagePreview = document.getElementById('image-preview');
 const activeVerifications = new Set();
 
 
-
+loadGlobalStats();
 
 let analysisId = null;
 let generatedReports = [];
@@ -1365,6 +1402,40 @@ function showToast(message, type = 'info') {
     toastEl.addEventListener('hidden.bs.toast', () => {
         toastEl.remove();
     });
+}
+
+async function loadGlobalStats() {
+    const kpiContainer = document.getElementById('kpi-stats-container');
+    if (!kpiContainer) return;
+
+    try {
+        // Fetch from the public global endpoint
+        const res = await fetch(`${API_BASE}/api/global-stats`);
+        
+        if (res.ok) {
+            const data = await res.json();
+            
+            // Update Numbers
+            // Use 'toLocaleString' to add commas (e.g., 1,200 instead of 1200)
+            document.getElementById('kpi-analyses').innerText = (data.total_analyses || 0).toLocaleString();
+            document.getElementById('kpi-claims').innerText = (data.total_claims || 0).toLocaleString();
+            document.getElementById('kpi-model').innerText = data.favorite_model || "None";
+
+            // Unhide the card
+            kpiContainer.classList.remove('d-none');
+            
+            // Fade in animation
+            kpiContainer.style.opacity = 0;
+            kpiContainer.style.transition = "opacity 0.8s ease-in-out";
+            
+            // Force reflow
+            void kpiContainer.offsetWidth; 
+            
+            kpiContainer.style.opacity = 1;
+        }
+    } catch (e) {
+        console.warn("Failed to load global stats", e);
+    }
 }
   
 // ----------------------------------------------------
