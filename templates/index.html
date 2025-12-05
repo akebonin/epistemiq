@@ -1013,37 +1013,6 @@ Download Analysis Report (PDF)
 </button>
 
 </div>
-<footer class="text-center text-muted footer">
-From murk to clarity — powered by Epistemiq.
-</footer>
-</div>
-<!-- Report Selection Modal -->
-<div class="modal fade" id="reportSelectionModal" tabindex="-1" aria-labelledby="reportSelectionModalLabel" aria-hidden="true">
-<div class="modal-dialog modal-lg">
-<div class="modal-content">
-<div class="modal-header">
-<h5 class="modal-title" id="reportSelectionModalLabel">Select Reports for PDF</h5>
-<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-</div>
-<div class="modal-body">
-<div class="mb-3">
-<button id="select-all-reports-modal" class="btn btn-outline-primary btn-sm">Select All</button>
-<button id="deselect-all-reports-modal" class="btn btn-outline-secondary btn-sm">Deselect All</button>
-</div>
-<div id="report-selection-list" class="report-selection-list">
-<!-- Dynamic content will be inserted here -->
-</div>
-</div>
-<div class="modal-footer">
-<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-<button id="generate-pdf-from-modal" class="btn btn-success">
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Generate PDF
-</button>
-</div>
-</div>
-</div>
-</div>
 
 <!-- 📊 KPI Stats Card (Hidden by default, shown via JS) -->
 <div id="kpi-stats-container" class="container mt-5 d-none">
@@ -1080,6 +1049,38 @@ Generate PDF
         .border-start-md { border-left: 1px solid #dee2e6; }
     }
 </style>
+  
+<footer class="text-center text-muted footer">
+From murk to clarity — powered by Epistemiq.
+</footer>
+</div>
+<!-- Report Selection Modal -->
+<div class="modal fade" id="reportSelectionModal" tabindex="-1" aria-labelledby="reportSelectionModalLabel" aria-hidden="true">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+<div class="modal-header">
+<h5 class="modal-title" id="reportSelectionModalLabel">Select Reports for PDF</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+<div class="mb-3">
+<button id="select-all-reports-modal" class="btn btn-outline-primary btn-sm">Select All</button>
+<button id="deselect-all-reports-modal" class="btn btn-outline-secondary btn-sm">Deselect All</button>
+</div>
+<div id="report-selection-list" class="report-selection-list">
+<!-- Dynamic content will be inserted here -->
+</div>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+<button id="generate-pdf-from-modal" class="btn btn-success">
+<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+Generate PDF
+</button>
+</div>
+</div>
+</div>
+</div>
   
 <!-- Research Report Modal (Vanilla Implementation) -->
 <div id="researchReportModal" class="custom-modal" aria-hidden="true">
