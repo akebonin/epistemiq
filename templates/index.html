@@ -2613,37 +2613,45 @@ async function runBatchVerification(totalClaims) {
     const batchBtn = document.getElementById('verify-all-btn');
     if (!batchBtn) return;
 
-    // Ensure button states are fresh before starting
-    updateAllClaimButtons();
-
+    // 1. Lock the button so user can't double-click
     batchBtn.disabled = true;
-    batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing...`;
+    batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Starting...`;
 
     let processedCount = 0;
 
     for (let i = 0; i < totalClaims; i++) {
         const singleBtn = document.getElementById(`btn-verify-${i}`);
         
-        // ✅ Logic: If button is Green (btn-success), it means it satisfies the CURRENT toggle state.
-        // So we skip it. If it's Blue, we click it.
+        // Check if this claim is already verified (Green button) or missing
+        // If so, skip it.
         if (!singleBtn || singleBtn.classList.contains('btn-success')) {
             processedCount++;
             continue; 
         }
 
-        // Update Batch Progress
+        // Update Text to show progress
         batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying ${i + 1}/${totalClaims}...`;
 
         const card = document.getElementById(`claim-${i}`);
         if(card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+        // Run Verification
         await runSingleVerification(i);
+        
+        // Small pause for UI rendering
         await new Promise(r => setTimeout(r, 500));
         processedCount++;
     }
 
-    // Final State Check
-    updateAllClaimButtons();
+    // ✅ FIX: Process is done. Unlock the button.
+    batchBtn.disabled = false;
+
+    // ✅ FIX: Call the global updater. 
+    // It will scan the page. If all claims are now verified, it turns the button Green.
+    // If some failed (and are still Blue), it turns the button Blue so you can retry.
+    if (window.updateAllClaimButtons) {
+        window.updateAllClaimButtons();
+    }
 }
 
 // Attach to window so HTML can see them
