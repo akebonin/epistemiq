@@ -856,6 +856,26 @@ max-width: none;
   </select>
 </div>
 
+<!-- 🌟 Daily Spotlight Card (Hidden by default) -->
+<div id="spotlight-container" class="card border-0 shadow-sm mb-4 d-none" style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border-left: 4px solid #0d6efd;">
+    <div class="card-body position-relative">
+        <span class="badge bg-primary mb-2">🌟 Daily Spotlight</span>
+        <h6 class="card-title fw-bold text-dark" id="spotlight-title">Loading...</h6>
+        <p class="card-text small text-muted mb-2">
+            Source: <span id="spotlight-source" class="fw-semibold">...</span>
+        </p>
+        
+        <div class="d-flex align-items-center mt-3">
+            <button id="btn-load-spotlight" class="btn btn-sm btn-outline-primary px-3">
+                <i class="bi bi-play-fill"></i> Load & View
+            </button>
+            <small class="text-muted ms-auto" style="font-size: 0.75rem;">
+                Explore real analysis
+            </small>
+        </div>
+    </div>
+</div>
+
 <!-- ✅ Chrome AI Info Card -->
 <div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
      style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
@@ -1301,7 +1321,7 @@ const imagePreview = document.getElementById('image-preview');
 
 const activeVerifications = new Set();
 
-
+loadDailySpotlight();
 loadGlobalStats();
 
 let analysisId = null;
@@ -1319,6 +1339,40 @@ let currentSourceUrl = null;
             window.updateAllClaimButtons();
         });
     }
+
+async function loadDailySpotlight() {
+    const container = document.getElementById('spotlight-container');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/daily-spotlight`);
+        if (res.ok) {
+            const data = await res.json();
+            
+            // Populate Data
+            document.getElementById('spotlight-title').innerText = '"' + data.title + '"';
+            document.getElementById('spotlight-source').innerText = data.source_domain;
+            
+            // Attach Click Event
+            const btn = document.getElementById('btn-load-spotlight');
+            btn.onclick = (e) => {
+                e.preventDefault();
+                // Reuse your existing logic!
+                loadAnalysis(data.analysis_id);
+                // Optional: Scroll down to results
+                setTimeout(() => {
+                    document.getElementById('results-container').scrollIntoView({ behavior: 'smooth' });
+                }, 500);
+            };
+
+            // Show Card
+            container.classList.remove('d-none');
+        }
+    } catch (e) {
+        console.warn("No spotlight available", e);
+    }
+}
+
   
 // --- WELCOME MODAL LOGIC ---
     const hasSeenWelcome = localStorage.getItem('ep_welcome_seen_v1');
