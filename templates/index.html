@@ -786,296 +786,370 @@ max-width: none;
 .model-attribution-badge i {
     margin-top: 2px; /* Micro-adjustment for icon alignment on multi-line text */
 }
+
+/* --- AD SPACE STYLES --- */
+
+/* Vertical Side Ads (Desktop) */
+.ad-sidebar-col {
+    position: relative;
+    min-height: 100vh;
+}
+
+.ad-vertical-placeholder {
+    width: 160px;  /* Standard Skyscraper width */
+    height: 600px; /* Standard Skyscraper height */
+    background-color: #f1f3f5;
+    border: 1px dashed #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-size: 0.8rem;
+    margin-top: 100px; /* Push down to align with content */
+    border-radius: 8px;
+}
+
+/* Horizontal In-Feed Ads */
+.ad-horizontal-placeholder {
+    width: 100%;
+    min-height: 90px; /* Leaderboard height */
+    background-color: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-size: 0.8rem;
+    margin: 30px 0; /* Spacing between cards */
+    border-radius: 8px;
+    padding: 20px;
+}
+
+/* Ensure main content remains centered */
+.main-content-col {
+    max-width: 900px;
+    margin: 0 auto;
+}
   
 </style>
 </head>
 <body>
-<div class="container">
-<div class="control-card">
-    <div class="logo-wrapper mb-4">
-    <img src="/static/icons/logo.png" alt="epistemiq logo">
-    <p class="tagline">Your Compass in the Epistemic Fog</p>
-  </div>
 
-<!-- ✨ User Block (Unified Style for Logged In & Logged Out) -->
-<div id="userAccessBlock" class="text-center mb-3" style="position: relative;">
-
-    <!-- LOGGED OUT DROPDOWN -->
-    <div id="userLoggedOutMenu" class="dropdown d-inline-block">
-        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
-            <span>Menu</span>
-        </button>
-
-        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
-            <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
-            
-            <li><hr class="dropdown-divider my-1"></li>
-            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
-            <li>
-                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
-            </li>
-            <li><hr class="dropdown-divider my-1"></li>
-            
-            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
-            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
-        </ul>
-    </div>
-
-    <!-- LOGGED IN DROPDOWN -->
-    <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
-        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
-            <span id="userEmail"></span>
-        </button>
-
-        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
-            <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
-            <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
-            
-            <li><hr class="dropdown-divider my-1"></li>
-            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
-            <li>
-                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
-            </li>
-            <li><hr class="dropdown-divider my-1"></li>
-
-            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
-        </ul>
-    </div>
-
-</div>
-  
-<form id="analysis-form">
-<div class="mb-3">
-  <label for="inputMethod" class="form-label">Input method</label>
-  <select id="inputMethod" class="form-select">
-    <option value="paste">Paste Text</option>
-    <option value="url">Provide URL</option>
-    <option value="image">Upload Image</option>
-    <option value="video">Upload Video</option>
-    <option value="video-url">Video URL</option>
-  </select>
-</div>
-
-<!-- 🌟 Daily Spotlight Card (Hidden by default) -->
-<div id="spotlight-container" class="card border-0 shadow-sm mb-4 d-none" style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border-left: 4px solid #0d6efd;">
-    <div class="card-body position-relative">
-        <span class="badge bg-primary mb-2">🌟 Daily Spotlight</span>
-        <h6 class="card-title fw-bold text-dark" id="spotlight-title">Loading...</h6>
-        <p class="card-text small text-muted mb-2">
-            Source: <span id="spotlight-source" class="fw-semibold">...</span>
-        </p>
+<!-- Full width wrapper -->
+<div class="container-fluid">
+    <div class="row">
         
-        <div class="d-flex align-items-center mt-3">
-            <button id="btn-load-spotlight" class="btn btn-sm btn-outline-primary px-3">
-                <i class="bi bi-play-fill"></i> Load & View
-            </button>
-            <small class="text-muted ms-auto" style="font-size: 0.75rem;">
-                Explore real analysis
-            </small>
+        <!-- 👈 LEFT AD COLUMN (Hidden on mobile/tablet, Visible on large screens) -->
+        <div class="col-xl-2 d-none d-xl-flex justify-content-end ad-sidebar-col">
+            <div class="ad-vertical-placeholder sticky-top" style="top: 20px;">
+                <!-- Put Ad Code Here Later -->
+                <span>Ad Space (Left)</span>
+            </div>
         </div>
-    </div>
-</div>
 
-<!-- ✅ Chrome AI Info Card -->
-<div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
-     style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
-  
-  <!-- Header: Title + Toggle Switch -->
-  <div class="d-flex justify-content-between align-items-start mb-2">
-    <div>
-      ⚙️ <strong>Chrome AI Mode</strong>
-    </div>
-    <div class="form-check form-switch">
-      <input class="form-check-input" type="checkbox" id="enableChromeAiToggle" checked style="cursor: pointer;">
-      <label class="form-check-label fw-bold" for="enableChromeAiToggle" style="font-size: 0.8rem;">Enabled</label>
-    </div>
-  </div>
-
-  <!-- Description -->
-  <div id="chrome-ai-description">
-    🧠 Gemini Nano will locally summarize and translate extracted or pasted text before analysis. This will ensure text preprocessing (cleanup, summarization & translation), full data privacy, and reduced backend costs.
-  </div>
-
-  <!-- Mode Selection -->
-  <div class="mt-2" id="chrome-ai-mode">
-    <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Processing Strategy</label>
-    <select id="chromeMode" class="form-select form-select-sm bg-white">
-      <option value="distill">🔬 Scientific Distillation (Epistemic Mode)</option>
-      <option value="accurate">🎯 Standard Summary</option>
-      <option value="fast">🏎️ Fast Cleanup</option>
-    </select>
-    <div class="form-text text-muted" style="font-size: 0.75rem;">
-      "Distillation" removes fluff but keeps all claims, dates, and data points.
-    </div>
-  </div>
-</div>
-
-<!-- ↩️ Undo Button (Hidden by default, sits below the button container) -->
-<div class="d-flex justify-content-end mt-1">
-    <button id="undo-nano-btn" class="btn btn-link btn-sm text-danger d-none" style="text-decoration:none; font-size: 0.85rem;">
-        ↩ Undo Changes
-    </button>
-</div>
-
-<!-- Area for Local AI Keywords -->
-<div id="nano-topics-container" class="d-none mt-2">
-  <small class="text-muted fw-bold me-2" style="font-size: 0.75rem;">TOPICS DETECTED:</small>
-  <div id="nano-topics-list" class="d-inline-block">
-    <!-- Badges will be injected here via JS -->
-  </div>
-</div>
-  
-<div id="paste-input-group" class="mb-3" style="position:relative;">
-  <label for="textInput" class="form-label">Paste article or post content</label>
-
-  <textarea id="textInput" rows="7" class="form-control"
-            placeholder="Paste content here..."></textarea>
-
-  <div id="chrome-ai-text" class="mt-2 d-none"></div>
-</div>
-
-<div id="url-input-group" class="mb-3 d-none">
-<label for="urlInput" class="form-label">Enter article URL</label>
-<div class="input-group">
-<input id="urlInput" type="text" class="form-control" placeholder="https://example.com">
-<button id="fetch-article-btn" class="btn btn-secondary" type="button">
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Fetch Article
-</button>
-</div>
-</div>
-<div id="image-input-group" class="mb-3 d-none">
-<label class="form-label">Upload Image with Text</label>
-<div class="file-upload-group" id="image-upload-area">
-<div class="upload-icon">🖼️</div>
-<h5>Drop image here or click to browse</h5>
-<p class="text-muted">Supports JPG, PNG, GIF (Max 10MB)</p>
-<input type="file" id="imageInput" class="file-input-hidden" accept="image/*">
-<button type="button" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">
-Choose Image
-</button>
-<div id="image-preview" class="mt-3"></div>
-</div>
-<button id="process-image-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Extract Text from Image
-</button>
-</div>
-<div id="video-input-group" class="mb-3 d-none">
-<label class="form-label">Upload Video</label>
-<div class="file-upload-group" id="video-upload-area">
-<div class="upload-icon">📹</div>
-<h5>Drop video here or click to browse</h5>
-<p class="text-muted">Supports MP4, AVI, MOV (Max 50MB)</p>
-<input type="file" id="videoInput" class="file-input-hidden" accept="video/*">
-<button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoInput').click()">
-Choose Video
-</button>
-</div>
-<button id="process-video-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Transcribe Video
-</button>
-</div>
-<div id="video-url-input-group" class="mb-3 d-none">
-<label for="videoUrlInput" class="form-label">Enter Video URL</label>
-<div class="input-group">
-<input id="videoUrlInput" type="text" class="form-control" placeholder="https://youtube.com/watch?v=... or https://vimeo.com/...">
-<button id="transcribe-video-url-btn" class="btn btn-secondary" type="button">
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Transcribe Video
-</button>
-</div>
-</div>
-
-<!-- ✅ Model Selector -->
-<div class="mb-3">
-  <label for="preferredModel" class="form-label">Select Verifier Model</label>
-  <select id="preferredModel" class="form-select">
-    <option value="openai/gpt-oss-120b:free">🔮 GPT‑OSS 120B (Massive open model, advanced reasoning)</option>
-    <option value="google/gemini-2.0-flash-exp:free">🧠 Gemini 2.0 Flash Exp (Deep reasoning, step‑by‑step)</option>
-    <option value="google/gemma-3-27b-it:free">💎 Gemma 3 27B (Instruction‑tuned, powerful open model)</option>
-    <option value="openai/gpt-oss-20b:free">🔮 GPT‑OSS 20B (OpenAI experimental, balanced power)</option>
-    <option value="meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B (Open Source, strong instruction following)</option>
-    <option value="mistralai/mistral-7b-instruct:free">🌪️ Mistral 7B (Lightweight, efficient, quick replies)</option>
-    <option value="amazon/nova-2-lite-v1:free">🌐 Nova 2 Lite (Amazon lightweight, fast & efficient)</option>
-    <option value="nvidia/nemotron-nano-12b-v2-vl:free">🖼️ Nemotron Nano 12B v2 VL (NVIDIA vision‑language, compact & multimodal)</option>
-  </select>
-  <div class="form-text text-muted" style="font-size: 0.75rem;">
-    If your preferred model is busy (429 errors), the system will automatically fall back to the others.
-  </div>
-</div>
-  
-<div class="mb-4">
-<label for="promptMode" class="form-label">Select Analysis Focus</label>
-<select id="promptMode" class="form-select">
-<option>General Analysis of Testable Claims</option>
-<option>Specific Focus on Scientific Claims</option>
-<option>Technology-Focused Extraction</option>
-</select>
-</div>
-<div class="mb-4 form-check form-switch">
-<input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
-<label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + CORE + PubMed data</label>
-</div>
-<div class="d-grid">
-<button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Run Analysis
-</button>
-</div>
-</form>
-</div>
-<div id="results-container"></div>
-<!-- Always visible download button -->
-<div id="pdf-download-section" class="text-center mt-5">
-<button id="download-pdf-btn" class="btn btn-success btn-lg">
-<span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-Download Analysis Report (PDF)
-</button>
-
-</div>
-
-<!-- 📊 KPI Stats Card (Hidden by default, shown via JS) -->
-<div id="kpi-stats-container" class="container mt-5 d-none">
-    <div class="card border-0 shadow-sm" style="background: #f8f9fa; border-radius: 12px;">
-        <div class="card-body py-4">
-            <div class="row text-center">
+        <!-- 📄 MAIN CONTENT COLUMN (Centered) -->
+        <div class="col-12 col-xl-8">
+            <div class="container main-content-col pt-4 pb-5">
                 
-                <!-- Metric 1: Analyses -->
-                <div class="col-md-4 mb-3 mb-md-0">
-                    <div class="text-uppercase text-muted small fw-bold mb-1">Total Analyses</div>
-                    <div class="h2 fw-bold text-primary mb-0" id="kpi-analyses">0</div>
+                <div class="control-card">
+                    <div class="logo-wrapper mb-4">
+                    <img src="/static/icons/logo.png" alt="epistemiq logo">
+                    <p class="tagline">Your Compass in the Epistemic Fog</p>
+                  </div>
+                
+                <!-- ✨ User Block (Unified Style for Logged In & Logged Out) -->
+                <div id="userAccessBlock" class="text-center mb-3" style="position: relative;">
+                
+                    <!-- LOGGED OUT DROPDOWN -->
+                    <div id="userLoggedOutMenu" class="dropdown d-inline-block">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
+                            <span>Menu</span>
+                        </button>
+                
+                        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
+                            <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
+                            
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
+                            <li>
+                                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            
+                            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
+                            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
+                        </ul>
+                    </div>
+                
+                    <!-- LOGGED IN DROPDOWN -->
+                    <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
+                            <span id="userEmail"></span>
+                        </button>
+                
+                        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
+                            <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
+                            <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
+                            
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
+                            <li>
+                                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                
+                            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
+                        </ul>
+                    </div>
+                
                 </div>
-
-                <!-- Metric 2: Claims -->
-                <div class="col-md-4 mb-3 mb-md-0 border-start-md">
-                    <div class="text-uppercase text-muted small fw-bold mb-1">Claims Verified</div>
-                    <div class="h2 fw-bold text-success mb-0" id="kpi-claims">0</div>
+                  
+                <form id="analysis-form">
+                <div class="mb-3">
+                  <label for="inputMethod" class="form-label">Input method</label>
+                  <select id="inputMethod" class="form-select">
+                    <option value="paste">Paste Text</option>
+                    <option value="url">Provide URL</option>
+                    <option value="image">Upload Image</option>
+                    <option value="video">Upload Video</option>
+                    <option value="video-url">Video URL</option>
+                  </select>
                 </div>
-
-                <!-- Metric 3: Top Model -->
-                <div class="col-md-4 border-start-md">
-                    <div class="text-uppercase text-muted small fw-bold mb-1">Top AI Model</div>
-                    <div class="h4 fw-bold text-dark mb-0 mt-1" id="kpi-model" style="word-break: break-word;">-</div>
+                
+                <!-- 🌟 Daily Spotlight Card (Hidden by default) -->
+                <div id="spotlight-container" class="card border-0 shadow-sm mb-4 d-none" style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border-left: 4px solid #0d6efd;">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-primary mb-2">🌟 Daily Spotlight</span>
+                        <h6 class="card-title fw-bold text-dark" id="spotlight-title">Loading...</h6>
+                        <p class="card-text small text-muted mb-2">
+                            Source: <span id="spotlight-source" class="fw-semibold">...</span>
+                        </p>
+                        
+                        <div class="d-flex align-items-center mt-3">
+                            <button id="btn-load-spotlight" class="btn btn-sm btn-outline-primary px-3">
+                                <i class="bi bi-play-fill"></i> Load & View
+                            </button>
+                            <small class="text-muted ms-auto" style="font-size: 0.75rem;">
+                                Explore real analysis
+                            </small>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- ✅ Chrome AI Info Card -->
+                <div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
+                     style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
+                  
+                  <!-- Header: Title + Toggle Switch -->
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      ⚙️ <strong>Chrome AI Mode</strong>
+                    </div>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="enableChromeAiToggle" checked style="cursor: pointer;">
+                      <label class="form-check-label fw-bold" for="enableChromeAiToggle" style="font-size: 0.8rem;">Enabled</label>
+                    </div>
+                  </div>
+                
+                  <!-- Description -->
+                  <div id="chrome-ai-description">
+                    🧠 Gemini Nano will locally summarize and translate extracted or pasted text before analysis. This will ensure text preprocessing (cleanup, summarization & translation), full data privacy, and reduced backend costs.
+                  </div>
+                
+                  <!-- Mode Selection -->
+                  <div class="mt-2" id="chrome-ai-mode">
+                    <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Processing Strategy</label>
+                    <select id="chromeMode" class="form-select form-select-sm bg-white">
+                      <option value="distill">🔬 Scientific Distillation (Epistemic Mode)</option>
+                      <option value="accurate">🎯 Standard Summary</option>
+                      <option value="fast">🏎️ Fast Cleanup</option>
+                    </select>
+                    <div class="form-text text-muted" style="font-size: 0.75rem;">
+                      "Distillation" removes fluff but keeps all claims, dates, and data points.
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- ↩️ Undo Button (Hidden by default, sits below the button container) -->
+                <div class="d-flex justify-content-end mt-1">
+                    <button id="undo-nano-btn" class="btn btn-link btn-sm text-danger d-none" style="text-decoration:none; font-size: 0.85rem;">
+                        ↩ Undo Changes
+                    </button>
+                </div>
+                
+                <!-- Area for Local AI Keywords -->
+                <div id="nano-topics-container" class="d-none mt-2">
+                  <small class="text-muted fw-bold me-2" style="font-size: 0.75rem;">TOPICS DETECTED:</small>
+                  <div id="nano-topics-list" class="d-inline-block">
+                    <!-- Badges will be injected here via JS -->
+                  </div>
+                </div>
+                  
+                <div id="paste-input-group" class="mb-3" style="position:relative;">
+                  <label for="textInput" class="form-label">Paste article or post content</label>
+                
+                  <textarea id="textInput" rows="7" class="form-control"
+                            placeholder="Paste content here..."></textarea>
+                
+                  <div id="chrome-ai-text" class="mt-2 d-none"></div>
+                </div>
+                
+                <div id="url-input-group" class="mb-3 d-none">
+                <label for="urlInput" class="form-label">Enter article URL</label>
+                <div class="input-group">
+                <input id="urlInput" type="text" class="form-control" placeholder="https://example.com">
+                <button id="fetch-article-btn" class="btn btn-secondary" type="button">
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                Fetch Article
+                </button>
+                </div>
+                </div>
+                <div id="image-input-group" class="mb-3 d-none">
+                <label class="form-label">Upload Image with Text</label>
+                <div class="file-upload-group" id="image-upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h5>Drop image here or click to browse</h5>
+                <p class="text-muted">Supports JPG, PNG, GIF (Max 10MB)</p>
+                <input type="file" id="imageInput" class="file-input-hidden" accept="image/*">
+                <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">
+                Choose Image
+                </button>
+                <div id="image-preview" class="mt-3"></div>
+                </div>
+                <button id="process-image-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                Extract Text from Image
+                </button>
+                </div>
+                <div id="video-input-group" class="mb-3 d-none">
+                <label class="form-label">Upload Video</label>
+                <div class="file-upload-group" id="video-upload-area">
+                <div class="upload-icon">📹</div>
+                <h5>Drop video here or click to browse</h5>
+                <p class="text-muted">Supports MP4, AVI, MOV (Max 50MB)</p>
+                <input type="file" id="videoInput" class="file-input-hidden" accept="video/*">
+                <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoInput').click()">
+                Choose Video
+                </button>
+                </div>
+                <button id="process-video-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                Transcribe Video
+                </button>
+                </div>
+                <div id="video-url-input-group" class="mb-3 d-none">
+                <label for="videoUrlInput" class="form-label">Enter Video URL</label>
+                <div class="input-group">
+                <input id="videoUrlInput" type="text" class="form-control" placeholder="https://youtube.com/watch?v=... or https://vimeo.com/...">
+                <button id="transcribe-video-url-btn" class="btn btn-secondary" type="button">
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                Transcribe Video
+                </button>
+                </div>
+                </div>
+                
+                <!-- ✅ Model Selector -->
+                <div class="mb-3">
+                  <label for="preferredModel" class="form-label">Select Verifier Model</label>
+                  <select id="preferredModel" class="form-select">
+                    <option value="openai/gpt-oss-120b:free">🔮 GPT‑OSS 120B (Massive open model, advanced reasoning)</option>
+                    <option value="google/gemini-2.0-flash-exp:free">🧠 Gemini 2.0 Flash Exp (Deep reasoning, step‑by‑step)</option>
+                    <option value="google/gemma-3-27b-it:free">💎 Gemma 3 27B (Instruction‑tuned, powerful open model)</option>
+                    <option value="openai/gpt-oss-20b:free">🔮 GPT‑OSS 20B (OpenAI experimental, balanced power)</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B (Open Source, strong instruction following)</option>
+                    <option value="mistralai/mistral-7b-instruct:free">🌪️ Mistral 7B (Lightweight, efficient, quick replies)</option>
+                    <option value="amazon/nova-2-lite-v1:free">🌐 Nova 2 Lite (Amazon lightweight, fast & efficient)</option>
+                    <option value="nvidia/nemotron-nano-12b-v2-vl:free">🖼️ Nemotron Nano 12B v2 VL (NVIDIA vision‑language, compact & multimodal)</option>
+                  </select>
+                  <div class="form-text text-muted" style="font-size: 0.75rem;">
+                    If your preferred model is busy (429 errors), the system will automatically fall back to the others.
+                  </div>
+                </div>
+                  
+                <div class="mb-4">
+                <label for="promptMode" class="form-label">Select Analysis Focus</label>
+                <select id="promptMode" class="form-select">
+                <option>General Analysis of Testable Claims</option>
+                <option>Specific Focus on Scientific Claims</option>
+                <option>Technology-Focused Extraction</option>
+                </select>
+                </div>
+                <div class="mb-4 form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
+                <label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + CORE + PubMed data</label>
+                </div>
+                <div class="d-grid">
+                <button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                Run Analysis
+                </button>
+                </div>
+                </form>
+                </div>
+                <div id="results-container"></div>
+                <!-- Always visible download button -->
+                <div id="pdf-download-section" class="text-center mt-5">
+                <button id="download-pdf-btn" class="btn btn-success btn-lg">
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                Download Analysis Report (PDF)
+                </button>
+                
+                </div>
+                
+                <!-- 📊 KPI Stats Card (Hidden by default, shown via JS) -->
+                <div id="kpi-stats-container" class="container mt-5 d-none">
+                    <div class="card border-0 shadow-sm" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="card-body py-4">
+                            <div class="row text-center">
+                                
+                                <!-- Metric 1: Analyses -->
+                                <div class="col-md-4 mb-3 mb-md-0">
+                                    <div class="text-uppercase text-muted small fw-bold mb-1">Total Analyses</div>
+                                    <div class="h2 fw-bold text-primary mb-0" id="kpi-analyses">0</div>
+                                </div>
+                
+                                <!-- Metric 2: Claims -->
+                                <div class="col-md-4 mb-3 mb-md-0 border-start-md">
+                                    <div class="text-uppercase text-muted small fw-bold mb-1">Claims Verified</div>
+                                    <div class="h2 fw-bold text-success mb-0" id="kpi-claims">0</div>
+                                </div>
+                
+                                <!-- Metric 3: Top Model -->
+                                <div class="col-md-4 border-start-md">
+                                    <div class="text-uppercase text-muted small fw-bold mb-1">Top AI Model</div>
+                                    <div class="h4 fw-bold text-dark mb-0 mt-1" id="kpi-model" style="word-break: break-word;">-</div>
+                                </div>
+                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- CSS adjustment for vertical dividers on desktop -->
+                <style>
+                    @media (min-width: 768px) {
+                        .border-start-md { border-left: 1px solid #dee2e6; }
+                    }
+                </style>
+                  
+                <footer class="text-center text-muted footer">
+                From murk to clarity — powered by Epistemiq.
+                </footer>
 
             </div>
         </div>
+
+        <!-- 👉 RIGHT AD COLUMN (Hidden on mobile/tablet) -->
+        <div class="col-xl-2 d-none d-xl-flex justify-content-start ad-sidebar-col">
+            <div class="ad-vertical-placeholder sticky-top" style="top: 20px;">
+                 <!-- Put Ad Code Here Later -->
+                <span>Ad Space (Right)</span>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- CSS adjustment for vertical dividers on desktop -->
-<style>
-    @media (min-width: 768px) {
-        .border-start-md { border-left: 1px solid #dee2e6; }
-    }
-</style>
-  
-<footer class="text-center text-muted footer">
-From murk to clarity — powered by Epistemiq.
-</footer>
-</div>
 <!-- Report Selection Modal -->
 <div class="modal fade" id="reportSelectionModal" tabindex="-1" aria-labelledby="reportSelectionModalLabel" aria-hidden="true">
 <div class="modal-dialog modal-lg">
@@ -1745,6 +1819,16 @@ async function loadAnalysis(id) {
     const wantPapers = document.getElementById("usePapersToggle")?.checked;
 
     data.claims.forEach((claim, idx) => {
+      
+      // ✅ NEW: Insert Ad Space in History (Matches fresh analysis layout)
+      if (idx > 0 && idx % 2 === 0) {
+          resultsContainer.innerHTML += `
+              <div class="ad-horizontal-placeholder">
+                  <span>Sponsored / Ad Space</span>
+              </div>
+          `;
+      }
+
       const claimId = `claim-${idx}`;
       
       // Determine existence of data
@@ -1756,7 +1840,6 @@ async function loadAnalysis(id) {
       
       let buttonHtml = '';
       if (isVerified) {
-          // ✅ FIX: Added 'id="btn-verify-${idx}"' so the toggle script can find this button later
           buttonHtml = `<button id="btn-verify-${idx}" class="btn btn-sm btn-success disabled"><i class="bi bi-check-lg"></i> Verified</button>`;
       } else {
           buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
@@ -2558,6 +2641,7 @@ function updateAllClaimButtons() {
 function displayClaimsStructure(claims, isCached = false) {
     const badgeHtml = isCached ? getBadgeHtml('db') : '';
     
+    // 1. Inject the "Verify All" Control Bar at the top
     let controlBar = '';
     if (claims.length > 1) {
         controlBar = `
@@ -2572,9 +2656,21 @@ function displayClaimsStructure(claims, isCached = false) {
     resultsContainer.innerHTML = controlBar;
 
     claims.forEach((claimText, index) => {
+        
+        // ✅ NEW: Insert Ad Space between cards
+        // Logic: Insert before the 3rd card (index 2), 5th card (index 4), etc.
+        // Effectively places an ad after every 2 claims.
+        if (index > 0 && index % 2 === 0) {
+            resultsContainer.innerHTML += `
+                <div class="ad-horizontal-placeholder">
+                    <span>Sponsored / Ad Space</span>
+                </div>
+            `;
+        }
+
         const claimId = `claim-${index}`;
         
-        // ✅ FIX: Add data attributes initialized to false (since this is a fresh run)
+        // Add data attributes initialized to false (since this is a fresh run)
         const claimHtml = `
         <div class="claim-card" id="${claimId}" data-has-model="false" data-has-external="false">
             <div class="d-flex justify-content-between align-items-start">
@@ -2611,9 +2707,8 @@ function displayClaimsStructure(claims, isCached = false) {
         resultsContainer.innerHTML += claimHtml;
     });
 
-    toggleLoading(runAnalysisBtn, false);
+    toggleLoading(runAnalysisBtn, false); // Reset main button
 }
-
 async function runSingleVerification(index) {
     if (activeVerifications.has(index)) return;
     const btn = document.getElementById(`btn-verify-${index}`);
