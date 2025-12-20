@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/logo.png">
+    <link rel="apple-touch-icon" href="/static/icons/logo.png">
+    <link rel="shortcut icon" href="/static/icons/logo.png">
+    <meta name="theme-color" content="#0d6efd">
+    <!-- ✅ SEO & Social Meta Tags -->
+    <meta property="og:title" content="{{ title }} | Epistemiq Compass">
+    <meta property="og:description" content="{{ summary | striptags }}">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="Epistemiq">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ title }}">
+    <meta name="twitter:description" content="{{ summary | striptags }}">
+    <!-- Update this meta tag -->
+    <meta property="og:image" content="{{ image or 'https://raw.githubusercontent.com/akebonin/G20techsprint2025/refs/heads/main/logo.png' }}">
+    <meta name="twitter:image" content="{{ image or 'https://raw.githubusercontent.com/akebonin/G20techsprint2025/refs/heads/main/logo.png' }}">
+
+    <title>{{ title }} - Epistemiq Compass</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- ✅ FIX: Updated to 1.11.3 to support X icon -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+     // ✅ Send Content Grouping Data
+     gtag('config', 'G-H5SNSXX9K0', {
+       'content_group': '{{ content[0].category if content else "General" }}' 
+     });
+    </script>
+    
+    <style>
+        body { background: #fff; font-family: 'Georgia', serif; line-height: 1.6; color: #212529; }
+        .nav-header { border-bottom: 1px solid #eee; padding: 1rem 0; font-family: 'Segoe UI', sans-serif; background: white; z-index: 1000; position: relative;}
+        .article-header { padding: 4rem 0 2rem; max-width: 800px; margin: 0 auto; text-align: center; }
+        
+        /* Main Content Column */
+        .content-col { max-width: 800px; margin: 0 auto; }
+        
+        /* Updated Editorial Summary Box */
+        .article-summary { 
+            font-size: 1.15rem; 
+            color: #495057; 
+            border-left: 5px solid #0d6efd; 
+            padding: 15px 25px; 
+            margin-bottom: 4rem;
+            background-color: #fcfcfc;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Segoe UI', sans-serif; /* Clean font for summary */
+            font-style: italic;
+        }
+        .article-summary p { margin-bottom: 1rem; line-height: 1.7; }
+        .article-summary p:last-child { margin-bottom: 0; }
+        .article-summary strong { color: #000; font-weight: 700; }
+        .article-summary ul { margin-top: 0.5rem; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .article-summary li { margin-bottom: 0.25rem; }
+
+        .claim-block { margin-bottom: 5rem; padding-bottom: 3rem; border-bottom: 1px solid #eee; }
+        .claim-text { font-size: 1.6rem; font-weight: 700; margin-bottom: 1.5rem; line-height: 1.3; color: #212529; font-family: 'Segoe UI', sans-serif; }
+        
+        .compass-box {
+            background: #f8f9fa; border-left: 4px solid #0d6efd;
+            padding: 2rem; margin-bottom: 2rem; border-radius: 4px;
+        }
+        
+        .compass-model-badge {
+            display: inline-block;
+            font-size: 0.65rem; 
+            color: #6c757d;
+            background: #ffffff; 
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 500;
+        }
+
+        .evidence-box { font-size: 0.95rem; font-family: 'Segoe UI', sans-serif; color: #495057; }
+        .source-link { color: #0d6efd; text-decoration: none; display: block; margin-bottom: 4px; }
+        .source-link:hover { text-decoration: underline; }
+        
+        .report-card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; margin-top: 20px; overflow: hidden; }
+        .report-header { background: #f1f3f5; padding: 10px 15px; font-weight: bold; font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; }
+        .report-body { padding: 15px; font-size: 0.9rem; }
+        
+        .verdict-success { color: #198754; }
+        .verdict-danger { color: #dc3545; }
+        .verdict-warning { color: #fd7e14; }
+
+        /* Social Share Bar */
+        .share-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Center buttons */
+            gap: 10px;
+            margin: 0 auto 3rem; /* Add spacing below header */
+            max-width: 760px;
+            padding: 0 15px;
+        }
+        .share-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid #dee2e6;
+            background: white;
+            color: #555;
+            transition: all 0.2s;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .share-btn:hover { transform: translateY(-3px); color: white; border-color: transparent; }
+        .share-x:hover { background-color: #000; }
+        .share-in:hover { background-color: #0077b5; }
+        .share-fb:hover { background-color: #1877f2; }
+        .share-rd:hover { background-color: #ff4500; }
+        
+        .share-label {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 0.75rem;
+            color: #6c757d;
+            font-weight: 700;
+            margin-right: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* --- AD CHIMNEY STYLES --- */
+        .ad-col {
+            position: relative;
+            min-height: 100vh;
+        }
+        .ad-chimney {
+            width: 160px;  /* Standard Skyscraper */
+            height: 600px; /* Standard Height */
+            background-color: #f8f9fa;
+            border: 1px dashed #dee2e6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #adb5bd;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            position: sticky;
+            top: 20px; /* Floats as user reads */
+            margin: 100px auto 0;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="nav-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <a href="/compass" class="fw-bold text-dark text-decoration-none fs-5">The Epistemiq Compass</a>
+        <a href="/" class="btn btn-sm btn-primary">Verify a Claim</a>
+    </div>
+</nav>
+
+<!-- Layout Wrapper -->
+<div class="container-fluid">
+    <div class="row">
+        
+        <!-- 👈 LEFT AD CHIMNEY (Hidden on Mobile/Tablet) -->
+        <div class="col-xl-2 d-none d-xl-block ad-col">
+            <div class="ad-chimney">
+                <span>Ad Space (Left)</span>
+                <!-- Insert Ad Code Here -->
+            </div>
+        </div>
+
+        <!-- 📄 MAIN ARTICLE CONTENT -->
+        <div class="col-12 col-xl-8">
+            <header class="article-header px-3">
+                <h1 class="display-5 fw-bold mb-3">{{ title }}</h1>
+                <div class="text-muted fst-italic">{{ date }}</div>
+            </header>
+
+            {% if image %}
+            <div class="mb-5 text-center">
+                <img src="{{ image }}" alt="Cover Image" class="img-fluid rounded shadow-sm" style="max-height: 500px; width: 100%; object-fit: cover;">
+            </div>
+            {% endif %}
+
+            <!-- Share Buttons -->
+            <div class="share-bar">
+                <span class="share-label">Share:</span>
+                <a href="https://twitter.com/intent/tweet?text={{ title }}&url={{ request.url }}" target="_blank" class="share-btn share-x" title="Share on X"><i class="bi bi-twitter-x"></i></a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ request.url }}" target="_blank" class="share-btn share-in" title="Share on LinkedIn"><i class="bi bi-linkedin"></i></a>
+                <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" class="share-btn share-fb" title="Share on Facebook"><i class="bi bi-facebook"></i></a>
+                <a href="https://reddit.com/submit?url={{ request.url }}&title={{ title }}" target="_blank" class="share-btn share-rd" title="Share on Reddit"><i class="bi bi-reddit"></i></a>
+                <button onclick="copyLink()" class="share-btn" title="Copy Link"><i class="bi bi-link-45deg"></i></button>
+            </div>
+
+            <main class="content-col px-3">
+                
+                {% if summary %}
+                <div class="article-summary">
+                    <!-- ✅ FIX: Added | safe to render HTML -->
+                    {{ summary | safe }}
+                </div>
+                {% endif %}
+
+                {% for claim in content %}
+                <div class="claim-block">
+                    <!-- Claim Text is Header -->
+                    <div class="claim-text">{{ claim.text }}</div>
+
+                    <!-- Compass Synthesis -->
+                    <div class="compass-box">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            
+                            <!-- Left Column: Category + Model -->
+                            <div class="d-flex flex-column">
+                                <span class="text-uppercase fw-bold text-secondary mb-2" style="font-size:0.75rem; letter-spacing:1px;">
+                                    <i class="bi bi-compass"></i> {{ claim.category }}
+                                </span>
+                                
+                                {% set display_model = claim.compass_model or claim.internal_model %}
+                                {% if display_model and display_model != 'Unknown' %}
+                                <div>
+                                    <span class="compass-model-badge" title="Verified by AI">
+                                        <i class="bi bi-cpu"></i> {{ display_model }}
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+            
+                            <!-- Right Column: Verdict -->
+                            <span class="fw-bold fs-4 text-end 
+                                {% if 'True' in art.verdict or 'Verified' in art.verdict or 'Supported' in art.verdict or 'Feasible' in art.verdict or 'Validated' in art.verdict or 'Accepted' in art.verdict %}verdict-success
+                                {% elif 'Debunked' in art.verdict or 'Nonsense' in art.verdict or 'False' in art.verdict or 'Scam' in art.verdict or 'Unlikely' in art.verdict%}verdict-danger
+                                {% else %}verdict-warning{% endif %}">
+                                {{ claim.verdict }}
+                            </span>
+                        </div>
+                        
+                        <p class="mb-0 fs-5 mt-2">{{ claim.summary }}</p>
+                    </div>
+
+                    <!-- Deep Dive Evidence -->
+                    <div class="evidence-box">
+                        <h5 class="fw-bold text-dark mb-3">The Evidence</h5>
+                        
+                        {% if claim.internal_verdict %}
+                        <p><strong>Internal Analysis:</strong> {{ claim.internal_verdict | safe }}</p>
+                        {% endif %}
+
+                        {% if claim.external_verdict %}
+                        <p><strong>External Verification:</strong> {{ claim.external_verdict | safe }}</p>
+                        {% endif %}
+
+                        {% if claim.sources %}
+                        <div class="mt-4 mb-4 p-3 bg-light rounded">
+                            <h6 class="fw-bold mb-2">Scientific Sources</h6>
+                            {% for src in claim.sources %}
+                            <a href="{{ src.url }}" target="_blank" class="source-link">
+                                📄 {{ src.title }} <small class="text-muted">({{ src.year }})</small>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Deep Dive Reports -->
+                        {% if claim.deep_dives %}
+                            <h5 class="fw-bold text-dark mt-5 mb-3">Deep Dives</h5>
+                            {% for report in claim.deep_dives %}
+                            <div class="report-card">
+                                <div class="report-header">
+                                    <i class="bi bi-robot"></i> {{ report.model }} | Q: {{ report.question }}
+                                </div>
+                                <div class="report-body">
+                                    {{ report.content | safe }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- ✅ ADDED id="launch-section" and onmouseenter trigger -->
+    <div id="launch-section" class="text-center py-5" style="position: relative;">
+        
+        <!-- The Sound File -->
+        <audio id="csi-sound" preload="auto">
+            <!-- Ensure this path matches your static setup -->
+            <source src="/static/sounds/yeah.mp3" type="audio/mpeg">
+        </audio>
+
+        <h3>Don't get fooled by the next headline.</h3>
+        <p class="text-muted mb-4">Use Epistemiq to verify scientific claims instantly.</p>
+        
+        <!-- Added a fun hover class -->
+        <a href="/" class="btn btn-lg btn-primary px-5 csi-btn">Launch App</a>
+        
+        <!-- Optional: Sunglasses Icon that appears -->
+        <div id="csi-glasses" style="opacity:0; transition: opacity 0.5s; font-size: 3rem; margin-top: 10px;">
+            🕶️
+        </div>
+    </div>
+
+            </main>
+        </div>
+
+        <!-- 👉 RIGHT AD CHIMNEY (Hidden on Mobile/Tablet) -->
+        <div class="col-xl-2 d-none d-xl-block ad-col">
+            <div class="ad-chimney">
+                <span>Ad Space (Right)</span>
+                <!-- Insert Ad Code Here -->
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<footer class="text-center py-4 text-muted bg-light mt-5" style="font-size: 0.8rem; font-family: sans-serif;">
+    &copy; 2025 Epistemiq. All rights reserved.
+</footer>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 3000;"></div>
+
+<script>
+    // ✅ Toast Notification Helper
+    function showToast(message, type = 'success') {
+        const container = document.querySelector('.toast-container');
+        if (!container) return; // Safety check
+        
+        let icon = type === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle-fill';
+        let colorClass = type === 'success' ? 'text-success' : 'text-primary';
+        
+        const toastId = 'toast-' + Date.now();
+        const html = `
+            <div id="${toastId}" class="toast align-items-center border-0 shadow-sm" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="bi ${icon} ${colorClass} me-2"></i> ${message}
+                    </div>
+                    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>`;
+            
+        const template = document.createElement('div');
+        template.innerHTML = html.trim();
+        const toastEl = template.firstChild;
+        container.appendChild(toastEl);
+        
+        const bsToast = new bootstrap.Toast(toastEl, { delay: 3000 });
+        bsToast.show();
+        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    }
+
+    // ✅ Updated Copy Function
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            showToast("Link copied to clipboard!");
+        }).catch(err => {
+            console.error("Copy failed", err);
+            showToast("Failed to copy link.", "error");
+        });
+    }
+
+    // ✅ THE WHO EASTER EGG
+    document.addEventListener('DOMContentLoaded', () => {
+        const section = document.getElementById('launch-section');
+        const audio = document.getElementById('csi-sound');
+        const glasses = document.getElementById('csi-glasses');
+        let hasPlayed = false;
+
+        // Function to play sound
+        const triggerSound = () => {
+            if (hasPlayed) return;
+            
+            // Try to play
+            const playPromise = audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                    // Autoplay started!
+                    hasPlayed = true;
+                    // Show sunglasses
+                    if(glasses) glasses.style.opacity = 1;
+                    
+                    // Stop listening
+                    removeListeners();
+                })
+                .catch(error => {
+                    // Browser blocked it (User hasn't interacted enough yet)
+                    console.log("Audio blocked by browser policy. Waiting for click.");
+                });
+            }
+        };
+
+        // 1. Try on Scroll (Intersection Observer)
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    triggerSound();
+                }
+            });
+        }, { threshold: 0.5 }); // Trigger when 50% visible
+
+        if(section) {
+            observer.observe(section);
+            
+            // 2. Fallback: Try on Mouse Over (More reliable)
+            section.addEventListener('mouseenter', triggerSound);
+            
+            // 3. Fallback: Try on Click (Guaranteed)
+            section.addEventListener('click', triggerSound);
+        }
+
+        function removeListeners() {
+            observer.disconnect();
+            section.removeEventListener('mouseenter', triggerSound);
+        }
+    });
+
+</script>
+
+</body>
+</html>

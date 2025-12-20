@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/logo.png">
+    <link rel="apple-touch-icon" href="/static/icons/logo.png">
+    <link rel="shortcut icon" href="/static/icons/logo.png">
+    <meta name="theme-color" content="#0d6efd">
+    <title>The Epistemiq Compass</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5SNSXX9K0"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-H5SNSXX9K0');
+    </script>
+
+    <style>
+        body { background: #f8f9fa; font-family: 'Segoe UI', serif; }
+        .hero { background: #0A0F2C; color: white; padding: 4rem 0; text-align: center; }
+        .article-card { transition: transform 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .article-card:hover { transform: translateY(-3px); }
+        .cat-badge { font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase; font-weight: 800; }
+        .verdict-success { color: #198754; }
+        .verdict-danger { color: #dc3545; }
+        .verdict-warning { color: #fd7e14; }
+
+        /* AD CARD STYLE */
+        .ad-feed-card {
+            background-color: #e9ecef;
+            border: 1px dashed #ced4da;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+            min-height: 300px;
+            color: #6c757d;
+        }
+
+        /* Filter Styles */
+        .filter-scroll {
+            display: flex;
+            overflow-x: auto;
+            white-space: nowrap;
+            gap: 10px;
+            padding-bottom: 5px;
+            scrollbar-width: none; /* Hide scrollbar Firefox */
+        }
+        .filter-scroll::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome */
+        
+        .cat-pill {
+            border: 1px solid #dee2e6;
+            background: white;
+            color: #6c757d;
+            border-radius: 50rem;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .cat-pill:hover { background: #e9ecef; color: #000; }
+        .cat-pill.active {
+            background: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+    </style>
+</head>
+<body>
+
+<div class="hero">
+    <div class="container">
+        <h1 class="display-4 fw-bold">The Epistemiq Compass</h1>
+        <p class="lead opacity-75">Navigating the fog of scientific misinformation.</p>
+        <a href="/" class="btn btn-outline-light mt-3">Verify Your Own Claims</a>
+    </div>
+</div>
+
+<!-- 🔍 SEARCH & FILTER BAR -->
+<div class="bg-white border-bottom shadow-sm sticky-top" style="z-index: 900;">
+    <div class="container py-3">
+        <div class="row gy-3 align-items-center">
+            
+            <!-- Category Pills (Scrollable on mobile) -->
+            <div class="col-md-8">
+                <div class="filter-scroll">
+                    <a href="/compass" class="cat-pill {% if not active_cat %}active{% endif %}">All</a>
+                    {% for cat in categories %}
+                    <a href="/compass?cat={{ cat | urlencode }}{% if active_search %}&q={{ active_search }}{% endif %}" 
+                       class="cat-pill {% if active_cat == cat %}active{% endif %}">
+                       {{ cat }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Search Box -->
+            <div class="col-md-4">
+                <form action="/compass" method="GET" class="d-flex">
+                    {% if active_cat %}<input type="hidden" name="cat" value="{{ active_cat }}">{% endif %}
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" 
+                               placeholder="Search topics..." value="{{ active_search }}">
+                        {% if active_search %}
+                        <a href="/compass{% if active_cat %}?cat={{ active_cat }}{% endif %}" class="btn btn-outline-secondary">✕</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    
+    <!-- Empty State -->
+    {% if articles|length == 0 %}
+    <div class="text-center py-5">
+        <h3 class="text-muted">No stories found.</h3>
+        <p>Try adjusting your search or category filter.</p>
+        <a href="/compass" class="btn btn-primary mt-2">Clear Filters</a>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        {% for art in articles %}
+        
+        <!-- Standard Article -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/compass/{{ art.slug }}" class="text-decoration-none">
+                <!-- ✅ FIX: Removed p-3 here so image touches edges -->
+                <div class="card article-card h-100 border-0 shadow-sm overflow-hidden">
+                    
+                    {% if art.image %}
+                    <div style="height: 200px; width: 100%; overflow: hidden;">
+                        <img src="{{ art.image }}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    {% endif %}
+
+                    <!-- ✅ FIX: Single Card Body -->
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="cat-badge text-secondary">{{ art.category }}</span>
+                            <small class="text-muted">{{ art.date }}</small>
+                        </div>
+                        <h4 class="card-title text-dark fw-bold mb-3">{{ art.title }}</h4>
+                        
+                        <div class="mb-3">
+                            <span class="fw-bold 
+                                {% if 'True' in art.verdict or 'Verified' in art.verdict or 'Supported' in art.verdict or 'Feasible' in art.verdict or 'Validated' in art.verdict or 'Accepted' in art.verdict %}verdict-success
+                                {% elif 'Debunked' in art.verdict or 'Nonsense' in art.verdict or 'False' in art.verdict or 'Scam' in art.verdict or 'Unlikely' in art.verdict%}verdict-danger
+                                {% else %}verdict-warning{% endif %}">
+                                {{ art.verdict }}
+                            </span>
+                        </div>
+                        
+                        <p class="card-text text-secondary">{{ art.summary[:140] }}...</p>
+                        
+                        <div class="mt-3">
+                            {% for tag in art.tags %}
+                            <span class="badge bg-light text-dark border">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- AD INSERTION: Every 3 articles -->
+        {% if loop.index > 0 and loop.index % 3 == 0 %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card article-card h-100 ad-feed-card">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h5 class="text-uppercase fw-bold" style="font-size: 0.8rem; letter-spacing: 1px;">Sponsored</h5>
+                    <p>Ad Space Available</p>
+                    <!-- Insert Ad Code Here -->
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% endfor %}
+    </div>
+</div>
+
+</body>
+</html>
