@@ -683,7 +683,7 @@ max-width: none;
     /* 1. Heavy white wash (96% opacity) to make the logo very faint */
     background-image: 
         linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)),
-        url('/static/icons/LOGOTO.PNG');
+        url('/static/icons/LOGOTO.png');
     
     /* 2. Center the image */
     background-position: center center;
@@ -830,7 +830,137 @@ max-width: none;
     max-width: 900px;
     margin: 0 auto;
 }
+
+/* --- COMPASS SYNTHESIS CARD STYLES --- */
+.synthesis-card {
+    border-left: 5px solid #0d6efd;
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    margin-top: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    position: relative;
+    overflow: hidden;
+}
+
+.synthesis-card::before {
+    /* Subtle background icon */
+    content: "\F290"; /* Bootstrap icon code for compass */
+    font-family: 'bootstrap-icons';
+    position: absolute;
+    right: -20px;
+    top: -20px;
+    font-size: 10rem;
+    color: rgba(0,0,0,0.03);
+    transform: rotate(20deg);
+    pointer-events: none;
+}
+
+.category-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #6c757d;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 2px;
+}
+
+.verdict-label {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+    line-height: 1.2;
+}
+
+.verdict-true { color: #198754; }
+.verdict-false { color: #dc3545; }
+.verdict-uncertain { color: #fd7e14; }
+
+.synthesis-summary {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: #212529;
+    /*font-family: 'Georgia', 'Times New Roman', serif; /* Editorial feel */
+    margin-bottom: 15px;
+}
+
+.hashtag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.hashtag {
+    font-size: 0.8rem;
+    color: #0d6efd;
+    background-color: #e7f1ff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+}
+.hashtag:hover { background-color: #cfe2ff; }
+
+/* Accordion Toggle Styles */
+.evidence-section {
+    border-top: 1px solid #e9ecef;
+    padding-top: 15px;
+}
+
+.evidence-toggle-btn {
+    width: 100%;
+    text-align: center;
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 10px;
+    transition: color 0.2s;
+}
+.evidence-toggle-btn:hover { color: #0d6efd; }
+
+.evidence-content {
+    display: none; /* Hidden by default */
+    animation: fadeIn 0.3s ease-in-out;
+}
+.evidence-content.show { display: block; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
   
+.compass-model-badge {
+    float: right;
+    font-size: 0.7rem;
+    color: #6c757d;
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    margin-top: -2px;
+}
+
+/* Mic Button Active State */
+.mic-active {
+    background-color: #dc3545 !important; /* Red */
+    color: white !important;
+    border-color: #dc3545 !important;
+    animation: mic-pulse 1.5s infinite;
+}
+
+@keyframes mic-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
 </style>
 </head>
 <body>
@@ -851,289 +981,258 @@ max-width: none;
         <div class="col-12 col-xl-8">
             <div class="container main-content-col pt-4 pb-5">
                 
+                <!-- ✅ CONTROL CARD (White Box Layout Restored) -->
                 <div class="control-card">
+                    
                     <div class="logo-wrapper mb-4">
-                    <img src="/static/icons/logo.png" alt="epistemiq logo">
-                    <p class="tagline">Your Compass in the Epistemic Fog</p>
-                  </div>
-                
-                <!-- ✨ User Block (Unified Style for Logged In & Logged Out) -->
-                <div id="userAccessBlock" class="text-center mb-3" style="position: relative;">
-                
-                    <!-- LOGGED OUT DROPDOWN -->
-                    <div id="userLoggedOutMenu" class="dropdown d-inline-block">
-                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
-                            <span>Menu</span>
-                        </button>
-                
-                        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
-                            <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
-                            
-                            <li><hr class="dropdown-divider my-1"></li>
-                            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
-                            <li>
-                                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
-                            </li>
-                            <li><hr class="dropdown-divider my-1"></li>
-                            
-                            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
-                            <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
-                        </ul>
+                      <img src="/static/icons/logo.png" alt="epistemiq logo">
+                      <p class="tagline">
+                        <!-- ✅ CLICKABLE TAGLINE -->
+                        <a href="/compass" class="text-reset text-decoration-none" title="Read The Compass Feed">
+                            Your Compass in the Epistemic Fog
+                        </a>
+                      </p>
                     </div>
                 
-                    <!-- LOGGED IN DROPDOWN -->
-                    <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
-                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
-                            <span id="userEmail"></span>
-                        </button>
-                
-                        <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
-                            <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
-                            <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
-                            
-                            <li><hr class="dropdown-divider my-1"></li>
-                            <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
-                            <li>
-                                <span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span>
-                            </li>
-                            <li><hr class="dropdown-divider my-1"></li>
-                
-                            <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
-                        </ul>
-                    </div>
-                
-                </div>
-                  
-                <form id="analysis-form">
-                <div class="mb-3">
-                  <label for="inputMethod" class="form-label">Input method</label>
-                  <select id="inputMethod" class="form-select">
-                    <option value="paste">Paste Text</option>
-                    <option value="url">Provide URL</option>
-                    <option value="image">Upload Image</option>
-                    <option value="video">Upload Video</option>
-                    <option value="video-url">Video URL</option>
-                  </select>
-                </div>
-                
-                <!-- 🌟 Daily Spotlight Card (Hidden by default) -->
-                <div id="spotlight-container" class="card border-0 shadow-sm mb-4 d-none" style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border-left: 4px solid #0d6efd;">
-                    <div class="card-body position-relative">
-                        <span class="badge bg-primary mb-2">🌟 Daily Spotlight</span>
-                        <h6 class="card-title fw-bold text-dark" id="spotlight-title">Loading...</h6>
-                        <p class="card-text small text-muted mb-2">
-                            Source: <span id="spotlight-source" class="fw-semibold">...</span>
-                        </p>
-                        
-                        <div class="d-flex align-items-center mt-3">
-                            <button id="btn-load-spotlight" class="btn btn-sm btn-outline-primary px-3">
-                                <i class="bi bi-play-fill"></i> Load & View
+                    <!-- ✨ User Block -->
+                    <div id="userAccessBlock" class="text-center mb-3" style="position: relative;">
+                    
+                        <!-- LOGGED OUT DROPDOWN -->
+                        <div id="userLoggedOutMenu" class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
+                                <span>Menu</span>
                             </button>
-                            <small class="text-muted ms-auto" style="font-size: 0.75rem;">
-                                Explore real analysis
-                            </small>
+                    
+                            <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
+                                <li><button class="dropdown-item" id="openFaqBtn_LoggedOut">FAQ</button></li>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
+                                <li><span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span></li>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedOut">Clear Chrome AI Cache</button></li>
+                                <li><button class="dropdown-item" id="loginBtn">Sign In</button></li>
+                            </ul>
+                        </div>
+                    
+                        <!-- LOGGED IN DROPDOWN -->
+                        <div id="userLoggedInMenu" class="dropdown d-none d-inline-block">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
+                                <span id="userEmail"></span>
+                            </button>
+                    
+                            <ul class="dropdown-menu user-menu-dropdown p-0 shadow-sm">
+                                <li><button class="dropdown-item" id="openHistoryBtn">Your Analyses</button></li>
+                                <li><button class="dropdown-item" id="openFaqBtn_LoggedIn">FAQ</button></li>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><span class="dropdown-item-text small text-muted pb-0" style="font-size: 0.75rem;">Contact Support:</span></li>
+                                <li><span class="dropdown-item-text pt-0">epistemiq.ai@gmail.com</span></li>
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><button class="dropdown-item" id="clearNanoCacheBtn_LoggedIn">Clear Chrome AI Cache</button></li>
+                            </ul>
                         </div>
                     </div>
-                </div>
+                      
+                    <form id="analysis-form">
+                        <div class="mb-3">
+                          <label for="inputMethod" class="form-label">Input method</label>
+                          <select id="inputMethod" class="form-select">
+                            <option value="paste">Paste Text</option>
+                            <option value="url">Provide URL</option>
+                            <option value="image">Upload Image</option>
+                            <option value="video">Upload Video</option>
+                            <option value="video-url">Video URL</option>
+                          </select>
+                        </div>
+                        
+                        <!-- 🌟 Daily Spotlight Card -->
+                        <div id="spotlight-container" class="card border-0 shadow-sm mb-4 d-none" style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border-left: 4px solid #0d6efd;">
+                            <div class="card-body position-relative">
+                                <span class="badge bg-primary mb-2">🌟 Daily Spotlight</span>
+                                <h6 class="card-title fw-bold text-dark" id="spotlight-title">Loading...</h6>
+                                <p class="card-text small text-muted mb-2">
+                                    Source: <span id="spotlight-source" class="fw-semibold">...</span>
+                                </p>
+                                <div class="d-flex align-items-center mt-3">
+                                    <button id="btn-load-spotlight" class="btn btn-sm btn-outline-primary px-3">
+                                        <i class="bi bi-play-fill"></i> Load & View
+                                    </button>
+                                    <small class="text-muted ms-auto" style="font-size: 0.75rem;">Explore real analysis</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Chrome AI Info -->
+                        <div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert" style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
+                          <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>⚙️ <strong>Chrome AI Mode</strong></div>
+                            <div class="form-check form-switch">
+                              <input class="form-check-input" type="checkbox" id="enableChromeAiToggle" checked style="cursor: pointer;">
+                              <label class="form-check-label fw-bold" for="enableChromeAiToggle" style="font-size: 0.8rem;">Enabled</label>
+                            </div>
+                          </div>
+                          <div id="chrome-ai-description">
+                            🧠 Gemini Nano will locally summarize and translate extracted or pasted text before analysis. This will ensure text preprocessing (cleanup, summarization & translation), full data privacy, and reduced backend costs.
+                          </div>
+                          <div class="mt-2" id="chrome-ai-mode">
+                            <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Processing Strategy</label>
+                            <select id="chromeMode" class="form-select form-select-sm bg-white">
+                              <option value="distill">🔬 Scientific Distillation (Epistemic Mode)</option>
+                              <option value="accurate">🎯 Standard Summary</option>
+                              <option value="fast">🏎️ Fast Cleanup</option>
+                            </select>
+                            <div class="form-text text-muted" style="font-size: 0.75rem;">
+                              "Distillation" removes fluff but keeps all claims, dates, and data points.
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <!-- Undo Button -->
+                        <div class="d-flex justify-content-end mt-1">
+                            <button id="undo-nano-btn" class="btn btn-link btn-sm text-danger d-none" style="text-decoration:none; font-size: 0.85rem;">↩ Undo Changes</button>
+                        </div>
+                        
+                        <!-- Local AI Topics -->
+                        <div id="nano-topics-container" class="d-none mt-2">
+                          <small class="text-muted fw-bold me-2" style="font-size: 0.75rem;">TOPICS DETECTED:</small>
+                          <div id="nano-topics-list" class="d-inline-block"></div>
+                        </div>
+                          
+                        <!-- INPUT GROUPS -->
+<div id="paste-input-group" class="mb-3">
+    <label for="textInput" class="form-label">Paste or Speak content</label>
+    
+    <div style="position: relative;">
+        <textarea id="textInput" rows="7" class="form-control" placeholder="Paste content here or click the mic to speak..."></textarea>
+        
+        <!-- 🎤 MIC BUTTON -->
+        <button id="micBtn" type="button" class="btn btn-light shadow-sm position-absolute bottom-0 end-0 m-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; border: 1px solid #dee2e6;" title="Speak Claim">
+            <i class="bi bi-mic-fill fs-5"></i>
+        </button>
+    </div>
+
+    <div id="chrome-ai-text" class="mt-2 d-none"></div>
+</div>
+                        
+                        <div id="url-input-group" class="mb-3 d-none">
+                            <label for="urlInput" class="form-label">Enter article URL</label>
+                            <div class="input-group">
+                                <input id="urlInput" type="text" class="form-control" placeholder="https://example.com">
+                                <button id="fetch-article-btn" class="btn btn-secondary" type="button">
+                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span> Fetch Article
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="image-input-group" class="mb-3 d-none">
+                            <label class="form-label">Upload Image with Text</label>
+                            <div class="file-upload-group" id="image-upload-area">
+                                <div class="upload-icon">🖼️</div>
+                                <h5>Drop image here or click to browse</h5>
+                                <p class="text-muted">Supports JPG, PNG, GIF (Max 10MB)</p>
+                                <input type="file" id="imageInput" class="file-input-hidden" accept="image/*">
+                                <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">Choose Image</button>
+                                <div id="image-preview" class="mt-3"></div>
+                            </div>
+                            <button id="process-image-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span> Extract Text from Image
+                            </button>
+                        </div>
+
+                        <div id="video-input-group" class="mb-3 d-none">
+                            <label class="form-label">Upload Video</label>
+                            <div class="file-upload-group" id="video-upload-area">
+                                <div class="upload-icon">📹</div>
+                                <h5>Drop video here or click to browse</h5>
+                                <p class="text-muted">Supports MP4, AVI, MOV (Max 50MB)</p>
+                                <input type="file" id="videoInput" class="file-input-hidden" accept="video/*">
+                                <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoInput').click()">Choose Video</button>
+                            </div>
+                            <button id="process-video-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span> Transcribe Video
+                            </button>
+                        </div>
+
+                        <div id="video-url-input-group" class="mb-3 d-none">
+                            <label for="videoUrlInput" class="form-label">Enter Video URL</label>
+                            <div class="input-group">
+                                <input id="videoUrlInput" type="text" class="form-control" placeholder="... or https://vimeo.com/...">
+                                <button id="transcribe-video-url-btn" class="btn btn-secondary" type="button">
+                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span> Transcribe Video
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Model Selector -->
+                        <div class="mb-3">
+                          <label for="preferredModel" class="form-label">Select Verifier Model</label>
+                          <select id="preferredModel" class="form-select">
+                            <option value="" selected>✨ Google Gemini (Flash/Pro) – Recommended Default (Balanced speed & reasoning)</option>
+                            <option disabled>--- OpenRouter (Community Models) ---</option>
+                            <option value="openai/gpt-oss-20b:free">🔮 GPT‑OSS 20B (Balanced power, good for general use)</option>              
+                            <option value="meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B (Open source, excels at instruction following)</option>
+                            <option value="allenai/olmo-3-32b-think:free">🧩 OLMo 3 32B Think (Reasoning‑focused, best for analysis & structured problem solving)</option>
+                            <option value="mistralai/mistral-7b-instruct:free">🌪️ Mistral 7B (Lightweight, efficient, quick replies)</option>
+                            <option value="nvidia/nemotron-nano-12b-v2-vl:free">🖼️ Nemotron Nano 12B (Vision‑language, best for multimodal tasks)</option>
+                            <option value="tngtech/deepseek-r1t2-chimera:free">🐉 DeepSeek R1T2 Chimera (Hybrid reasoning, ideal for experimental analysis & creative exploration)</option>
+                          </select>
+                          <div class="form-text text-muted" style="font-size: 0.75rem;">
+                            If your preferred model is busy (429 errors), the system will automatically fall back to the others.
+                          </div>
+                        </div>
+                          
+                        <div class="mb-4">
+                            <label for="promptMode" class="form-label">Select Analysis Focus</label>
+                            <select id="promptMode" class="form-select">
+                                <option>General Analysis of Testable Claims</option>
+                                <option>Specific Focus on Scientific Claims</option>
+                                <option>Technology-Focused Extraction</option>
+                            </select>
+                        </div>
+                        <div class="mb-4 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
+                            <label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + CORE + PubMed data</label>
+                        </div>
+                        <div class="d-grid">
+                            <button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span> Run Analysis
+                            </button>
+                        </div>
+                    </form>
+                </div> <!-- CLOSING CONTROL CARD -->
                 
-                <!-- ✅ Chrome AI Info Card -->
-                <div id="chrome-ai-info" class="alert alert-warning d-none mt-2" role="alert"
-                     style="background-color:#fff9e6; border-color:#ffe8b3; color:#5c4a00; font-size:0.9rem;">
-                  
-                  <!-- Header: Title + Toggle Switch -->
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div>
-                      ⚙️ <strong>Chrome AI Mode</strong>
-                    </div>
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="enableChromeAiToggle" checked style="cursor: pointer;">
-                      <label class="form-check-label fw-bold" for="enableChromeAiToggle" style="font-size: 0.8rem;">Enabled</label>
-                    </div>
-                  </div>
+                <div id="results-container"></div>
                 
-                  <!-- Description -->
-                  <div id="chrome-ai-description">
-                    🧠 Gemini Nano will locally summarize and translate extracted or pasted text before analysis. This will ensure text preprocessing (cleanup, summarization & translation), full data privacy, and reduced backend costs.
-                  </div>
-                
-                  <!-- Mode Selection -->
-                  <div class="mt-2" id="chrome-ai-mode">
-                    <label class="form-label fw-semibold mb-1" style="font-size:0.8rem;">Processing Strategy</label>
-                    <select id="chromeMode" class="form-select form-select-sm bg-white">
-                      <option value="distill">🔬 Scientific Distillation (Epistemic Mode)</option>
-                      <option value="accurate">🎯 Standard Summary</option>
-                      <option value="fast">🏎️ Fast Cleanup</option>
-                    </select>
-                    <div class="form-text text-muted" style="font-size: 0.75rem;">
-                      "Distillation" removes fluff but keeps all claims, dates, and data points.
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- ↩️ Undo Button (Hidden by default, sits below the button container) -->
-                <div class="d-flex justify-content-end mt-1">
-                    <button id="undo-nano-btn" class="btn btn-link btn-sm text-danger d-none" style="text-decoration:none; font-size: 0.85rem;">
-                        ↩ Undo Changes
+                <!-- Always visible download button -->
+                <div id="pdf-download-section" class="text-center mt-5">
+                    <button id="download-pdf-btn" class="btn btn-success btn-lg">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span> Download Analysis Report (PDF)
                     </button>
                 </div>
                 
-                <!-- Area for Local AI Keywords -->
-                <div id="nano-topics-container" class="d-none mt-2">
-                  <small class="text-muted fw-bold me-2" style="font-size: 0.75rem;">TOPICS DETECTED:</small>
-                  <div id="nano-topics-list" class="d-inline-block">
-                    <!-- Badges will be injected here via JS -->
-                  </div>
-                </div>
-                  
-                <div id="paste-input-group" class="mb-3" style="position:relative;">
-                  <label for="textInput" class="form-label">Paste article or post content</label>
-                
-                  <textarea id="textInput" rows="7" class="form-control"
-                            placeholder="Paste content here..."></textarea>
-                
-                  <div id="chrome-ai-text" class="mt-2 d-none"></div>
-                </div>
-                
-                <div id="url-input-group" class="mb-3 d-none">
-                <label for="urlInput" class="form-label">Enter article URL</label>
-                <div class="input-group">
-                <input id="urlInput" type="text" class="form-control" placeholder="https://example.com">
-                <button id="fetch-article-btn" class="btn btn-secondary" type="button">
-                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                Fetch Article
-                </button>
-                </div>
-                </div>
-                <div id="image-input-group" class="mb-3 d-none">
-                <label class="form-label">Upload Image with Text</label>
-                <div class="file-upload-group" id="image-upload-area">
-                <div class="upload-icon">🖼️</div>
-                <h5>Drop image here or click to browse</h5>
-                <p class="text-muted">Supports JPG, PNG, GIF (Max 10MB)</p>
-                <input type="file" id="imageInput" class="file-input-hidden" accept="image/*">
-                <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">
-                Choose Image
-                </button>
-                <div id="image-preview" class="mt-3"></div>
-                </div>
-                <button id="process-image-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
-                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                Extract Text from Image
-                </button>
-                </div>
-                <div id="video-input-group" class="mb-3 d-none">
-                <label class="form-label">Upload Video</label>
-                <div class="file-upload-group" id="video-upload-area">
-                <div class="upload-icon">📹</div>
-                <h5>Drop video here or click to browse</h5>
-                <p class="text-muted">Supports MP4, AVI, MOV (Max 50MB)</p>
-                <input type="file" id="videoInput" class="file-input-hidden" accept="video/*">
-                <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoInput').click()">
-                Choose Video
-                </button>
-                </div>
-                <button id="process-video-btn" class="btn btn-info mt-2 w-100" type="button" disabled>
-                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                Transcribe Video
-                </button>
-                </div>
-                <div id="video-url-input-group" class="mb-3 d-none">
-                <label for="videoUrlInput" class="form-label">Enter Video URL</label>
-                <div class="input-group">
-                <input id="videoUrlInput" type="text" class="form-control" placeholder="https://youtube.com/watch?v=... or https://vimeo.com/...">
-                <button id="transcribe-video-url-btn" class="btn btn-secondary" type="button">
-                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                Transcribe Video
-                </button>
-                </div>
-                </div>
-                
-                <!-- ✅ Model Selector -->
-                <div class="mb-3">
-                  <label for="preferredModel" class="form-label">Select Verifier Model</label>
-                  <select id="preferredModel" class="form-select">
-                    <option value="openai/gpt-oss-120b:free">🔮 GPT‑OSS 120B (Massive open model, advanced reasoning)</option>
-                    <option value="google/gemini-2.0-flash-exp:free">🧠 Gemini 2.0 Flash Exp (Deep reasoning, step‑by‑step)</option>
-                    <option value="google/gemma-3-27b-it:free">💎 Gemma 3 27B (Instruction‑tuned, powerful open model)</option>
-                    <option value="openai/gpt-oss-20b:free">🔮 GPT‑OSS 20B (OpenAI experimental, balanced power)</option>
-                    <option value="meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B (Open Source, strong instruction following)</option>
-                    <option value="mistralai/mistral-7b-instruct:free">🌪️ Mistral 7B (Lightweight, efficient, quick replies)</option>
-                    <option value="amazon/nova-2-lite-v1:free">🌐 Nova 2 Lite (Amazon lightweight, fast & efficient)</option>
-                    <option value="nvidia/nemotron-nano-12b-v2-vl:free">🖼️ Nemotron Nano 12B v2 VL (NVIDIA vision‑language, compact & multimodal)</option>
-                  </select>
-                  <div class="form-text text-muted" style="font-size: 0.75rem;">
-                    If your preferred model is busy (429 errors), the system will automatically fall back to the others.
-                  </div>
-                </div>
-                  
-                <div class="mb-4">
-                <label for="promptMode" class="form-label">Select Analysis Focus</label>
-                <select id="promptMode" class="form-select">
-                <option>General Analysis of Testable Claims</option>
-                <option>Specific Focus on Scientific Claims</option>
-                <option>Technology-Focused Extraction</option>
-                </select>
-                </div>
-                <div class="mb-4 form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="usePapersToggle" checked>
-                <label class="form-check-label" for="usePapersToggle">📜 Supplement with Semantic Scholar + Crossref + CORE + PubMed data</label>
-                </div>
-                <div class="d-grid">
-                <button id="run-analysis-btn" class="btn btn-primary btn-lg" type="submit">
-                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                Run Analysis
-                </button>
-                </div>
-                </form>
-                </div>
-                <div id="results-container"></div>
-                <!-- Always visible download button -->
-                <div id="pdf-download-section" class="text-center mt-5">
-                <button id="download-pdf-btn" class="btn btn-success btn-lg">
-                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                Download Analysis Report (PDF)
-                </button>
-                
-                </div>
-                
-                <!-- 📊 KPI Stats Card (Hidden by default, shown via JS) -->
+                <!-- KPI Stats Card -->
                 <div id="kpi-stats-container" class="container mt-5 d-none">
                     <div class="card border-0 shadow-sm" style="background: #f8f9fa; border-radius: 12px;">
                         <div class="card-body py-4">
                             <div class="row text-center">
-                                
-                                <!-- Metric 1: Analyses -->
                                 <div class="col-md-4 mb-3 mb-md-0">
                                     <div class="text-uppercase text-muted small fw-bold mb-1">Total Analyses</div>
                                     <div class="h2 fw-bold text-primary mb-0" id="kpi-analyses">0</div>
                                 </div>
-                
-                                <!-- Metric 2: Claims -->
                                 <div class="col-md-4 mb-3 mb-md-0 border-start-md">
                                     <div class="text-uppercase text-muted small fw-bold mb-1">Claims Verified</div>
                                     <div class="h2 fw-bold text-success mb-0" id="kpi-claims">0</div>
                                 </div>
-                
-                                <!-- Metric 3: Top Model -->
                                 <div class="col-md-4 border-start-md">
                                     <div class="text-uppercase text-muted small fw-bold mb-1">Top AI Model</div>
                                     <div class="h4 fw-bold text-dark mb-0 mt-1" id="kpi-model" style="word-break: break-word;">-</div>
                                 </div>
-                
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- CSS adjustment for vertical dividers on desktop -->
-                <style>
-                    @media (min-width: 768px) {
-                        .border-start-md { border-left: 1px solid #dee2e6; }
-                    }
-                </style>
                   
                 <footer class="text-center text-muted footer">
-                From murk to clarity — powered by Epistemiq.
+                    From murk to clarity — powered by Epistemiq.
                 </footer>
 
             </div>
@@ -1395,6 +1494,11 @@ const imagePreview = document.getElementById('image-preview');
 
 const activeVerifications = new Set();
 
+// 🎤 Speech Recognition Setup
+const micBtn = document.getElementById('micBtn');   
+// Check browser support
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
 loadDailySpotlight();
 loadGlobalStats();
 
@@ -1405,6 +1509,65 @@ let currentVideoFile = null;
 let currentSourceUrl = null;
 
 
+// 🎤 SPEECH TO TEXT (Voice Input)
+
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false; // Stop after user stops speaking
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        let isListening = false;
+
+        micBtn.addEventListener('click', () => {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        });
+
+        recognition.onstart = () => {
+            isListening = true;
+            micBtn.classList.add('mic-active');
+            micBtn.innerHTML = '<i class="bi bi-mic-mute-fill fs-5"></i>';
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            micBtn.classList.remove('mic-active');
+            micBtn.innerHTML = '<i class="bi bi-mic-fill fs-5"></i>';
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            
+            // Append text (with space if needed)
+            const currentVal = textInput.value;
+            textInput.value = currentVal + (currentVal && !currentVal.endsWith(' ') ? ' ' : '') + transcript;
+            
+            // Trigger input method change to "Paste"
+            inputMethodSelect.value = 'paste';
+            inputMethodSelect.dispatchEvent(new Event('change'));
+            
+            // Optional: Auto-scroll to bottom
+            textInput.scrollTop = textInput.scrollHeight;
+        };
+        
+        recognition.onerror = (event) => {
+            console.error("Speech error", event.error);
+            showToast("Microphone error: " + event.error, "error");
+            isListening = false;
+            micBtn.classList.remove('mic-active');
+        };
+
+    } else {
+        // Hide button if browser doesn't support API
+        if(micBtn) micBtn.style.display = 'none';
+        console.warn("Web Speech API not supported in this browser.");
+    }
+
+
  // ✅ FIX: Explicitly attach the listener
     const toggle = document.getElementById("usePapersToggle");
     if(toggle) {
@@ -1413,6 +1576,81 @@ let currentSourceUrl = null;
             window.updateAllClaimButtons();
         });
     }
+
+
+
+// ==========================================
+// HELPER: Generate Compass Card HTML
+// ==========================================
+function getSynthesisHtml(claim, usedModel = null) {
+    if (!claim.final_verdict) return ''; 
+
+    let colorClass = 'verdict-uncertain'; 
+    const v = (claim.final_verdict || '').toLowerCase();
+    
+    if (v.includes('true') || v.includes('verified') || v.includes('supported') || v.includes('feasible') || v.includes('accepted')) {
+        colorClass = 'verdict-true';
+    }
+    if (v.includes('debunked') || v.includes('nonsense') || v.includes('false') || v.includes('scam') || v.includes('unlikely')) {
+        colorClass = 'verdict-false';
+    }
+
+    const tagsHtml = (claim.tags || []).map(t => `<span class="hashtag">${t}</span>`).join('');
+    
+    let catIcon = "bi-compass";
+    if (claim.category === "The Hype Check") catIcon = "bi-stars";
+    if (claim.category === "The Scam Bust") catIcon = "bi-exclamation-octagon-fill";
+    if (claim.category === "The Nuance") catIcon = "bi-journals";
+
+    let modelBadge = '';
+    if (usedModel) {
+        const cleanModel = usedModel.replace(":free", "").replace("/", " / ");
+        modelBadge = `<span class="compass-model-badge" title="Unified verification model"><i class="bi bi-cpu"></i> ${cleanModel}</span>`;
+    }
+
+    // ✅ FIX: Encode text for data attribute
+    const rawTtsText = `Verdict: ${claim.final_verdict}. ${claim.synthesis_summary}`;
+    const safeTtsText = encodeURIComponent(rawTtsText);
+
+    return `
+    <div class="synthesis-card">
+        ${modelBadge}
+        <span class="category-badge"><i class="bi ${catIcon}"></i> ${claim.category || 'ANALYSIS'}</span>
+        <div class="verdict-label ${colorClass}">${claim.final_verdict}</div>
+        <div class="synthesis-summary">${claim.synthesis_summary || ''}</div>
+        
+        <!-- ✅ FIXED BUTTON: Data attribute instead of function argument -->
+        <div class="d-flex align-items-center gap-2 mt-3">
+            <button class="btn btn-sm btn-dark rounded-pill px-3" 
+                    data-tts="${safeTtsText}"
+                    onclick="playAudioSummary(this)">
+                <i class="bi bi-volume-up-fill"></i> Listen to Briefing
+            </button>
+            <div class="hashtag-container ms-auto">${tagsHtml}</div>
+        </div>
+    </div>
+    `;
+}
+
+// ==========================================
+// HELPER: Toggle Evidence Accordion
+// ==========================================
+window.toggleEvidence = function(claimId) {
+    const el = document.getElementById(`evidence-${claimId}`);
+    const btn = document.getElementById(`evidence-btn-${claimId}`);
+    if (!el || !btn) return;
+
+    if (el.classList.contains('show')) {
+        el.classList.remove('show');
+        btn.innerHTML = '<i class="bi bi-chevron-down"></i> View Full Scientific Evidence & Sources';
+    } else {
+        el.classList.add('show');
+        btn.innerHTML = '<i class="bi bi-chevron-up"></i> Hide Full Scientific Evidence';
+    }
+}
+
+
+// --- DAILY SPOTLIGHT LOGIC ---
 
 async function loadDailySpotlight() {
     const container = document.getElementById('spotlight-container');
@@ -1535,6 +1773,52 @@ function showToast(message, type = 'info') {
     });
 }
 
+// ✅ Plays ElevenLabs Audio (Data Attribute Version)
+async function playAudioSummary(btn) {
+    if (btn.classList.contains('playing')) return; 
+    
+    // ✅ FIX: Read from data-tts attribute
+    const encodedText = btn.getAttribute('data-tts');
+    if (!encodedText) return;
+
+    const text = decodeURIComponent(encodedText);
+    
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = `<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Loading...`;
+    btn.classList.add('disabled');
+
+    try {
+        const response = await fetch(`${API_BASE}/api/speak-verdict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+
+        if (!response.ok) throw new Error("Audio generation failed");
+
+        const blob = await response.blob();
+        const audio = new Audio(URL.createObjectURL(blob));
+        
+        btn.innerHTML = `<i class="bi bi-stop-fill"></i> Playing...`;
+        btn.classList.add('playing');
+        btn.classList.remove('disabled');
+        
+        audio.play();
+        
+        audio.onended = () => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('playing');
+        };
+
+    } catch (e) {
+        console.error(e);
+        showToast("Could not generate audio.", "error");
+        btn.innerHTML = originalHtml;
+        btn.classList.remove('disabled');
+    }
+}
+window.playAudioSummary = playAudioSummary;
+
 async function loadGlobalStats() {
     const kpiContainer = document.getElementById('kpi-stats-container');
     if (!kpiContainer) return;
@@ -1572,11 +1856,18 @@ async function loadGlobalStats() {
 // ----------------------------------------------------
 // 1. Check login status on page load
 // ----------------------------------------------------
+// ✅ 1. Define global state variable here
+window.isUserLoggedIn = false;
+
+// ✅ 2. Update the function to set the state
 async function checkAuth() {
   const res = await fetch(`${API_BASE}/auth/me`, {
     credentials: "include"
   });
   const data = await res.json();
+
+  // Update the global variable based on response
+  window.isUserLoggedIn = data.authenticated;
 
   const loginBtn = document.getElementById("loginBtn");
   const userMenu = document.getElementById("userLoggedInMenu");
@@ -1590,11 +1881,10 @@ async function checkAuth() {
     document.getElementById("userLoggedOutMenu")?.classList.add("d-none");
     document.getElementById("userLoggedInMenu")?.classList.remove("d-none");
     emailSpan.innerText = data.email || "";
-} else {
+  } else {
     document.getElementById("userLoggedInMenu")?.classList.add("d-none");
     document.getElementById("userLoggedOutMenu")?.classList.remove("d-none");
-}
-
+  }
 }
 
 checkAuth();
@@ -1800,124 +2090,55 @@ async function loadAnalysis(id) {
     analysisId = data.analysis_id;
     resultsContainer.innerHTML = "";
 
-    // 1. Inject Verify All Bar
-    if (data.claims.length > 1) {
-         const allDone = data.claims.every(c => c.model_verdict && c.external_verdict);
-         const btnClass = allDone ? "btn-success" : "btn-primary";
-         const btnText = allDone ? `<i class="bi bi-check-all"></i> All Verified` : `<i class="bi bi-robot"></i> Verify All Claims`;
-         const disabled = allDone ? "disabled" : "";
-
-         resultsContainer.innerHTML = `
-        <div class="verify-actions-bar sticky-top" style="top: 10px; z-index: 100;">
-            <div><strong>${data.claims.length} Claims Loaded</strong></div>
-            <button id="verify-all-btn" class="btn ${btnClass} btn-sm" onclick="runBatchVerification(${data.claims.length})" ${disabled}>
-                ${btnText}
-            </button>
-        </div>`;
-    }
-
-    const wantPapers = document.getElementById("usePapersToggle")?.checked;
+    // ✅ FIX: The snapshot response structure for claims needs to align
+    // The backend now sends 'used_model' in the claim object.
+    displayClaimsStructure(data.claims, true);
 
     data.claims.forEach((claim, idx) => {
-      
-      // ✅ NEW: Insert Ad Space in History (Matches fresh analysis layout)
-      if (idx > 0 && idx % 2 === 0) {
-          resultsContainer.innerHTML += `
-              <div class="ad-horizontal-placeholder">
-                  <span>Sponsored / Ad Space</span>
-              </div>
-          `;
-      }
+        const modelBox = document.getElementById(`model-verdict-claim-${idx}`);
+        const extBox = document.getElementById(`external-verdict-claim-${idx}`);
+        const sourceList = document.getElementById(`external-sources-claim-${idx}`);
+        const questionsList = document.getElementById(`questions-list-claim-${idx}`);
+        const btn = document.getElementById(`btn-verify-${idx}`);
+        const toggleBtn = document.getElementById(`evidence-btn-claim-${idx}`);
 
-      const claimId = `claim-${idx}`;
-      
-      // Determine existence of data
-      const hasModel = !!claim.model_verdict;
-      const hasExternal = !!claim.external_verdict;
-      
-      // Determine initial visual state based on current toggle
-      const isVerified = wantPapers ? (hasModel && hasExternal) : hasModel;
-      
-      let buttonHtml = '';
-      if (isVerified) {
-          buttonHtml = `<button id="btn-verify-${idx}" class="btn btn-sm btn-success disabled"><i class="bi bi-check-lg"></i> Verified</button>`;
-      } else {
-          buttonHtml = `<button id="btn-verify-${idx}" class="btn-verify-single" onclick="runSingleVerification(${idx})">Verify This Claim</button>`;
-      }
+        // Update Button State
+        if (claim.final_verdict) {
+            if(btn) {
+                btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+                btn.className = "btn btn-success btn-sm disabled";
+            }
+            if(toggleBtn) {
+                toggleBtn.style.display = 'inline-block';
+            }
+        }
 
-      // --- Prepare Model Verdict HTML ---
-      let modelVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
-      if (claim.model_verdict) {
-          let badge = "";
-          if (claim.used_model) {
-              const clean = claim.used_model.replace(":free", "").replace("/", " / ");
-              badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
-          }
-          modelVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.model_verdict);
-      }
-
-      // --- Prepare External Verdict HTML ---
-      let externalVerdictHtml = '<span class="text-muted fst-italic">Waiting for verification...</span>';
-      if (claim.external_verdict) {
-          let badge = "";
-          if (claim.external_model) { 
-              const clean = claim.external_model.replace(":free", "").replace("/", " / ");
-              badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Verified by ${escapeHTML(clean)}</span><br>`;
-          }
-          externalVerdictHtml = badge + formatTextWithMarkdownAndLinks(claim.external_verdict);
-      }
-
-      const claimHtml = `
-        <div class="claim-card" id="${claimId}" 
-             data-has-model="${hasModel}" 
-             data-has-external="${hasExternal}">
-             
-          <div class="d-flex justify-content-between align-items-start">
-            <h5>Claim ${idx + 1} ${getBadgeHtml('db')}</h5> 
-            ${buttonHtml}
-          </div>
-
-          <p class="claim-text mb-3">${escapeHTML(claim.claim_text)}</p>
-
-          <strong>Model Verdict:</strong>
-          <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
-            ${modelVerdictHtml}
-          </div>
-
-          <strong>Suggested Research Questions:</strong>
-          <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
-            ${(claim.questions && claim.questions.length > 0) ? claim.questions.map((q, qIdx) => `
+        // Fill Details
+        if (modelBox && claim.model_verdict) {
+            modelBox.innerHTML = formatTextWithMarkdownAndLinks(claim.model_verdict);
+        }
+        if (extBox && claim.external_verdict) {
+            extBox.innerHTML = formatTextWithMarkdownAndLinks(claim.external_verdict);
+        }
+        if (sourceList && claim.external_sources) {
+            sourceList.innerHTML = claim.external_sources.map(s => 
+                `<li>📄 [${s.source||'Ref'}] <a href="${s.url}" target="_blank">${escapeHTML(s.title||'Source')}</a></li>`
+            ).join('');
+        }
+        if (questionsList && claim.questions) {
+            questionsList.innerHTML = claim.questions.map((q, qIdx) => `
                 <li class="list-group-item">
                     <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
                     <button class="btn btn-primary btn-sm generate-report-btn"
-                        data-claim-idx="${idx}"
-                        data-question-idx="${qIdx}"
+                        data-claim-idx="${idx}" data-question-idx="${qIdx}"
                         data-report-container-id="report-claim-${idx}-${qIdx}">
                     Generate Report
                     </button>
                     <div id="report-claim-${idx}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
-                </li>
-            `).join('') : '<li class="list-group-item text-muted fst-italic">Generated after verification.</li>'}
-          </ul>
-
-          <hr>
-
-          <strong>External Verification:</strong>
-          <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
-            ${externalVerdictHtml}
-          </div>
-          <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3">
-             ${(claim.external_sources || []).map(s => `
-                <li>📄 [${s.source || 'Ref'}] <a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHTML(s.title || 'Source')}</a></li>
-             `).join('')}
-          </ul>
-        </div>
-      `;
-
-      resultsContainer.innerHTML += claimHtml;
+                </li>`).join('');
+        }
     });
 
-    // Sync state immediately
     updateAllClaimButtons();
 
   } catch (err) {
@@ -1925,6 +2146,7 @@ async function loadAnalysis(id) {
     showToast("Error loading analysis: " + err.message, 'error');
   }
 }
+
   
 window.loadAnalysis = loadAnalysis;
 window.deleteAnalysis = deleteAnalysis;
@@ -2092,78 +2314,69 @@ function convertMarkdownTablesToHTML(text) {
 function formatTextWithMarkdownAndLinks(text) {
     if (!text) return "";
 
-    // 1. Aggressive Normalization (Fixes encoding artifacts)
-    let normalizedText = text.normalize('NFKD');
-    
-    // Map common encoding garbage to clean characters
-    const charMap = {
-        'â\u0080\u0093': '-', // En dash
-        'â\u0080\u0094': '-', // Em dash
-        'â\u0080\u0099': "'", // Smart quote
-        'â\u0080\u009c': '"', // Left quote
-        'â\u0080\u009d': '"', // Right quote
-        'â\u0080\u00af': ' ', // Non-breaking space
-        'Â': '',             // Random A hat
-        'â': '-',            // Often replaces bullets
-        '–': '-',
-        '—': '-'
-    };
-    
-    for (const [bad, good] of Object.entries(charMap)) {
-        normalizedText = normalizedText.split(bad).join(good);
-    }
-    
-    let formattedText = escapeHTML(normalizedText);
+    // 1. Aggressive Cleanup (The "Nuclear" Option for encoding artifacts)
+    // We handle common mojibake characters manually before normalization
+    let clean = text
+        .replace(/â€“/g, '-')
+        .replace(/â€”/g, '-')
+        .replace(/â\u0080\u0093/g, '-') // En dash
+        .replace(/â\u0080\u0094/g, '-') // Em dash
+        .replace(/â\u0080\u0099/g, "'") // Smart quote
+        .replace(/â\u0080\u009C/g, '"') // Left double quote
+        .replace(/â\u0080\u009D/g, '"') // Right double quote
+        .replace(/â\u0080\u00A6/g, '...') // Ellipsis
+        .replace(/â\u20AC\u2122/g, "'")
+        .replace(/â\-/g, '-')  // The specific artifact from your screenshot
+        .replace(/â/g, '')     // Remove any remaining ghost 'a's
+        .replace(/\\n/g, '\n'); // Fix escaped newlines
 
-    // Fix Glued Verdicts
+    // 2. Normalization
+    clean = clean.normalize('NFKC'); 
+    
+    let formattedText = escapeHTML(clean);
+
+    // Fix Glued Verdicts (Legacy support)
     formattedText = formattedText.replace(/([a-z])(AI's Initial Verdict:)/g, '$1<br><br><strong>$2</strong>');
     formattedText = formattedText.replace(/([a-z])(External Verification Verdict:)/g, '$1<br><br><strong>$2</strong>');
 
-    // 2. Convert Tables to HTML
+    // 3. Convert Tables to HTML
     formattedText = convertMarkdownTablesToHTML(formattedText);
 
-    // 3. Process Line-by-Line
+    // 4. Process Line-by-Line
     const lines = formattedText.split('\n');
     let inHtmlBlock = false;
     
     const finalLines = lines.map(line => {
         let trimmed = line.trim();
         
-        // A. HTML Table Protection
+        // Table Protection
         if (trimmed.startsWith('<div class="table-responsive')) inHtmlBlock = true;
         if (inHtmlBlock) {
             if (trimmed.includes('</table></div>')) inHtmlBlock = false;
             return line; 
         }
 
-        // B. Format Normal Text
-        
-        // ✅ Smaller Headers (h6 + uppercase)
-        const headerMatch = trimmed.match(/^(?:##\s*|)(\d+\.\s+)?\*\*(.*?)\*\*$/);
-        if (headerMatch) {
-            const numbering = headerMatch[1] || ""; 
-            const content = headerMatch[2];       
-            return `<h6 class="mt-4 mb-2 text-primary fw-bold text-uppercase" style="font-size: 0.9rem; letter-spacing: 0.5px;">${numbering}${content}</h6>`;
-        }
-        
+        // Headers (##)
         if (trimmed.startsWith('##')) {
             const headerContent = trimmed.replace(/^#+\s*/, '');
-            return `<h6 class="mt-4 mb-2 text-primary fw-bold text-uppercase" style="font-size: 0.9rem; letter-spacing: 0.5px;">${headerContent}</h6>`;
+            return `<h5 class="mt-4 mb-3 text-primary fw-bold">${headerContent}</h5>`;
         }
         
-        // Bold
+        // Bold (**text**)
         line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         
-        // Links
+        // Links [text](url)
         line = line.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+        
+        // Raw URLs
         line = line.replace(/(https?:\/\/[^\s<"']+)/g, (match) => {
             if (match.includes('</a>') || match.includes('">')) return match; 
             return `<a href="${match}" target="_blank" rel="noopener noreferrer">${match}</a>`;
         });
 
         // Bullets
-        if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-            return `<li class="ms-3">${line.substring(2)}</li>`;
+        if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
+            return `<li class="ms-3 mb-1">${line.substring(2)}</li>`;
         }
 
         // Standard Newlines
@@ -2638,10 +2851,12 @@ function updateAllClaimButtons() {
 }
     
   
+// ==========================================
+// DISPLAY FUNCTION (Fresh Analysis)
+// ==========================================
 function displayClaimsStructure(claims, isCached = false) {
     const badgeHtml = isCached ? getBadgeHtml('db') : '';
     
-    // 1. Inject the "Verify All" Control Bar at the top
     let controlBar = '';
     if (claims.length > 1) {
         controlBar = `
@@ -2652,109 +2867,184 @@ function displayClaimsStructure(claims, isCached = false) {
             </button>
         </div>`;
     }
-
     resultsContainer.innerHTML = controlBar;
 
-    claims.forEach((claimText, index) => {
-        
-        // ✅ NEW: Insert Ad Space between cards
-        // Logic: Insert before the 3rd card (index 2), 5th card (index 4), etc.
-        // Effectively places an ad after every 2 claims.
+    claims.forEach((claimObj, index) => {
         if (index > 0 && index % 2 === 0) {
-            resultsContainer.innerHTML += `
-                <div class="ad-horizontal-placeholder">
-                    <span>Sponsored / Ad Space</span>
-                </div>
-            `;
+            resultsContainer.innerHTML += `<div class="ad-horizontal-placeholder"><span>Sponsored / Ad Space</span></div>`;
         }
 
         const claimId = `claim-${index}`;
+        const claimText = typeof claimObj === 'string' ? claimObj : claimObj.claim_text;
         
-        // Add data attributes initialized to false (since this is a fresh run)
+        // Pass model if we have it (cached)
+        const modelName = (typeof claimObj === 'object') ? (claimObj.used_model || null) : null;
+        const synthesisHtml = (typeof claimObj === 'object') ? getSynthesisHtml(claimObj, modelName) : '';
+        const hasSynthesis = !!(typeof claimObj === 'object' && claimObj.final_verdict);
+
+        // UI State
+        const btnClass = hasSynthesis ? "btn btn-success btn-sm disabled" : "btn-verify-single";
+        const btnInner = hasSynthesis ? `<i class="bi bi-check-lg"></i> Verified` : `Verify This Claim`;
+        const toggleBtnText = hasSynthesis ? '<i class="bi bi-chevron-down"></i> View Full Scientific Evidence & Sources' : '';
+        const toggleDisplay = hasSynthesis ? 'inline-block' : 'none';
+
         const claimHtml = `
-        <div class="claim-card" id="${claimId}" data-has-model="false" data-has-external="false">
+        <div class="claim-card" id="${claimId}" data-has-model="${hasSynthesis}" data-has-external="${hasSynthesis}">
             <div class="d-flex justify-content-between align-items-start">
                 <h5>Claim ${index + 1} ${badgeHtml}</h5>
-                <button id="btn-verify-${index}" class="btn-verify-single" onclick="runSingleVerification(${index})">
-                    Verify This Claim
+                <button id="btn-verify-${index}" class="${btnClass}" onclick="runSingleVerification(${index})">
+                    ${btnInner}
                 </button>
             </div>
             
-            <p class="claim-text mb-3">${escapeHTML(claimText)}</p>
+            <p class="claim-text mb-3 lead" style="font-weight:500;">${escapeHTML(claimText)}</p>
             
-            <!-- MODEL VERDICT -->
-            <strong>Model Verdict:</strong>
-            <div id="model-verdict-${claimId}" class="verdict-box model-verdict-box mb-3" style="min-height: 50px;">
-                <span class="text-muted fst-italic">Waiting for verification...</span>
+            <div id="synthesis-container-${index}">
+                ${synthesisHtml}
             </div>
-            
-            <!-- QUESTIONS -->
-            <strong>Suggested Research Questions:</strong>
-            <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
-                 <li class="list-group-item text-muted fst-italic">Generated after verification.</li>
-            </ul>
-            
-            <hr>
-            
-            <!-- EXTERNAL -->
-            <strong>External Verification (Semantic Scholar, CORE, Crossref & PubMed):</strong>
-            <div id="external-verdict-${claimId}" class="verdict-box mb-2" style="min-height: 50px;">
-                <span class="text-muted fst-italic">Waiting for verification...</span>
+
+            <div class="text-center mt-2 mb-3">
+                <button id="evidence-btn-${claimId}" class="btn btn-sm btn-link text-decoration-none text-muted" 
+                        onclick="toggleEvidence('${claimId}')" 
+                        style="display:${toggleDisplay}">
+                    ${toggleBtnText}
+                </button>
             </div>
-            <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3"></ul>
+
+            <div id="evidence-${claimId}" class="evidence-content">
+                <div class="pt-2 border-top">
+                    <strong>Internal Analysis:</strong>
+                    <div id="model-verdict-${claimId}" class="verdict-box mb-3">
+                        <span class="text-muted fst-italic">Waiting for verification...</span>
+                    </div>
+                    
+                    <strong>External Verification:</strong>
+                    <div id="external-verdict-${claimId}" class="verdict-box mb-3">
+                        <span class="text-muted fst-italic">Waiting for verification...</span>
+                    </div>
+
+                    <ul id="external-sources-${claimId}" class="source-list list-unstyled ps-3 mb-3"></ul>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h6 class="fw-bold text-muted text-uppercase" style="font-size:0.75rem;">Suggested Research Questions:</h6>
+                <ul id="questions-list-${claimId}" class="question-list list-group list-group-flush mb-3">
+                    <li class="list-group-item text-muted fst-italic">Generated after verification.</li>
+                </ul>
+            </div>
         </div>
         `;
         resultsContainer.innerHTML += claimHtml;
     });
 
-    toggleLoading(runAnalysisBtn, false); // Reset main button
+    toggleLoading(runAnalysisBtn, false);
 }
+
+// ==========================================
+// RUN SINGLE VERIFICATION (THE UNIFIED CALL)
+// ==========================================
 async function runSingleVerification(index) {
-    if (activeVerifications.has(index)) return;
+    if (activeVerifications.has(index)) return false; 
     const btn = document.getElementById(`btn-verify-${index}`);
-    if (!btn) return;
+    if (!btn) return false;
 
     activeVerifications.add(index);
     
-    // UI Loading
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying...`;
 
-    const verdictId = `model-verdict-claim-${index}`;
-    const questionsId = `questions-list-claim-${index}`;
-    const extVerdictId = `external-verdict-claim-${index}`;
-    const extSourcesId = `external-sources-claim-${index}`;
-    
-    const preferredModel = document.getElementById("preferredModel")?.value || null;
-    const usePapers = document.getElementById("usePapersToggle")?.checked;
+    const synthesisContainer = document.getElementById(`synthesis-container-${index}`);
+    const modelBox = document.getElementById(`model-verdict-claim-${index}`);
+    const extBox = document.getElementById(`external-verdict-claim-${index}`);
+    const sourceList = document.getElementById(`external-sources-claim-${index}`);
+    const questionsList = document.getElementById(`questions-list-claim-${index}`);
+    const toggleBtn = document.getElementById(`evidence-btn-claim-${index}`); // The missing button
     const card = document.getElementById(`claim-${index}`);
 
-    try {
-        // 1. AI Verification
-        await getModelDetails(index, verdictId, questionsId, null, true, preferredModel);
-        
-        // ✅ Update State
-        card.setAttribute('data-has-model', 'true');
+    const usePapers = document.getElementById("usePapersToggle")?.checked;
+    const preferredModel = document.getElementById("preferredModel")?.value || "";
 
-        // 2. External Verification
-        if (usePapers) {
-            await verifyExternal(index, extVerdictId, extSourcesId, null, true, preferredModel);
-            // ✅ Update State
-            card.setAttribute('data-has-external', 'true');
-        } else {
-            const extContainer = document.getElementById(extVerdictId);
-            if(extContainer) extContainer.innerHTML = '<span class="text-muted">External verification disabled.</span>';
+    try {
+        const response = await fetch(`${API_BASE}/api/verify-claim`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                analysis_id: analysisId,
+                claim_idx: index,
+                use_papers: usePapers,
+                preferred_model: preferredModel
+            })
+        });
+
+        if (response.status === 429) {
+            const errData = await response.json();
+            showToast(errData.error || "Daily verification limit reached.", 'warning');
+            
+            btn.innerHTML = "Verify This Claim"; 
+            btn.className = "btn-verify-single";
+            btn.disabled = false;
+            return false; 
         }
 
-        // ✅ Final UI Refresh: This decides if the button turns Green or stays Blue
-        updateAllClaimButtons();
+        if (!response.ok) throw new Error("Verification failed");
         
+        const data = await response.json();
+        
+        if (data.compass) {
+            synthesisContainer.innerHTML = getSynthesisHtml({
+                final_verdict: data.compass.verdict_label,
+                synthesis_summary: data.compass.summary,
+                category: data.compass.category,
+                tags: data.compass.tags
+            }, data.evidence.used_model);
+        }
+
+        if (data.evidence) {
+            if (modelBox && data.evidence.model_verdict) modelBox.innerHTML = formatTextWithMarkdownAndLinks(data.evidence.model_verdict);
+            if (extBox && data.evidence.external_verdict) extBox.innerHTML = formatTextWithMarkdownAndLinks(data.evidence.external_verdict);
+            if (sourceList && data.evidence.sources) {
+                sourceList.innerHTML = data.evidence.sources.map(s => 
+                    `<li>📄 [${s.source||'Ref'}] <a href="${s.url}" target="_blank">${escapeHTML(s.title||'Source')}</a></li>`
+                ).join('');
+            }
+            if (questionsList && data.evidence.questions) {
+                questionsList.innerHTML = data.evidence.questions.map((q, qIdx) => `
+                    <li class="list-group-item">
+                        <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
+                        <button class="btn btn-primary btn-sm generate-report-btn"
+                            data-claim-idx="${index}" data-question-idx="${qIdx}"
+                            data-report-container-id="report-claim-${index}-${qIdx}">
+                        Generate Report
+                        </button>
+                        <div id="report-claim-${index}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
+                    </li>`).join('');
+            }
+        }
+
+        btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+        btn.className = "btn btn-success btn-sm disabled";
+        
+        // ✅ FIX: Make the "View Evidence" button visible AND give it text
+        if (toggleBtn) {
+            toggleBtn.style.display = 'inline-block';
+            toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i> View Full Scientific Evidence & Sources';
+        }
+
+        if (card) {
+            card.setAttribute('data-has-model', 'true');
+            card.setAttribute('data-has-external', 'true');
+        }
+        updateAllClaimButtons();
+        return true; 
+
     } catch (error) {
         console.error(error);
         btn.innerHTML = `Retry Verification`;
-        btn.className = "btn-verify-single"; // Ensure it looks clickable
-        btn.disabled = false; 
-        showToast(`Verification failed for Claim ${index + 1}`, 'error');
+        btn.className = "btn-verify-single";
+        btn.disabled = false;
+        showToast("Verification failed. Please try again.", 'error');
+        return false; 
     } finally {
         activeVerifications.delete(index);
     }
@@ -2764,45 +3054,42 @@ async function runBatchVerification(totalClaims) {
     const batchBtn = document.getElementById('verify-all-btn');
     if (!batchBtn) return;
 
-    // 1. Lock the button so user can't double-click
     batchBtn.disabled = true;
     batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Starting...`;
 
     let processedCount = 0;
+    let stopBatch = false;
 
     for (let i = 0; i < totalClaims; i++) {
+        if (stopBatch) break; // 🛑 Stop loop if limit reached
+
         const singleBtn = document.getElementById(`btn-verify-${i}`);
         
-        // Check if this claim is already verified (Green button) or missing
-        // If so, skip it.
+        // Skip already verified
         if (!singleBtn || singleBtn.classList.contains('btn-success')) {
             processedCount++;
             continue; 
         }
 
-        // Update Text to show progress
         batchBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying ${i + 1}/${totalClaims}...`;
-
         const card = document.getElementById(`claim-${i}`);
         if(card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Run Verification
-        await runSingleVerification(i);
+        // Run and check result
+        const success = await runSingleVerification(i);
         
-        // Small pause for UI rendering
+        if (!success) {
+            // If it failed (likely 429), stop the whole batch
+            stopBatch = true;
+            console.warn("Batch verification stopped due to error or rate limit.");
+        }
+        
         await new Promise(r => setTimeout(r, 500));
         processedCount++;
     }
 
-    // ✅ FIX: Process is done. Unlock the button.
     batchBtn.disabled = false;
-
-    // ✅ FIX: Call the global updater. 
-    // It will scan the page. If all claims are now verified, it turns the button Green.
-    // If some failed (and are still Blue), it turns the button Blue so you can retry.
-    if (window.updateAllClaimButtons) {
-        window.updateAllClaimButtons();
-    }
+    updateAllClaimButtons();
 }
 
 // Attach to window so HTML can see them
@@ -3057,104 +3344,110 @@ showToast('Failed to copy report to clipboard', 'error');
 }
 
 async function generateReport(claimIdx, questionIdx, reportContainerId, button) {
-  const reportContainer = document.getElementById(reportContainerId);
-  const preferredModel = document.getElementById("preferredModel")?.value || "";
+    const reportContainer = document.getElementById(reportContainerId);
+    const preferredModel = document.getElementById("preferredModel")?.value || "";
 
-  reportContainer.innerHTML =
-    '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
-  
-  if (button) { 
-      button.disabled = true; 
-      button.innerHTML = 'Generating...'; 
-  }
+    // UI Loading State
+    reportContainer.innerHTML = '<div class="report-box text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Generating report...</div>';
+    if (button) { 
+        button.disabled = true; 
+        button.innerHTML = 'Generating...'; 
+    }
 
-  try {
-    const es = new EventSource(
-      `${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}&preferred_model=${encodeURIComponent(preferredModel)}`,
-      { withCredentials: true }
-    );
+    try {
+        const response = await fetch(`${API_BASE}/api/generate-report?analysis_id=${encodeURIComponent(analysisId)}&claim_idx=${encodeURIComponent(claimIdx)}&question_idx=${encodeURIComponent(questionIdx)}&preferred_model=${encodeURIComponent(preferredModel)}`, {
+            headers: { 'Accept': 'text/event-stream' }
+        });
 
-    let fullContent = '';
-    let isFirstChunk = true;
-    let reportBox = null;
-    let detectedModel = null;
+        if (response.status === 429) {
+            const errData = await response.json();
+            showToast(errData.error || "Daily report limit reached.", 'warning');
+            reportContainer.innerHTML = ''; 
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = 'Generate Report';
+            }
+            return;
+        }
 
-    es.onmessage = (event) => {
-      if (event.data === '[DONE]') {
-        es.close();
+        if (!response.ok) throw new Error("Report generation failed");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        let fullContent = '';
+        let isFirstChunk = true;
+        let reportBox = null;
+        let detectedModel = null;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (line.trim() === 'data: [DONE]') {
+                    // Stream finished
+                    if (button) { 
+                        button.disabled = false; 
+                        button.innerHTML = 'Generate Report'; 
+                    }
+                    
+                    if (fullContent.trim().length > 0) {
+                         // ✅ RESTORED: View Full Report Button
+                         const viewBtn = document.createElement('button');
+                         viewBtn.className = 'btn btn-outline-primary btn-sm mt-2 w-100';
+                         viewBtn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i> View Full Report';
+                         viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
+                         reportContainer.appendChild(viewBtn);
+
+                         markReportGenerated(claimIdx, questionIdx);
+                    }
+                    return;
+                }
+
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6);
+                    try {
+                        const data = JSON.parse(dataStr);
+                        
+                        if (data.error) {
+                            reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(data.error)}</div>`;
+                            return;
+                        }
+
+                        if (isFirstChunk) {
+                            reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
+                            reportBox = reportContainer.querySelector('.report-box');
+                            isFirstChunk = false;
+                        }
+
+                        if (data.content) fullContent += data.content;
+                        if (data.used_model) detectedModel = data.used_model;
+
+                        let currentHtml = formatTextWithMarkdownAndLinks(fullContent);
+                        if (detectedModel) {
+                            const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
+                            const badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
+                            currentHtml = badge + currentHtml;
+                        }
+                        if (reportBox) reportBox.innerHTML = currentHtml;
+
+                    } catch (e) { }
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Report error:', error);
+        reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
         if (button) { 
             button.disabled = false; 
             button.innerHTML = 'Generate Report'; 
         }
-
-        if (fullContent && fullContent.trim().length > 0) {
-          let finalHtml = formatTextWithMarkdownAndLinks(fullContent);
-          if (detectedModel) {
-              const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
-              // ✅ FIX: New badge
-              const badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
-              finalHtml = badge + finalHtml;
-          }
-          if (reportBox) reportBox.innerHTML = finalHtml;
-
-          const viewBtn = document.createElement('button');
-          viewBtn.className = 'btn btn-outline-primary btn-sm mt-2';
-          viewBtn.textContent = '📖 View Full Report';
-          viewBtn.onclick = () => showReportInModal(fullContent, claimIdx, questionIdx);
-          reportContainer.appendChild(viewBtn);
-
-          markReportGenerated(claimIdx, questionIdx);
-        } else {
-          reportContainer.innerHTML = '<div class="alert alert-warning p-2">No report content returned.</div>';
-        }
-        return;
-      }
-
-      if (isFirstChunk) {
-          reportContainer.innerHTML = '<div class="report-box compact-report"></div>';
-          reportBox = reportContainer.querySelector('.report-box');
-          isFirstChunk = false;
-      }
-
-      try {
-        const data = JSON.parse(event.data);
-        if (data.content) fullContent += data.content;
-        if (data.used_model) detectedModel = data.used_model;
-
-        if (data.error) {
-          reportBox.innerHTML += `<br><strong class="text-danger">Error: ${escapeHTML(data.error)}</strong>`;
-        } else {
-            let currentHtml = formatTextWithMarkdownAndLinks(fullContent);
-            if (detectedModel) {
-                const cleanModel = detectedModel.replace(":free", "").replace("/", " / ");
-                // ✅ FIX: New badge
-                const badge = `<span class="model-attribution-badge"><i class="bi bi-cpu"></i> Report by ${escapeHTML(cleanModel)}</span><br>`;
-                currentHtml = badge + currentHtml;
-            }
-            reportBox.innerHTML = currentHtml;
-        }
-      } catch {
-        fullContent += event.data;
-        reportBox.innerHTML = formatTextWithMarkdownAndLinks(fullContent);
-      }
-    };
-
-    es.onerror = () => {
-      es.close();
-      reportContainer.innerHTML = `<div class="alert alert-danger">Stream error or unsupported media type.</div>`;
-      if (button) { 
-          button.disabled = false; 
-          button.innerHTML = 'Generate Report'; 
-      }
-    };
-  } catch (error) {
-    console.error('Report generation error:', error);
-    reportContainer.innerHTML = `<div class="alert alert-danger">${escapeHTML(error.message)}</div>`;
-    if (button) { 
-        button.disabled = false; 
-        button.innerHTML = 'Generate Report'; 
     }
-  }
 }
 
 
@@ -3439,15 +3732,23 @@ fetchArticleBtn.addEventListener('click', async () => {
 
 analysisForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const articleText = textInput.value.trim();
     
-    // ✅ Logic: Use the captured URL if available, otherwise check the input box
+    // ✅ 🛑 MANDATORY SIGNUP INTERCEPTOR
+    if (!window.isUserLoggedIn) {
+        const modal = new bootstrap.Modal(document.getElementById("loginModal"));
+        modal.show();
+        showToast("Please sign in to run an analysis.", "info");
+        return; 
+    }
+
+    const articleText = textInput.value.trim();
     const finalSourceUrl = currentSourceUrl || (urlInput ? urlInput.value.trim() : null);
 
     if (!articleText) {
         showToast('Article text is empty. Please paste content or use one of the input methods.', 'info');
         return;
     }
+    
     toggleLoading(runAnalysisBtn, true, 'Analyzing...');
     resultsContainer.innerHTML = '';
     generatedReports = [];
@@ -3460,32 +3761,97 @@ analysisForm.addEventListener('submit', async (e) => {
                 text: articleText,
                 mode: promptModeSelect.value,
                 usePapers: usePapersToggle.checked,
-                // ✅ Send the source URL to backend
                 source_url: finalSourceUrl
             }),
         });
+        
         const data = await response.json();
+
+        if (response.status === 429) {
+            showToast(data.error || "Daily limit reached.", 'warning');
+            toggleLoading(runAnalysisBtn, false);
+            return;
+        }
         
-        // 1. Capture the backend cached flag
         const backendCached = !!data.cached;
-        
         analysisId = data.analysis_id;   
+
         if (!response.ok) {
             const errorMessage = data.error || `Failed to analyze text: ${response.status}`;
             throw new Error(errorMessage);
         }
+
         if (data.claims.length === 0) {
             resultsContainer.innerHTML = '<div class="alert alert-info mt-4">No explicit claims found in the provided text.</div>';
             toggleLoading(runAnalysisBtn, false);
             return;
         }
 
-        // 2. Pass the flag to the display function
+        // 1. Draw the skeletons/cards
         displayClaimsStructure(data.claims, backendCached);
 
-        // 3. Removed applyCachedBadgesForClaims() call here
+        // 2. ✅ NEW REHYDRATION LOGIC: If cached, fill the skeletons immediately
+        if (backendCached) {
+            data.claims.forEach((claim, idx) => {
+                const modelBox = document.getElementById(`model-verdict-claim-${idx}`);
+                const extBox = document.getElementById(`external-verdict-claim-${idx}`);
+                const sourceList = document.getElementById(`external-sources-claim-${idx}`);
+                const questionsList = document.getElementById(`questions-list-claim-${idx}`);
+                const btn = document.getElementById(`btn-verify-${idx}`);
+                const toggleBtn = document.getElementById(`evidence-btn-claim-${idx}`);
+
+                
+
+                // Update Button State to "Verified"
+                if (claim.final_verdict || claim.model_verdict) {
+                    if(btn) {
+                        btn.innerHTML = `<i class="bi bi-check-lg"></i> Verified`;
+                        btn.className = "btn btn-success btn-sm disabled";
+                    }
+                    if(toggleBtn) {
+                        toggleBtn.style.display = 'inline-block';
+                    }
+                }
+
+                // Populate the Detail Boxes
+                if (modelBox && claim.model_verdict) {
+                    modelBox.innerHTML = formatTextWithMarkdownAndLinks(claim.model_verdict);
+                }
+                if (extBox && claim.external_verdict) {
+                    extBox.innerHTML = formatTextWithMarkdownAndLinks(claim.external_verdict);
+                }
+
+                
+
+                // Populate Source List
+                if (sourceList && claim.external_sources) {
+                    sourceList.innerHTML = claim.external_sources.map(s => 
+                        `<li>📄 [${s.source||'Ref'}] <a href="${s.url}" target="_blank">${escapeHTML(s.title||'Source')}</a></li>`
+                    ).join('');
+                }
+
+                // Populate Suggested Questions
+                if (questionsList && claim.questions) {
+                    questionsList.innerHTML = claim.questions.map((q, qIdx) => `
+                        <li class="list-group-item">
+                            <span class="d-block mb-2"><b>Q${qIdx + 1}:</b> ${escapeHTML(q)}</span>
+                            <button class="btn btn-primary btn-sm generate-report-btn"
+                                data-claim-idx="${idx}" data-question-idx="${qIdx}"
+                                data-report-container-id="report-claim-${idx}-${qIdx}">
+                            Generate Report
+                            </button>
+                            <div id="report-claim-${idx}-${qIdx}" class="report-placeholder mt-2 w-100"></div>
+                        </li>`).join('');
+                }
+            });
+        }
+
+        // Final UI updates
+        updateAllClaimButtons();
+        toggleLoading(runAnalysisBtn, false);
 
     } catch (error) {
+        console.error("Analysis Error:", error);
         resultsContainer.innerHTML = `<div class="alert alert-danger mt-4">Error during analysis: ${error.message}</div>`;
         toggleLoading(runAnalysisBtn, false);
     }
