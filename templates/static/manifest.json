@@ -1,20 +1,21 @@
 {
-  "name": "epistemiq",
-  "short_name": "epistemiq",
-  "description": "Verify scientific claims directly from web articles and social media.",
+  "name": "Epistemiq",
+  "short_name": "Epistemiq",
+  "description": "AI-powered scientific verification agent.",
   "start_url": "/analyze",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait", 
+  "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff", 
+  "theme_color": "#0d6efd",
   "icons": [
     {
-      "src": "/static/icons/icon-192x192.png",
+      "src": "/static/icons/logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/static/icons/icon-512x512.png",
+      "src": "/static/icons/logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }
@@ -24,9 +25,9 @@
     "method": "POST",
     "enctype": "application/x-www-form-urlencoded",
     "params": {
+      "title": "title",
       "text": "text",
-      "url": "url",
-      "title": "title"
+      "url": "url"
     }
   }
 }
