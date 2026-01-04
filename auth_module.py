@@ -18,7 +18,7 @@ def get_conn():
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise Exception("DATABASE_URL not set")
-    
+
     conn = psycopg2.connect(db_url)
     return conn
 
@@ -37,7 +37,7 @@ def send_magic_link(email: str, link_url: str) -> bool:
         "content": [{"type": "text/plain", "value": f"Click below to log in:\n\n{link_url}\n\nExpires in 20 minutes."}]
     }
     headers = {"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"}
-    
+
     try:
         r = requests.post("https://api.sendgrid.com/v3/mail/send", json=payload, headers=headers, timeout=10)
         return r.status_code in (200, 202)
@@ -71,10 +71,10 @@ def get_current_user():
                 WHERE s.session_token = %s
             """, (token,))
             row = c.fetchone()
-            
+
             if not row: return None
             if row['expires_at'] < datetime.now(): return None
-            
+
             return {"user_id": row['user_id'], "email": row['email']}
     finally:
         conn.close()
@@ -106,7 +106,7 @@ def request_magic_link():
             token, token_hash = create_magic_token()
             expires = datetime.now() + timedelta(minutes=20)
 
-            c.execute("INSERT INTO magic_links (user_id, token_hash, expires_at) VALUES (%s, %s, %s)", 
+            c.execute("INSERT INTO magic_links (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
                       (user_id, token_hash, expires))
             conn.commit()
     finally:
@@ -114,7 +114,7 @@ def request_magic_link():
 
     frontend_url = os.getenv("FRONTEND_URL", request.host_url.rstrip('/'))
     link_url = f"{frontend_url}/auth/verify?token={token}&email={email}"
-    
+
     if not send_magic_link(email, link_url):
         return jsonify({"error": "Failed to send email"}), 500
     return jsonify({"message": "Magic link sent"}), 200
@@ -134,7 +134,7 @@ def verify_magic_link():
             user_id = row['id']
 
             c.execute("""
-                SELECT id, token_hash, expires_at, used_at 
+                SELECT id, token_hash, expires_at, used_at
                 FROM magic_links WHERE user_id=%s ORDER BY id DESC LIMIT 1
             """, (user_id,))
             link = c.fetchone()
@@ -144,16 +144,16 @@ def verify_magic_link():
             if link['used_at']: return "Used", 400
 
             c.execute("UPDATE magic_links SET used_at=%s WHERE id=%s", (datetime.now(), link['id']))
-            
+
             session_token = create_session_token()
             expires = datetime.now() + timedelta(days=30)
-            c.execute("INSERT INTO sessions (user_id, session_token, expires_at) VALUES (%s, %s, %s)", 
+            c.execute("INSERT INTO sessions (user_id, session_token, expires_at) VALUES (%s, %s, %s)",
                       (user_id, session_token, expires))
             conn.commit()
     finally:
         conn.close()
 
-    frontend_url = os.getenv("FRONTEND_URL", "https://epistemiq.vercel.app")
+    frontend_url = os.getenv("FRONTEND_URL", "http://epistemiq.pythonanywhere.com/")
     resp = make_response(redirect(f"{frontend_url}/"))
     resp.set_cookie("ep_session", session_token, httponly=True, secure=True, samesite="None", expires=expires)
     return resp
@@ -174,7 +174,7 @@ def logout():
                 conn.commit()
         finally:
             conn.close()
-    
+
     resp = jsonify({"message": "Logged out"})
     resp.delete_cookie("ep_session", path="/", samesite="None", secure=True)
     return resp
