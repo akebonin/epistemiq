@@ -33,24 +33,24 @@
 
      // ✅ Send Content Grouping Data
      gtag('config', 'G-H5SNSXX9K0', {
-       'content_group': '{{ content[0].category if content else "General" }}' 
+       'content_group': '{{ content[0].category if content else "General" }}'
      });
     </script>
-    
+
     <style>
         body { background: #fff; font-family: 'Georgia', serif; line-height: 1.6; color: #212529; }
         .nav-header { border-bottom: 1px solid #eee; padding: 1rem 0; font-family: 'Segoe UI', sans-serif; background: white; z-index: 1000; position: relative;}
         .article-header { padding: 4rem 0 2rem; max-width: 800px; margin: 0 auto; text-align: center; }
-        
+
         /* Main Content Column */
         .content-col { max-width: 800px; margin: 0 auto; }
-        
+
         /* Updated Editorial Summary Box */
-        .article-summary { 
-            font-size: 1.15rem; 
-            color: #495057; 
-            border-left: 5px solid #0d6efd; 
-            padding: 15px 25px; 
+        .article-summary {
+            font-size: 1.15rem;
+            color: #495057;
+            border-left: 5px solid #0d6efd;
+            padding: 15px 25px;
             margin-bottom: 4rem;
             background-color: #fcfcfc;
             border-radius: 0 8px 8px 0;
@@ -65,17 +65,17 @@
 
         .claim-block { margin-bottom: 5rem; padding-bottom: 3rem; border-bottom: 1px solid #eee; }
         .claim-text { font-size: 1.6rem; font-weight: 700; margin-bottom: 1.5rem; line-height: 1.3; color: #212529; font-family: 'Segoe UI', sans-serif; }
-        
+
         .compass-box {
             background: #f8f9fa; border-left: 4px solid #0d6efd;
             padding: 2rem; margin-bottom: 2rem; border-radius: 4px;
         }
-        
+
         .compass-model-badge {
             display: inline-block;
-            font-size: 0.65rem; 
+            font-size: 0.65rem;
             color: #6c757d;
-            background: #ffffff; 
+            background: #ffffff;
             padding: 3px 8px;
             border-radius: 4px;
             border: 1px solid #dee2e6;
@@ -86,11 +86,11 @@
         .evidence-box { font-size: 0.95rem; font-family: 'Segoe UI', sans-serif; color: #495057; }
         .source-link { color: #0d6efd; text-decoration: none; display: block; margin-bottom: 4px; }
         .source-link:hover { text-decoration: underline; }
-        
+
         .report-card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; margin-top: 20px; overflow: hidden; }
         .report-header { background: #f1f3f5; padding: 10px 15px; font-weight: bold; font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; }
         .report-body { padding: 15px; font-size: 0.9rem; }
-        
+
         .verdict-success { color: #198754; }
         .verdict-danger { color: #dc3545; }
         .verdict-warning { color: #fd7e14; }
@@ -124,7 +124,7 @@
         .share-in:hover { background-color: #0077b5; }
         .share-fb:hover { background-color: #1877f2; }
         .share-rd:hover { background-color: #ff4500; }
-        
+
         .share-label {
             font-family: 'Segoe UI', sans-serif;
             font-size: 0.75rem;
@@ -170,13 +170,14 @@
 <!-- Layout Wrapper -->
 <div class="container-fluid">
     <div class="row">
-        
+
         <!-- 👈 LEFT AD CHIMNEY (Hidden on Mobile/Tablet) -->
         <div class="col-xl-2 d-none d-xl-block ad-col">
-            <div class="ad-chimney">
-                <span>Ad Space (Left)</span>
-                <!-- Insert Ad Code Here -->
-            </div>
+            <div class="ad-vertical-placeholder sticky-top" style="top: 20px; border: none; background: transparent;">
+    <a href="https://alizgravenil.wixsite.com/alisgravenil" target="_blank" rel="noopener noreferrer">
+        <img src="/static/images/agn_ad.png" alt="Alis Grave Nil" width="160" height="600" style="border-radius: 8px;">
+    </a>
+</div>
         </div>
 
         <!-- 📄 MAIN ARTICLE CONTENT -->
@@ -203,7 +204,7 @@
             </div>
 
             <main class="content-col px-3">
-                
+
                 {% if summary %}
                 <div class="article-summary">
                     <!-- ✅ FIX: Added | safe to render HTML -->
@@ -219,13 +220,13 @@
                     <!-- Compass Synthesis -->
                     <div class="compass-box">
                         <div class="d-flex justify-content-between align-items-start mb-3">
-                            
+
                             <!-- Left Column: Category + Model -->
                             <div class="d-flex flex-column">
                                 <span class="text-uppercase fw-bold text-secondary mb-2" style="font-size:0.75rem; letter-spacing:1px;">
                                     <i class="bi bi-compass"></i> {{ claim.category }}
                                 </span>
-                                
+
                                 {% set display_model = claim.compass_model or claim.internal_model %}
                                 {% if display_model and display_model != 'Unknown' %}
                                 <div>
@@ -235,23 +236,23 @@
                                 </div>
                                 {% endif %}
                             </div>
-            
+
                             <!-- Right Column: Verdict -->
-                            <span class="fw-bold fs-4 text-end 
-                                {% if 'True' in art.verdict or 'Verified' in art.verdict or 'Supported' in art.verdict or 'Feasible' in art.verdict or 'Validated' in art.verdict or 'Accepted' in art.verdict %}verdict-success
-                                {% elif 'Debunked' in art.verdict or 'Nonsense' in art.verdict or 'False' in art.verdict or 'Scam' in art.verdict or 'Unlikely' in art.verdict%}verdict-danger
+                            <span class="fw-bold fs-4 text-end
+                                {% if claim.verdict and ('True' in claim.verdict or 'Verified' in claim.verdict or 'Supported' in claim.verdict or 'Feasible' in claim.verdict or 'Validated' in claim.verdict or 'Accepted' in claim.verdict or 'Scientific Consensus' in claim.verdict) %}verdict-success
+                                {% elif claim.verdict and ('Debunked' in claim.verdict or 'Nonsense' in claim.verdict or 'False' in claim.verdict or 'Scam' in claim.verdict or 'Unlikely' in claim.verdictor or 'Fabrication' in claim.verdict or 'Fabricated' in claim.verdict or 'Hoax' in claim.verdict or 'Misinterpreted' in claim.verdict) %}verdict-danger
                                 {% else %}verdict-warning{% endif %}">
-                                {{ claim.verdict }}
+                                {{ claim.verdict or 'Pending' }}
                             </span>
                         </div>
-                        
+
                         <p class="mb-0 fs-5 mt-2">{{ claim.summary }}</p>
                     </div>
 
                     <!-- Deep Dive Evidence -->
                     <div class="evidence-box">
                         <h5 class="fw-bold text-dark mb-3">The Evidence</h5>
-                        
+
                         {% if claim.internal_verdict %}
                         <p><strong>Internal Analysis:</strong> {{ claim.internal_verdict | safe }}</p>
                         {% endif %}
@@ -290,9 +291,57 @@
                 </div>
                 {% endfor %}
 
+
+<!-- ... End of Article Content ... -->
+
+<!-- ✅ COMMENTS SECTION -->
+<div class="container content-col mt-5 pt-4 border-top">
+    <h4 class="fw-bold mb-4"><i class="bi bi-chat-left-text-fill text-primary me-2"></i>Community Discussion</h4>
+
+    <!-- Input Form -->
+    {% if user %}
+    <div class="card border-0 shadow-sm mb-4 bg-light">
+        <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Join the discussion as <strong>{{ user.email.split('@')[0] }}</strong></h6>
+            <textarea id="commentInput" class="form-control mb-3" rows="3" placeholder="Share your thoughts or evidence..." style="resize: none;"></textarea>
+            <button id="postCommentBtn" class="btn btn-primary btn-sm" onclick="postComment()">Post Comment</button>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-light border text-center mb-4">
+        <a href="/" class="fw-bold text-decoration-none">Sign in</a> to join the discussion.
+    </div>
+    {% endif %}
+
+    <!-- Comment List -->
+    <div id="commentsList">
+        {% for comment in comments %}
+        <div class="d-flex mb-3">
+            <div class="flex-shrink-0">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                    {{ comment.user[0] | upper }}
+                </div>
+            </div>
+            <div class="flex-grow-1 ms-3">
+                <div class="bg-light p-3 rounded">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong class="text-dark">{{ comment.user }}</strong>
+                        <small class="text-muted" style="font-size: 0.75rem;">{{ comment.date }}</small>
+                    </div>
+                    <p class="mb-0 text-secondary" style="font-size: 0.95rem;">{{ comment.content }}</p>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted text-center fst-italic" id="noCommentsMsg">No comments yet. Be the first to weigh in!</p>
+        {% endfor %}
+    </div>
+</div>
+
+
                 <!-- ✅ ADDED id="launch-section" and onmouseenter trigger -->
     <div id="launch-section" class="text-center py-5" style="position: relative;">
-        
+
         <!-- The Sound File -->
         <audio id="csi-sound" preload="auto">
             <!-- Ensure this path matches your static setup -->
@@ -301,10 +350,10 @@
 
         <h3>Don't get fooled by the next headline.</h3>
         <p class="text-muted mb-4">Use Epistemiq to verify scientific claims instantly.</p>
-        
+
         <!-- Added a fun hover class -->
         <a href="/" class="btn btn-lg btn-primary px-5 csi-btn">Launch App</a>
-        
+
         <!-- Optional: Sunglasses Icon that appears -->
         <div id="csi-glasses" style="opacity:0; transition: opacity 0.5s; font-size: 3rem; margin-top: 10px;">
             🕶️
@@ -316,31 +365,35 @@
 
         <!-- 👉 RIGHT AD CHIMNEY (Hidden on Mobile/Tablet) -->
         <div class="col-xl-2 d-none d-xl-block ad-col">
-            <div class="ad-chimney">
-                <span>Ad Space (Right)</span>
-                <!-- Insert Ad Code Here -->
-            </div>
+            <div class="ad-vertical-placeholder sticky-top" style="top: 20px; border: none; background: transparent;">
+    <a href="https://alizgravenil.wixsite.com/alisgravenil" target="_blank" rel="noopener noreferrer">
+        <img src="/static/images/agn_ad.png" alt="Alis Grave Nil" width="160" height="600" style="border-radius: 8px;">
+    </a>
+</div>
         </div>
 
     </div>
 </div>
 
+
 <footer class="text-center py-4 text-muted bg-light mt-5" style="font-size: 0.8rem; font-family: sans-serif;">
     &copy; 2025 Epistemiq. All rights reserved.
 </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Toast Container -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 3000;"></div>
 
 <script>
-    // ✅ Toast Notification Helper
+    // ✅ 1. Toast Notification Helper
     function showToast(message, type = 'success') {
         const container = document.querySelector('.toast-container');
-        if (!container) return; // Safety check
-        
+        if (!container) return;
+
         let icon = type === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle-fill';
         let colorClass = type === 'success' ? 'text-success' : 'text-primary';
-        
+
         const toastId = 'toast-' + Date.now();
         const html = `
             <div id="${toastId}" class="toast align-items-center border-0 shadow-sm" role="alert" aria-live="assertive" aria-atomic="true">
@@ -351,18 +404,18 @@
                     <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
                 </div>
             </div>`;
-            
+
         const template = document.createElement('div');
         template.innerHTML = html.trim();
         const toastEl = template.firstChild;
         container.appendChild(toastEl);
-        
+
         const bsToast = new bootstrap.Toast(toastEl, { delay: 3000 });
         bsToast.show();
         toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
     }
 
-    // ✅ Updated Copy Function
+    // ✅ 2. Copy Link Function
     function copyLink() {
         navigator.clipboard.writeText(window.location.href).then(() => {
             showToast("Link copied to clipboard!");
@@ -372,53 +425,118 @@
         });
     }
 
-    // ✅ THE WHO EASTER EGG
+    // ✅ 3. HTML Escaping Helper
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g,
+            tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag]));
+    }
+
+    // ✅ 4. Post Comment Logic (Updated for Archive Table)
+    async function postComment() {
+        const input = document.getElementById('commentInput');
+        const btn = document.getElementById('postCommentBtn');
+        const content = input.value.trim();
+
+        // This value is injected by Flask/Jinja from the backend
+        const articleId = "{{ article_id }}";
+
+        if (!content) return;
+
+        btn.disabled = true;
+        btn.innerText = "Posting...";
+
+        try {
+            const res = await fetch('/api/post-comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ article_id: articleId, content: content })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+
+                // Inject new comment immediately (Optimistic UI update)
+                const list = document.getElementById('commentsList');
+                const noMsg = document.getElementById('noCommentsMsg');
+                if (noMsg) noMsg.remove();
+
+                const newHtml = `
+                <div class="d-flex mb-3 fade-in">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                            ${data.user[0].toUpperCase()}
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="bg-light p-3 rounded">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="text-dark">${data.user}</strong>
+                                <small class="text-muted" style="font-size: 0.75rem;">Just now</small>
+                            </div>
+                            <p class="mb-0 text-secondary" style="font-size: 0.95rem;">${escapeHTML(content)}</p>
+                        </div>
+                    </div>
+                </div>`;
+
+                list.insertAdjacentHTML('afterbegin', newHtml);
+                input.value = "";
+                showToast("Comment posted!", "success");
+            } else {
+                showToast("Failed to post comment", "error");
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Error posting comment", "error");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Post Comment";
+        }
+    }
+
+    // ✅ 5. Add Fade-in animation style dynamically
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .fade-in { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    `;
+    document.head.appendChild(style);
+
+    // ✅ 6. THE WHO EASTER EGG (Launch App Button)
     document.addEventListener('DOMContentLoaded', () => {
         const section = document.getElementById('launch-section');
         const audio = document.getElementById('csi-sound');
         const glasses = document.getElementById('csi-glasses');
         let hasPlayed = false;
 
-        // Function to play sound
         const triggerSound = () => {
             if (hasPlayed) return;
-            
-            // Try to play
             const playPromise = audio.play();
-
             if (playPromise !== undefined) {
                 playPromise.then(_ => {
-                    // Autoplay started!
                     hasPlayed = true;
-                    // Show sunglasses
                     if(glasses) glasses.style.opacity = 1;
-                    
-                    // Stop listening
                     removeListeners();
-                })
-                .catch(error => {
-                    // Browser blocked it (User hasn't interacted enough yet)
-                    console.log("Audio blocked by browser policy. Waiting for click.");
+                }).catch(error => {
+                    // Browser blocked autoplay
                 });
             }
         };
 
-        // 1. Try on Scroll (Intersection Observer)
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    triggerSound();
-                }
+                if (entry.isIntersecting) triggerSound();
             });
-        }, { threshold: 0.5 }); // Trigger when 50% visible
+        }, { threshold: 0.5 });
 
         if(section) {
             observer.observe(section);
-            
-            // 2. Fallback: Try on Mouse Over (More reliable)
             section.addEventListener('mouseenter', triggerSound);
-            
-            // 3. Fallback: Try on Click (Guaranteed)
             section.addEventListener('click', triggerSound);
         }
 
@@ -427,8 +545,6 @@
             section.removeEventListener('mouseenter', triggerSound);
         }
     });
-
 </script>
-
 </body>
 </html>
