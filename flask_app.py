@@ -35,7 +35,7 @@ from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 from admin_routes import admin_bp
 import random
 from reportlab.lib.utils import ImageReader
-import fcntl 
+import fcntl
 from whitenoise import WhiteNoise
 import math
 
@@ -49,7 +49,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 app = Flask(__name__, static_folder='templates/static')
-app.wsgi_app = WhiteNoise(app.wsgi_app, root='templates/static/', prefix='static/')
+
+# ✅ FIX: Use absolute path for WhiteNoise
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+static_root = os.path.join(BASE_DIR, 'templates', 'static')
+
+# Only enable WhiteNoise if the directory actually exists (prevents crash)
+if os.path.exists(static_root):
+    app.wsgi_app = WhiteNoise(app.wsgi_app, root=static_root, prefix='static/')
+else:
+    logging.warning(f"Static folder not found at {static_root}")
+
+
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 if not app.secret_key:
     app.secret_key = os.urandom(24)
@@ -77,7 +88,6 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # --- Model Lists ---
 
 # A. Google Native Rotation (High throughput, large context)
-# We prioritize Flash 2.0 for speed, then Pro, then 1.5 versions.
 GOOGLE_ROTATION_MODELS = [
     "gemini-3-flash-preview",
     "gemini-2.5-pro",
@@ -131,7 +141,7 @@ def call_google_native(prompt, model_name, stream=False, temperature=0.0, json_m
             temperature=temperature,
             response_mime_type="application/json" if json_mode else "text/plain"
         )
-        
+
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt, stream=stream, generation_config=generation_config)
 
@@ -142,7 +152,7 @@ def call_google_native(prompt, model_name, stream=False, temperature=0.0, json_m
                         data = json.dumps({"choices": [{"delta": {"content": chunk.text}}]})
                         yield f"data: {data}\n\n"
                 yield "data: [DONE]\n\n"
-            
+
             return UnifiedResponse(stream_generator=google_stream_adapter(), model_used=model_name)
         else:
             return UnifiedResponse(content=response.text, model_used=model_name)
@@ -158,10 +168,10 @@ def call_openrouter(prompt, model_name, stream=False, temperature=0.0, json_mode
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://epistemiq.vercel.app",
+        "HTTP-Referer": "http://epistemiq.pythonanywhere.com/",
         "X-Title": "Epistemiq"
     }
-    
+
     if "70b" in model_name or "pro" in model_name:
         timeout = max(timeout, 90)
 
@@ -171,16 +181,16 @@ def call_openrouter(prompt, model_name, stream=False, temperature=0.0, json_mode
         "stream": stream,
         "temperature": temperature
     }
-    
+
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
 
     try:
         response = requests.post(OR_URL, headers=headers, json=payload, stream=stream, timeout=timeout)
-        
+
         if response.status_code in [429, 502, 503, 504]:
             raise Exception(f"OpenRouter Provider Error {response.status_code}")
-            
+
         if response.status_code != 200:
             raise Exception(f"OpenRouter Status {response.status_code}: {response.text[:200]}")
 
@@ -195,24 +205,24 @@ def call_openrouter(prompt, model_name, stream=False, temperature=0.0, json_mode
 def call_hybrid_flow(prompt, stream=False, json_mode=False, temperature=0.0, preferred_model=None, task_type="verification", timeout=60):
     """
     Iterates through models based on strategy.
-    
-    task_type="extraction": 
+
+    task_type="extraction":
        1. Gemma-3-27b (Google Native) -> Google Rotation -> OpenRouter Fallback
-       
+
     task_type="verification" / "report":
        1. User Preferred Model (if set)
        2. Google Native Rotation (Default)
        3. OpenRouter Fallback
     """
     queue = []
-    
+
     # 1. Build the Execution Queue
     if task_type == "extraction":
         # Force Gemma 3 (Native) first
         queue.append(EXTRACTION_DEFAULT_MODEL)
         queue.extend(GOOGLE_ROTATION_MODELS)
         queue.extend(OPENROUTER_ROTATION_MODELS)
-    
+
     else: # verification or report
         if preferred_model and preferred_model.strip():
             # User wants a specific OpenRouter model
@@ -237,7 +247,7 @@ def call_hybrid_flow(prompt, stream=False, json_mode=False, temperature=0.0, pre
             # Google Native models don't have slashes (e.g. "gemma-3-27b-it", "gemini-2.0-flash")
             # OpenRouter models have slashes (e.g. "google/gemma-3-27b-it:free")
             is_google_native = "/" not in model_name
-            
+
             logging.info(f"🔄 Attempting model: {model_name} ({'Google Native' if is_google_native else 'OpenRouter'})")
 
             if is_google_native:
@@ -305,7 +315,7 @@ def with_retry_db(fn):
 
 QUOTA_LIMITS = {
     "analysis": 1,      # Extractions per day
-    "verification": 1,  # Claims verified per day
+    "verification": 1,  # Claims verified per day (Strict cost saving)
     "report": 1         # Deep dives per day
 }
 
@@ -316,21 +326,20 @@ def check_and_increment_quota(user_id, quota_type):
     """
     limit = QUOTA_LIMITS.get(quota_type, 0)
     col_name = f"{quota_type}_count"
-    
+
     conn = get_conn()
     try:
         with conn.cursor() as c:
             # 1. CHECK FOR ADMIN EXEMPTION
             c.execute("SELECT email FROM users WHERE id = %s", (user_id,))
             user_row = c.fetchone()
-            
+
             if user_row and user_row[0] == "epistemiq.ai@gmail.com":
-                # Admin gets unlimited access. We return True, 0 usage, and a fake high limit.
                 return True, 0, 99999
 
             # 2. Standard Logic
             today = datetime.now().date()
-            
+
             # Ensure record exists
             c.execute("""
                 INSERT INTO user_quotas (user_id, usage_date, analysis_count, verification_count, report_count)
@@ -348,7 +357,7 @@ def check_and_increment_quota(user_id, quota_type):
             # Increment
             c.execute(f"UPDATE user_quotas SET {col_name} = {col_name} + 1 WHERE user_id=%s AND usage_date=%s", (user_id, today))
             conn.commit()
-            
+
             return True, current_count + 1, limit
     finally:
         conn.close()
@@ -358,22 +367,20 @@ def get_todays_spotlight_id():
     conn = get_conn()
     try:
         with conn.cursor() as c:
-            # ✅ FIX: Removed "DISTINCT" to fix the PostgreSQL ORDER BY error.
-            # We filter by ordinal=0, so duplicates aren't possible anyway.
-            #-- REMOVED FOR DIVERSITY --- WHERE a.source_type = 'url'
+            # Pick a "random" one based on the date (stable for 24h) from recent 50
+            # Filtering for ordinal=0 ensures we get unique analysis IDs
             c.execute("""
                 SELECT a.analysis_id
                 FROM analyses a
                 JOIN claims c ON a.analysis_id = c.analysis_id
-                AND c.ordinal = 0
+                WHERE c.ordinal = 0
                 ORDER BY a.created_at DESC
                 LIMIT 50
             """)
             rows = c.fetchall()
-            
+
             if not rows: return None
-            
-            # Pick a "random" one based on the date (stable for 24h)
+
             today_int = int(datetime.now().strftime("%Y%m%d"))
             selected_index = today_int % len(rows)
             return rows[selected_index][0]
@@ -402,7 +409,6 @@ def get_google_embedding(text):
         logging.error(f"Embedding failed: {e}")
         return None
 
-
 # ==============================================================
 #  Initialization: POSTGRES SCHEMA
 # ==============================================================
@@ -427,8 +433,8 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP
             )""")
-            
-            # ✅ QUOTA SYSTEM
+
+            # Quota System
             c.execute("""
             CREATE TABLE IF NOT EXISTS user_quotas (
                 user_id INTEGER REFERENCES users(id),
@@ -438,7 +444,7 @@ def init_db():
                 report_count INTEGER DEFAULT 0,
                 PRIMARY KEY (user_id, usage_date)
             )""")
-            
+
             c.execute("""
             CREATE TABLE IF NOT EXISTS magic_links (
                 id SERIAL PRIMARY KEY,
@@ -462,7 +468,7 @@ def init_db():
             c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token)")
 
-            # Core Analyses
+            # Core Analyses (Updated for 768 dim)
             c.execute("""
             CREATE TABLE IF NOT EXISTS analyses (
                 analysis_id TEXT PRIMARY KEY,
@@ -474,26 +480,21 @@ def init_db():
                 source_meta TEXT,
                 embedding vector(768),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_published BOOLEAN DEFAULT FALSE,
+                published_slug TEXT UNIQUE,
+                published_title TEXT,
+                published_at TIMESTAMP,
+                published_summary TEXT,
+                published_image_url TEXT
             )""")
             c.execute("""
-                CREATE INDEX IF NOT EXISTS idx_analyses_embedding 
+                CREATE INDEX IF NOT EXISTS idx_analyses_embedding
                 ON analyses USING hnsw (embedding vector_cosine_ops)
             """)
             c.execute("CREATE INDEX IF NOT EXISTS idx_analyses_hash_mode ON analyses(text_hash, mode)")
-            
-            # ✅ MIGRATION: Add Publishing Columns to Analyses
-            try:
-                c.execute("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT FALSE")
-                c.execute("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS published_slug TEXT UNIQUE")
-                c.execute("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS published_title TEXT")
-                c.execute("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS published_at TIMESTAMP")
-                c.execute("CREATE INDEX IF NOT EXISTS idx_analyses_slug ON analyses(published_slug)")
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                logging.warning(f"Publishing column addition failed: {e}")
 
+            # User Analyses Mapping
             c.execute("""
             CREATE TABLE IF NOT EXISTS user_analyses (
                 id SERIAL PRIMARY KEY,
@@ -537,38 +538,16 @@ def init_db():
                 ordinal INTEGER NOT NULL,
                 claim_text TEXT NOT NULL,
                 claim_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                final_verdict TEXT,
+                synthesis_summary TEXT,
+                category TEXT,
+                tags TEXT,
+                search_keywords TEXT
             )""")
             c.execute("CREATE INDEX IF NOT EXISTS idx_claims_analysis ON claims(analysis_id, ordinal)")
 
-            # ✅ MIGRATION: Add Compass & Keyword Columns
-            # We use ALTER TABLE to safely handle existing deployments
-            try:
-                c.execute("ALTER TABLE claims ADD COLUMN IF NOT EXISTS final_verdict TEXT")
-                c.execute("ALTER TABLE claims ADD COLUMN IF NOT EXISTS synthesis_summary TEXT")
-                c.execute("ALTER TABLE claims ADD COLUMN IF NOT EXISTS category TEXT")
-                c.execute("ALTER TABLE claims ADD COLUMN IF NOT EXISTS tags TEXT")
-                c.execute("ALTER TABLE claims ADD COLUMN IF NOT EXISTS search_keywords TEXT") # New for Unified Flow
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                logging.warning(f"Column addition failed (might already exist): {e}")
-
-            try:
-                # ... existing columns ...
-                c.execute("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS published_summary TEXT") # <--- NEW
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                logging.warning(f"Publishing column addition failed: {e}")
-            try:
-                c.execute("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS published_image_url TEXT") # <--- NEW
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                logging.warning(f"Publishing column addition failed: {e}")
-
-            # Verdict Caches (For the 'Deep Dive' Accordion)
+            # Verdict Caches (For the 'Deep Dive' Accordion - 768 dim for Google embeddings)
             c.execute("""
             CREATE TABLE IF NOT EXISTS model_cache (
                 claim_hash TEXT PRIMARY KEY,
@@ -598,6 +577,31 @@ def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )""")
 
+            # ✅ PUBLISHING ARCHIVE (Snapshot Table)
+            c.execute("""
+            CREATE TABLE IF NOT EXISTS published_articles (
+                id SERIAL PRIMARY KEY,
+                slug TEXT UNIQUE NOT NULL,
+                title TEXT NOT NULL,
+                summary TEXT,
+                image_url TEXT,
+                published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                tags JSONB,
+                categories JSONB,
+                content_snapshot JSONB NOT NULL
+            )""")
+
+            # ✅ COMMENTS (Linked to Archive)
+            c.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id SERIAL PRIMARY KEY,
+                article_id INTEGER REFERENCES published_articles(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id),
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_comments_article ON comments(article_id)")
+
             conn.commit()
     except Exception as e:
         print(f"❌ Database Init Failed: {e}")
@@ -624,21 +628,15 @@ def text_hash(text: str) -> str:
 
 @with_retry_db
 def save_claims_for_analysis(analysis_id: str, claims_data_list: list):
-    """
-    Saves claims AND their keywords to the DB.
-    Expects claims_data_list to be a list of dicts:
-    [{ 'claim': '...', 'keywords': [...] }, ...]
-    """
     conn = get_conn()
     try:
         with conn.cursor() as c:
             c.execute("DELETE FROM claims WHERE analysis_id=%s", (analysis_id,))
-            
+
             for idx, item in enumerate(claims_data_list):
                 claim_text = item.get("claim", "").strip()
                 if not claim_text: continue
-                
-                # Handle Keywords (List -> JSON string)
+
                 keywords_raw = item.get("keywords", [])
                 keywords_json = json_dumps(keywords_raw) if keywords_raw else None
 
@@ -648,7 +646,7 @@ def save_claims_for_analysis(analysis_id: str, claims_data_list: list):
 
                 c.execute("""
                 INSERT INTO claims (
-                    claim_id, analysis_id, ordinal, claim_text, 
+                    claim_id, analysis_id, ordinal, claim_text,
                     claim_hash, search_keywords, created_at
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
@@ -740,7 +738,6 @@ def store_media_cache(file_hash, media_type, extracted_text):
     finally:
         conn.close()
 
-# Include file upload helper here since it is used by media routes
 def save_uploaded_file(file, upload_folder=None):
     """Save uploaded file and return path"""
     if upload_folder is None:
@@ -769,62 +766,49 @@ def cleanup_old_cache():
     try:
         with conn.cursor() as c:
             cutoff = datetime.now() - timedelta(days=30)
-            
+
             # 1. DELETE UNUSED MEDIA
-            # (Media is transient, usually safe to delete unless we want to keep source images for articles)
             c.execute('DELETE FROM media_cache WHERE created_at < %s', (cutoff,))
             media_deleted = c.rowcount
 
-            # 2. DELETE OLD ANALYSES (BUT KEEP PUBLISHED ONES)
-            # We only delete if is_published is FALSE or NULL
+            # 2. DELETE OLD ANALYSES (Aggressive cleanup - Published content is safe in Archive)
             c.execute("""
-                DELETE FROM analyses 
-                WHERE last_accessed < %s 
-                AND (is_published IS FALSE OR is_published IS NULL)
+                DELETE FROM analyses
+                WHERE last_accessed < %s
             """, (cutoff,))
             analyses_deleted = c.rowcount
-            
-            # 3. DELETE INPUT CACHES (Only if not linked to a published analysis)
-            # This protects the "Source Text" of published articles
+
+            # 3. DELETE INPUT CACHES
             c.execute("""
-                DELETE FROM pasted_texts 
-                WHERE created_at < %s 
+                DELETE FROM pasted_texts
+                WHERE created_at < %s
                 AND text_hash NOT IN (
-                    SELECT text_hash FROM analyses WHERE is_published = TRUE
+                    SELECT text_hash FROM analyses
                 )
             """, (cutoff,))
             texts_deleted = c.rowcount
 
-            # 4. DELETE CACHED VERDICTS (Protect data used in published articles)
-            # We must ensure we don't delete verdicts that appear in a published article
-            
-            # Helper subquery for published claim hashes
-            published_hashes_query = """
-                SELECT claim_hash FROM claims 
-                JOIN analyses ON claims.analysis_id = analyses.analysis_id 
-                WHERE analyses.is_published = TRUE
-            """
+            # 4. DELETE ORPHANED VERDICTS
+            # Only keep verdicts that are linked to currently active claims
+            active_claims_query = "SELECT claim_hash FROM claims"
 
             c.execute(f"""
-                DELETE FROM model_cache 
-                WHERE updated_at < %s 
-                AND claim_hash NOT IN ({published_hashes_query})
+                DELETE FROM model_cache
+                WHERE updated_at < %s
+                AND claim_hash NOT IN ({active_claims_query})
             """, (cutoff,))
             model_deleted = c.rowcount
 
             c.execute(f"""
-                DELETE FROM external_cache 
-                WHERE updated_at < %s 
-                AND claim_hash NOT IN ({published_hashes_query})
+                DELETE FROM external_cache
+                WHERE updated_at < %s
+                AND claim_hash NOT IN ({active_claims_query})
             """, (cutoff,))
             external_deleted = c.rowcount
 
-            # 5. DELETE REPORTS
-            # Reports link via rq_hash (claim text + question). 
-            # It's harder to join directly, so we'll rely on timestamp, 
-            # BUT for safety in a production CMS, you might just want to keep reports longer or 
-            # accept that Deep Dives might need regeneration after 30 days.
-            # For now, let's just clean old ones to save space.
+            # 5. DELETE ORPHANED REPORTS
+            # Reports are harder to join directly, so we delete based on time for now
+            # (Or implement a strict join if rq_hash logic allows)
             c.execute('DELETE FROM report_cache WHERE updated_at < %s', (cutoff,))
             report_deleted = c.rowcount
 
@@ -836,8 +820,8 @@ def cleanup_old_cache():
         logging.info(
             f"Cache cleanup: {media_deleted} media, {analyses_deleted} analyses, "
             f"{texts_deleted} texts, {articles_deleted} articles, "
-            f"{model_deleted} model, {external_deleted} external removed. "
-            f"(Published articles protected)"
+            f"{model_deleted} model, {external_deleted} external, "
+            f"{report_deleted} reports removed."
         )
     except Exception as e:
         logging.error(f"Cleanup error: {e}")
@@ -872,27 +856,27 @@ UNIFIED_EXTRACTION_TEMPLATES = {
     "General Analysis of Testable Claims": f'''
     You will be given a text. Extract a **numbered list** of the **top up to 7** most scientifically significant and testable claims.
     Prioritize controversial, specific, or verifiable assertions over general statements.
-    
+
     {{text}}
-    
+
     {BASE_TEXT_INSTRUCTION}
     ''',
 
     "Specific Focus on Scientific Claims": f'''
     You will be given a text. Extract a **numbered list** of the **top up to 7** most significant, scientifically testable claims related to science.
     Prioritize controversial, data-driven or specific experimental assertions.
-    
+
     {{text}}
-    
+
     {BASE_TEXT_INSTRUCTION}
     ''',
 
     "Technology-Focused Extraction": f'''
     You will be given a text. Extract a **numbered list** of the **top up to 7** most significant, testable claims related to technology.
     Prioritize specific capabilities, benchmarks, or innovation claims.
-    
+
     {{text}}
-    
+
     {BASE_TEXT_INSTRUCTION}
     '''
 }
@@ -901,7 +885,7 @@ UNIFIED_EXTRACTION_TEMPLATES = {
 VERIFICATION_MODES = {
     "General Analysis of Testable Claims": '''
     **ROLE:** You are a rigorous scientific fact-checker.
-    
+
     **VERDICT LOGIC TABLE (Follow strictly):**
     - If the claim is a known scientific fact -> **VERIFIED**
     - If the claim is plausible but lacks proof -> **POSSIBLE_BUT_UNPROVEN**
@@ -917,7 +901,7 @@ VERIFICATION_MODES = {
 
     "Specific Focus on Scientific Claims": '''
     **ROLE:** You are a rigorous scientific fact-checker.
-    
+
     **VERDICT LOGIC TABLE (Follow strictly):**
     - If the claim is a known scientific fact -> **VERIFIED**
     - If the claim contradicts standard models (e.g. "CERN simulation became conscious") -> **NONSENSE**
@@ -932,7 +916,7 @@ VERIFICATION_MODES = {
 
     "Technology-Focused Extraction": '''
     **ROLE:** You are a technology fact-checker.
-    
+
     **VERDICT LOGIC TABLE (Follow strictly):**
     - If technology exists and works -> **VERIFIED**
     - If technology is theoretical -> **FEASIBLE**
@@ -968,7 +952,7 @@ Use ONLY your internal pre-trained knowledge to evaluate the scientific validity
 ---
 ### STEP 2: EXTERNAL ANALYSIS (Paper Review)
 Now, look *only* at the "Scientific Papers Found".
-1. **Relevance Check:** Do these papers explicitly confirm the specific event/discovery/phenomenon described in the claim? 
+1. **Relevance Check:** Do these papers explicitly confirm the specific event/discovery/phenomenon described in the claim?
 2. **Verdict:** Analyze the papers. Do they Support, Refute, or are they Irrelevant?
 3. If the papers discuss similar topics but do NOT mention the specific breakthrough claimed, point that out.
 3. **Citation:** You MUST cite specific papers from the list by Title/Year in your text.
@@ -987,12 +971,18 @@ Generate 3 specific, open-ended research questions that would help a user valida
     - Prioritize External Verification if it cites papers.
     - Explain *why* there is a mismatch (e.g. "External search likely failed due to keywords").
 - **Detect Gaps:** If the Internal AI says "Possible" but External Search says "False/Unsupported", check the External Sources. Are they relevant? Or did they miss the topic?
-- **Judge the Discrepancy:** 
+- **Judge the Discrepancy:**
     - If papers exist but disprove the claim -> "Explicitly Debunked".
     - If no relevant papers were found -> "Theoretical but Unproven".
     - If papers confirm it -> "Scientific Consensus".
 - **Weigh Evidence:** Prioritize peer-reviewed studies over preprints, and larger studies over smaller ones.
 - **Nuance:** If evidence is mixed, highlight the complexity rather than oversimplifying.
+
+**CATEGORY SELECTION GUIDE (CRITICAL):**
+- **"The Hype Check"**: Use when a claim exaggerates a real scientific finding (e.g., "New study cures cancer" when it was just mice).
+- **"The Scam Bust"**: Use when the claim is pseudoscience, a hoax, or scientifically impossible (e.g., "Perpetual motion machine", "Aliens confirmed").
+- **"The Nuance"**: Use when the claim is partially true but lacks context, or if scientific consensus is mixed/debated.
+- **"Fact Check"**: Use ONLY for dry, binary historical or data verification (e.g., "Apollo 11 landed in 1969"). **Avoid using this if others apply.**
 
 ---
 ### OUTPUT FORMAT (Strict JSON)
@@ -1033,7 +1023,7 @@ def rank_papers_with_google(claim_text, papers):
     Optimized to use BATCH embedding to avoid 429 Rate Limits.
     """
     if not papers: return []
-    
+
     try:
         # 1. Embed the Claim (The "Query")
         claim_result = genai.embed_content(
@@ -1042,16 +1032,16 @@ def rank_papers_with_google(claim_text, papers):
             task_type="FACT_VERIFICATION"
         )
         claim_vector = claim_result['embedding']
-        
+
         # 2. Prepare Batch for Papers (The "Corpus")
         valid_papers = []
         texts_to_embed = []
-        
+
         for p in papers:
             # Combine Title + Abstract
             text_content = f"{p.get('title', '')} {p.get('abstract', '')}"
-            if len(text_content) < 20: continue 
-            
+            if len(text_content) < 20: continue
+
             valid_papers.append(p)
             texts_to_embed.append(text_content[:4000]) # Stay within char limits
 
@@ -1064,19 +1054,19 @@ def rank_papers_with_google(claim_text, papers):
             content=texts_to_embed,
             task_type="RETRIEVAL_DOCUMENT"
         )
-        
+
         # Google returns a dict with 'embedding' key which is a list of vectors
         doc_vectors = batch_result['embedding']
-        
+
         scored_papers = []
         for i, doc_vector in enumerate(doc_vectors):
             score = calculate_cosine_similarity(claim_vector, doc_vector)
             scored_papers.append({**valid_papers[i], "score": score})
-        
+
         # 4. Sort
         scored_papers.sort(key=lambda x: x['score'], reverse=True)
         logging.info(f"Reranked {len(scored_papers)} papers in batch. Top: {scored_papers[0]['score']:.4f}")
-        
+
         return scored_papers
 
     except Exception as e:
@@ -1140,14 +1130,14 @@ def fetch_core(keywords, max_results=10):
         if response.status_code != 200:
             logging.warning(f"CORE API Error: {response.status_code}")
             return []
-            
+
         data = response.json()
         results = []
-        
+
         for item in data.get("results", []):
             # Extract Abstract
             abstract = item.get("abstract") or item.get("description") or "No abstract available."
-            
+
             # Extract URL (prefer download, then fullText, then landing)
             link = item.get("downloadUrl")
             if not link and item.get("links"):
@@ -1294,11 +1284,121 @@ def analyze_image_with_ocr(image_path):
         logging.error(f"OCR processing failed: {e}")
         return ""
 
+def analyze_image_with_openrouter(image_path):
+    """
+    Uses OpenRouter (Free Tier) for OCR to avoid Google Direct Rate Limits.
+    Tries Gemini 2.0 Flash first, then Llama 3.2 Vision.
+    """
+    if not OPENROUTER_API_KEY:
+        return None
+
+    # 1. Encode Image to Base64
+    try:
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+    except Exception as e:
+        logging.error(f"Image encoding failed: {e}")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://epistemiq.vercel.app",
+        "X-Title": "Epistemiq"
+    }
+
+    # Rotation of Free Vision Models
+    models = [
+        "google/gemini-2.0-flash-exp:free",
+        "meta-llama/llama-3.2-11b-vision-instruct:free"
+    ]
+
+    prompt = "Transcribe all the text visible in this image. Do not describe the image, just return the text found."
+
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+
+        try:
+            logging.info(f"Attempting OCR with OpenRouter: {model}")
+            response = requests.post(OR_URL, headers=headers, json=payload, timeout=45)
+
+            if response.status_code == 200:
+                content = response.json()['choices'][0]['message']['content']
+                if content:
+                    return content.strip()
+            else:
+                logging.warning(f"OpenRouter OCR failed ({model}): {response.status_code} - {response.text}")
+
+        except Exception as e:
+            logging.error(f"OpenRouter OCR error: {e}")
+            continue
+
+    return None
+
+def analyze_image_with_gemini(image_path):
+    """
+    Uses Google Gemini to transcribe text from an image.
+    Rotates through SPECIFIC STABLE model versions to avoid 404s and 429s.
+    """
+    # Use exact version numbers. Aliases like 'gemini-1.5-flash' sometimes fail
+    # depending on region/library version.
+    vision_models = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite-preview-02-05",
+        "gemini-2.0-pro-exp-02-05"
+        "gemma-3-27b-it"
+    ]
+
+    try:
+        img = Image.open(image_path)
+        prompt = "Transcribe all the text visible in this image. Do not describe the image, just return the text found."
+
+        for model_name in vision_models:
+            try:
+                logging.info(f"Attempting OCR with {model_name}...")
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content([prompt, img])
+
+                if response.text:
+                    return response.text.strip()
+            except Exception as e:
+                # Log specific error but keep trying
+                if "429" in str(e):
+                    logging.warning(f"Quota exceeded for {model_name}. Rotating...")
+                    time.sleep(1) # Short pause before next try
+                elif "404" in str(e):
+                    logging.warning(f"Model {model_name} not found/supported. Rotating...")
+                else:
+                    logging.warning(f"OCR error with {model_name}: {e}")
+                continue
+
+        return None
+
+    except Exception as e:
+        logging.error(f"Gemini Vision fatal error: {e}")
+        return None
+
 def save_uploaded_file(file, upload_folder=None):
     """Save uploaded file and return path"""
     # Logic to handle Docker vs Local paths automatically
     if upload_folder is None:
-        if os.getenv("DB_PATH"): 
+        if os.getenv("DB_PATH"):
             # We are likely in Docker if this env var is set
             upload_folder = "/app/uploads"
         else:
@@ -1440,19 +1540,19 @@ def render_report_html(text):
     Converts Report Markdown (Headers, Tables, Lists) to HTML for the Compass View.
     """
     if not text: return ""
-    
+
     # 1. Escape HTML first for safety
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    
+
     lines = text.split('\n')
     html_output = []
-    
+
     table_buffer = []
     in_table = False
-    
+
     for line in lines:
         stripped = line.strip()
-        
+
         # --- Table Detection ---
         if "|" in stripped:
             table_buffer.append(stripped)
@@ -1464,59 +1564,59 @@ def render_report_html(text):
                 html_output.append(_render_table(table_buffer))
                 table_buffer = []
                 in_table = False
-        
+
         # --- Normal Markdown ---
         if stripped.startswith("##"):
             # Header
             content = stripped.replace("#", "").strip()
             html_output.append(f'<h4 class="mt-4 mb-3 fw-bold text-dark">{content}</h4>')
-            
+
         elif stripped.startswith("- ") or stripped.startswith("* "):
             # List Item
             content = stripped[1:].strip()
             # Handle Bold within list
             content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
             html_output.append(f'<li class="ms-3 mb-1">{content}</li>')
-            
+
         elif stripped == "":
-            html_output.append("") 
-            
+            html_output.append("")
+
         else:
             # Standard Paragraph
             # ✅ FIX: Initialize 'content' from 'stripped' before regex
             content = stripped
             content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
             html_output.append(f'<p>{content}</p>')
-            
+
     # Flush pending table at end
     if in_table:
         html_output.append(_render_table(table_buffer))
-        
+
     return "\n".join(html_output)
 
 def _render_table(buffer):
     """Helper to turn a list of pipe-separated lines into a Bootstrap table."""
     if len(buffer) < 2: return "\n".join(buffer) # Not a valid table
-    
+
     html = '<div class="table-responsive mb-3"><table class="table table-bordered table-sm table-striped table-hover">'
-    
+
     # Header (First line)
     html += '<thead class="table-light"><tr>'
     headers = [h.strip() for h in buffer[0].strip('|').split('|')]
     for h in headers:
         html += f'<th>{h}</th>'
     html += '</tr></thead><tbody>'
-    
+
     # Body (Skip separator line if it exists e.g. ---|---)
     start_idx = 2 if '---' in buffer[1] else 1
-    
+
     for row in buffer[start_idx:]:
         cols = [c.strip() for c in row.strip('|').split('|')]
         html += '<tr>'
         for c in cols:
             html += f'<td>{c}</td>'
         html += '</tr>'
-        
+
     html += '</tbody></table></div>'
     return html
 
@@ -1526,24 +1626,24 @@ def normalize_text_for_pdf(text):
     Converts ALL fancy unicode characters to ASCII equivalents.
     """
     if not text: return ""
-    
+
     # 1. Normalize unicode
     text = unicodedata.normalize('NFKD', text)
-    
+
     # 2. Manual Map for common offenders
     replacements = {
-        "â€“": "-", "â€”": "-", "â€": "'", "â€œ": '"', "â€": '"', 
-        "â€™": "'", "â€˜": "'", "â-": "-", "â": "-", 
+        "â€“": "-", "â€”": "-", "â€": "'", "â€œ": '"', "â€": '"',
+        "â€™": "'", "â€˜": "'", "â-": "-", "â": "-",
         "–": "-", "—": "-", "“": '"', "”": '"', "‘": "'", "’": "'",
         "…": "...", "\u2022": "*", "\u25a0": "-" # The square block
     }
     for bad, good in replacements.items():
         text = text.replace(bad, good)
-        
+
     # 3. ASCII Fallback: Remove anything that isn't basic Latin-1
     # This prevents '■' and other mojibake from crashing the font renderer
     text = text.encode('ascii', 'ignore').decode('ascii')
-    
+
     return text.strip()
 
 # --- STYLES ---
@@ -1599,7 +1699,7 @@ def draw_page_footer(pdf_canvas, page_width):
     # Text
     page_num = pdf_canvas.getPageNumber()
     pdf_canvas.drawString(0.75 * inch, 0.5 * inch, f"Page {page_num}")
-    pdf_canvas.drawRightString(page_width - 0.75 * inch, 0.5 * inch, "epistemiq.vercel.app")
+    pdf_canvas.drawRightString(page_width - 0.75 * inch, 0.5 * inch, "http://epistemiq.pythonanywhere.com/")
 
     pdf_canvas.restoreState()
 
@@ -1804,11 +1904,11 @@ def fetch_article():
     try:
         # 1. Fetch raw HTML
         headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; EpistemiqBot/1.0; +https://epistemiq.vercel.app)",
+            "User-Agent": "Mozilla/5.0 (compatible; EpistemiqBot/1.0; +http://epistemiq.pythonanywhere.com/)",
             "Accept": "text/html,application/xhtml+xml"
         }
         response = requests.get(url, headers=headers, timeout=15)
-        
+
         if response.status_code != 200:
             return jsonify({
                 "error": f"Failed to fetch URL: {response.reason}",
@@ -1821,7 +1921,7 @@ def fetch_article():
         # 2. Clean HTML (Remove junk tags)
         for tag in soup(["script", "style", "noscript", "iframe", "svg", "button", "header", "footer", "nav", "aside", "form"]):
             tag.decompose()
-            
+
         # Also remove common ad/junk classes (Basic attempt)
         for junk in soup.find_all(attrs={"class": re.compile(r"(ad|ads|social-share|menu|sidebar)", re.I)}):
             junk.decompose()
@@ -1864,7 +1964,7 @@ def is_valid_content(text):
 
     # B. Check for Menu/Landing Page Density
     lines = [line.strip() for line in text.split('\n') if line.strip()]
-    
+
     if not lines:
         return False, "Empty content"
 
@@ -1889,7 +1989,7 @@ def speak_verdict():
     """
     data = request.json or {}
     text = data.get("text", "")
-    
+
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
@@ -1898,22 +1998,22 @@ def speak_verdict():
         return jsonify({"error": "ElevenLabs API Key missing"}), 500
 
     # Voice ID: "Brian" (Standard English Male)
-    VOICE_ID = "IKne3meq5aSn9XLyUdCD" 
+    VOICE_ID = "IKne3meq5aSn9XLyUdCD"
 
     # ✅ FIX: Remove '/stream' from URL, use query param instead
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}?stream=true"
 
-    
+
     headers = {
         "Accept": "audio/mpeg",
         "Content-Type": "application/json",
         "xi-api-key": ELEVENLABS_API_KEY
     }
-    
+
     payload = {
         "text": text,
         # ✅ FIX: Use Flash v2.5 (Faster, Cheaper, Stable)
-        "model_id": "eleven_flash_v2_5", 
+        "model_id": "eleven_flash_v2_5",
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.75
@@ -1922,7 +2022,7 @@ def speak_verdict():
 
     try:
         response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
-        
+
         # Log error body if status is not 200
         if response.status_code != 200:
             logging.error(f"ElevenLabs Error {response.status_code}: {response.text}")
@@ -1982,7 +2082,7 @@ def analyze(user):
             if vector_embedding:
                 try:
                     c.execute("""
-                        SELECT analysis_id, (embedding <=> %s::vector) as distance 
+                        SELECT analysis_id, (embedding <=> %s::vector) as distance
                         FROM analyses WHERE mode=%s ORDER BY distance ASC LIMIT 1
                     """, (str(vector_embedding), mode))
                     match = c.fetchone()
@@ -2002,12 +2102,12 @@ def analyze(user):
             # 3. REHYDRATION (Snapshot Style - Restores Full Frontend State)
             if analysis_id:
                 c.execute("UPDATE analyses SET last_accessed=CURRENT_TIMESTAMP WHERE analysis_id=%s", (analysis_id,))
-                
+
                 # Get basic claim rows
                 c.execute("""
                     SELECT ordinal, claim_text, final_verdict, synthesis_summary, category, tags
-                    FROM claims 
-                    WHERE analysis_id = %s 
+                    FROM claims
+                    WHERE analysis_id = %s
                     ORDER BY ordinal
                 """, (analysis_id,))
                 claim_rows = c.fetchall()
@@ -2041,11 +2141,11 @@ def analyze(user):
                             "external_verdict": e_row["verdict"] if e_row else None,
                             "external_sources": json_loads(e_row["sources_json"], []) if (e_row and e_row['sources_json']) else []
                         })
-                    
+
                     conn.commit()
                     return jsonify({
-                        "claims": claims_payload, 
-                        "analysis_id": analysis_id, 
+                        "claims": claims_payload,
+                        "analysis_id": analysis_id,
                         "cached": True,
                         "mode": mode
                     })
@@ -2056,10 +2156,10 @@ def analyze(user):
                 INSERT INTO analyses (analysis_id, user_id, text_hash, canonical_text, mode, source_type, source_meta, embedding)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (analysis_id, user_id, txt_hash, canonical, mode, current_source_type, source_url, str(vector_embedding) if vector_embedding else None))
-            
+
             if user_id:
                 c.execute("INSERT INTO user_analyses (user_id, analysis_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user_id, analysis_id))
-            
+
             conn.commit()
 
     finally:
@@ -2076,9 +2176,9 @@ def analyze(user):
     try:
         # ✅ NEW: Use Hybrid Flow (Task: Extraction = Gemma Native First)
         res, _ = call_hybrid_flow(prompt, json_mode=False, task_type="extraction")
-        
+
         raw_content = res.json()["choices"][0]["message"]["content"]
-        
+
         extracted_data = []
         for line in raw_content.splitlines():
             line = line.strip()
@@ -2090,7 +2190,7 @@ def analyze(user):
                 k_txt = match.group(2)
                 k_list = [k.strip() for k in re.split(r'[,;]', k_txt) if k.strip()]
                 extracted_data.append({"claim": c_txt, "keywords": k_list})
-        
+
         if extracted_data:
             save_claims_for_analysis(analysis_id, extracted_data)
 
@@ -2113,7 +2213,7 @@ def verify_claim_unified(user):
     use_papers = data.get("use_papers", True)
     preferred_model = data.get("preferred_model")
     user_id = user["user_id"]
-    
+
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as c:
@@ -2124,14 +2224,14 @@ def verify_claim_unified(user):
                 WHERE c.analysis_id=%s AND c.ordinal=%s
             """, (analysis_id, int(ordinal)))
             row = c.fetchone()
-            
+
             if not row: return jsonify({"error": "Not found"}), 404
-            
+
             claim_text = row['claim_text']
             keywords = json_loads(row['search_keywords'], [])
             full_text = row['canonical_text'] or ""
             analysis_mode = row['mode'] or "General Analysis of Testable Claims"
-            
+
             if not keywords:
                 keywords = [claim_text[:50]]
     finally:
@@ -2145,42 +2245,42 @@ def verify_claim_unified(user):
     # --- 2. Run Verification ---
     paper_abstracts = "No external papers requested."
     unique_sources = []
-    
+
     if use_papers:
         all_sources = []
-        
+
         # ✅ 1. Aggressive Fetching (Wider Net)
         # We fetch 10 from major sources to give the Reranker enough candidates
         try: all_sources.extend(fetch_semantic_scholar(keywords, max_results=20))
         except: pass
-        
+
         try: all_sources.extend(fetch_core(keywords, max_results=20))
         except: pass
-        
+
         try: all_sources.extend(fetch_pubmed(keywords)) # Returns ~5 default
         except: pass
-        
+
         try: all_sources.extend(fetch_crossref(keywords)) # Returns ~3 default
         except: pass
-        
+
         # ✅ 2. Deduplication by Fuzzy Title
         seen_titles = set()
         deduped_sources = []
         for s in all_sources:
             raw_title = s.get('title', '')
             clean_title = re.sub(r'[^a-z0-9]', '', raw_title.lower())
-            
+
             if len(clean_title) > 10 and clean_title not in seen_titles:
                 deduped_sources.append(s)
                 seen_titles.add(clean_title)
-        
+
         # ✅ 3. Semantic Reranking (Fact Verification)
         if deduped_sources:
             logging.info(f"--- RERANKING {len(deduped_sources)} PAPERS VIA EMBEDDINGS ---")
             try:
                 # Uses the helper function defined earlier in the file
                 ranked_sources = rank_papers_with_google(claim_text, deduped_sources)
-                
+
                 # If ranking worked, use it. Otherwise fall back to raw list.
                 if ranked_sources:
                     unique_sources = ranked_sources[:10] # Top 10 most relevant
@@ -2193,7 +2293,7 @@ def verify_claim_unified(user):
             paper_abstracts = "\n\n".join([
                 f"SOURCE [{i+1}]: {s.get('title', 'Unknown')}\n"
                 f"YEAR: {s.get('year', 'N/A')}\n"
-                f"ABSTRACT: {(s.get('abstract') or 'No abstract')[:800]}" 
+                f"ABSTRACT: {(s.get('abstract') or 'No abstract')[:800]}"
                 for i, s in enumerate(unique_sources)
             ])
         else:
@@ -2201,7 +2301,7 @@ def verify_claim_unified(user):
 
     short_context = full_text[:4000].replace("{","(").replace("}",")")
     specific_instructions = VERIFICATION_MODES.get(analysis_mode, VERIFICATION_MODES["General Analysis of Testable Claims"])
-    
+
     prompt = UNIFIED_VERIFICATION_PROMPT.format(
         short_context=short_context,
         claim_text=claim_text,
@@ -2212,16 +2312,16 @@ def verify_claim_unified(user):
     try:
         # ✅ CALL HYBRID FLOW
         res, used_model = call_hybrid_flow(
-            prompt, 
-            json_mode=True, 
-            preferred_model=preferred_model, 
+            prompt,
+            json_mode=True,
+            preferred_model=preferred_model,
             task_type="verification",
             timeout=120
         )
-        
+
         raw_json = res.json()["choices"][0]["message"]["content"]
         result = json.loads(raw_json)
-        
+
         compass = result.get("compass", {})
         evidence = result.get("evidence", {})
 
@@ -2229,20 +2329,20 @@ def verify_claim_unified(user):
         try:
             with conn.cursor() as c:
                 c.execute("""
-                    UPDATE claims 
+                    UPDATE claims
                     SET final_verdict=%s, synthesis_summary=%s, category=%s, tags=%s
                     WHERE analysis_id=%s AND ordinal=%s
                 """, (compass.get("verdict_label"), compass.get("summary"), compass.get("category"), json.dumps(compass.get("tags", [])), analysis_id, int(ordinal)))
-                
+
                 ch = sha256_str(claim_text.strip().lower())
                 questions_list = evidence.get("questions", [])
-                
+
                 c.execute("""
                     INSERT INTO model_cache (claim_hash, verdict, questions_json, used_model, updated_at)
                     VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
                     ON CONFLICT(claim_hash) DO UPDATE SET verdict=EXCLUDED.verdict, questions_json=EXCLUDED.questions_json, used_model=EXCLUDED.used_model
                 """, (ch, evidence.get("model_verdict"), json.dumps(questions_list), used_model))
-                
+
                 # Save top 10 unique sources (Semantically Ranked)
                 c.execute("""
                     INSERT INTO external_cache (claim_hash, verdict, sources_json, used_model, updated_at)
@@ -2344,56 +2444,86 @@ def my_analyses(user):
 @app.route("/api/analysis-snapshot", methods=["GET"])
 def analysis_snapshot():
     """
-    Return a read-only snapshot.
-    Public access allowed ONLY if it is the 'Daily Spotlight'.
-    Otherwise requires login + ownership.
+    Returns data for the Tool View.
+    Handles LIVE (UUID) and ARCHIVED (Integer) IDs.
+    Allows public access IF the ID matches the Daily Spotlight.
     """
-    analysis_id = request.args.get("analysis_id")
-    if not analysis_id: return jsonify({"error": "Missing analysis_id"}), 400
+    analysis_id_str = request.args.get("analysis_id")
+    if not analysis_id_str: return jsonify({"error": "Missing analysis_id"}), 400
 
-    user = get_current_user() # Returns None if not logged in
-    
-    # 1. AUTH & AUTHORIZATION CHECK
-    is_authorized = False
-    
-    # A. Check if it matches Daily Spotlight (Public Access)
-    spotlight_id = get_todays_spotlight_id()
-    if analysis_id == spotlight_id:
-        is_authorized = True
-    
-    # B. If not spotlight, check User Ownership
-    if not is_authorized:
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-            
-        conn = get_conn()
-        try:
-            with conn.cursor() as c:
-                c.execute("SELECT 1 FROM user_analyses WHERE user_id=%s AND analysis_id=%s", (user['user_id'], analysis_id))
-                if c.fetchone():
-                    is_authorized = True
-        finally:
-            conn.close()
+    user = get_current_user()
 
-    if not is_authorized:
-        return jsonify({"error": "Forbidden: You do not have access to this analysis."}), 403
+    # 1. Determine Source: Archive vs Live
+    is_archive = analysis_id_str.isdigit()
 
-    # 2. FETCH DATA (If authorized)
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as c:
-            # Metadata
-            c.execute("SELECT analysis_id, mode, canonical_text, created_at FROM analyses WHERE analysis_id = %s", (analysis_id,))
+
+            # --- PATH A: ARCHIVED ARTICLE (Integer ID) ---
+            if is_archive:
+                c.execute("SELECT title, published_at, content_snapshot FROM published_articles WHERE id = %s", (int(analysis_id_str),))
+                row = c.fetchone()
+                if not row: return jsonify({"error": "Archived analysis not found"}), 404
+
+                # Map Archive JSON -> Tool View JSON
+                snapshot = row['content_snapshot']
+                mapped_claims = []
+                for idx, item in enumerate(snapshot):
+                    mapped_claims.append({
+                        "ordinal": idx,
+                        "claim_text": item.get('text'),
+                        "final_verdict": item.get('verdict'),
+                        "synthesis_summary": item.get('summary'),
+                        "category": item.get('category'),
+                        "tags": item.get('tags', []),
+                        "model_verdict": item.get('internal_verdict'),
+                        "used_model": item.get('internal_model', 'Archived'),
+                        "external_verdict": item.get('external_verdict'),
+                        "external_sources": item.get('sources', []),
+                        "questions": [d['question'] for d in item.get('deep_dives', [])] if item.get('deep_dives') else []
+                    })
+
+                return jsonify({
+                    "analysis_id": analysis_id_str,
+                    "mode": "Archived Spotlight",
+                    "title": row['title'],
+                    "created_at": row['published_at'],
+                    "claims": mapped_claims
+                })
+
+            # --- PATH B: LIVE ANALYSIS (UUID) ---
+
+            # 1. Access Control
+            is_authorized = False
+
+            # Check 1: Is user owner?
+            if user:
+                c.execute("SELECT 1 FROM user_analyses WHERE user_id=%s AND analysis_id=%s", (user['user_id'], analysis_id_str))
+                if c.fetchone(): is_authorized = True
+
+            # Check 2: Is this the Daily Spotlight? (Public Access)
+            if not is_authorized:
+                # We calculate the spotlight ID again to check permission
+                # (Optimization: You could cache this, but calculating it is fast enough)
+                spotlight_id = get_todays_spotlight_id()
+                if analysis_id_str == spotlight_id:
+                    is_authorized = True
+
+            if not is_authorized:
+                 return jsonify({"error": "Forbidden: You do not have access to this analysis."}), 403
+
+            # 2. Fetch Live Data
+            c.execute("SELECT analysis_id, mode, canonical_text, created_at FROM analyses WHERE analysis_id = %s", (analysis_id_str,))
             meta = c.fetchone()
             if not meta: return jsonify({"error": "Analysis not found"}), 404
 
-            # Claims
             c.execute("""
                 SELECT ordinal, claim_text, final_verdict, synthesis_summary, category, tags
-                FROM claims 
-                WHERE analysis_id = %s 
+                FROM claims
+                WHERE analysis_id = %s
                 ORDER BY ordinal
-            """, (analysis_id,))
+            """, (analysis_id_str,))
             claim_rows = c.fetchall()
 
             claims_payload = []
@@ -2402,7 +2532,6 @@ def analysis_snapshot():
                 claim_text = row["claim_text"]
                 ch = sha256_str(claim_text.strip().lower())
 
-                # Caches
                 c.execute("SELECT verdict, questions_json, used_model FROM model_cache WHERE claim_hash=%s", (ch,))
                 model_row = c.fetchone()
 
@@ -2412,12 +2541,10 @@ def analysis_snapshot():
                 claims_payload.append({
                     "ordinal": ordinal,
                     "claim_text": claim_text,
-                    # Compass
                     "final_verdict": row["final_verdict"],
                     "synthesis_summary": row["synthesis_summary"],
                     "category": row["category"],
                     "tags": json_loads(row["tags"], []) if row["tags"] else [],
-                    # Deep Dive
                     "model_verdict": model_row["verdict"] if model_row else None,
                     "used_model": model_row["used_model"] if model_row else None,
                     "questions": json_loads(model_row["questions_json"], []) if (model_row and model_row['questions_json']) else [],
@@ -2426,23 +2553,22 @@ def analysis_snapshot():
                     "external_sources": json_loads(ext_row["sources_json"], []) if (ext_row and ext_row['sources_json']) else []
                 })
 
+            def _title_from_text(txt, fallback_mode):
+                txt = (txt or "").strip()
+                if not txt: return fallback_mode or "Untitled analysis"
+                first_line = txt.splitlines()[0].strip()
+                return first_line[:117] + "..." if len(first_line) > 120 else first_line
+
+            return jsonify({
+                "analysis_id": meta["analysis_id"],
+                "mode": meta["mode"],
+                "title": _title_from_text(meta["canonical_text"], meta["mode"]),
+                "created_at": meta["created_at"],
+                "claims": claims_payload,
+            })
+
     finally:
         conn.close()
-
-    # Title Logic
-    def _title_from_text(txt, fallback_mode):
-        txt = (txt or "").strip()
-        if not txt: return fallback_mode or "Untitled analysis"
-        first_line = txt.splitlines()[0].strip()
-        return first_line[:117] + "..." if len(first_line) > 120 else first_line
-
-    return jsonify({
-        "analysis_id": meta["analysis_id"],
-        "mode": meta["mode"],
-        "title": _title_from_text(meta["canonical_text"], meta["mode"]),
-        "created_at": meta["created_at"].isoformat() if hasattr(meta["created_at"], "isoformat") else meta["created_at"],
-        "claims": claims_payload,
-    })
 
 
 @app.route("/api/delete-analysis/<analysis_id>", methods=["DELETE"])
@@ -2519,17 +2645,17 @@ def core_proxy():
     for attempt in range(max_retries + 1):
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=10)
-            
+
             # If success, return data
             if resp.status_code == 200:
                 return jsonify(resp.json())
-            
+
             # If server busy (429 or 5xx), wait and retry
             if resp.status_code == 429 or resp.status_code >= 500:
                 if attempt < max_retries:
                     time.sleep(1)
                     continue
-            
+
             # If other error, return it
             return jsonify({"error": f"CORE API Error: {resp.text}"}), resp.status_code
 
@@ -2543,7 +2669,7 @@ def core_proxy():
 
 @app.route("/api/process-image", methods=["POST"])
 def process_image():
-    """Process uploaded image and extract text using OCR with caching"""
+    """Process uploaded image and extract text using OpenRouter Vision (Fallback to Tesseract)"""
     try:
         if 'image' not in request.files:
             return jsonify({"error": "No image file provided"}), 400
@@ -2552,36 +2678,37 @@ def process_image():
         if image_file.filename == '':
             return jsonify({"error": "No image file selected"}), 400
 
-        # Save the uploaded image temporarily to compute hash
+        # Save temporarily
         image_path = save_uploaded_file(image_file)
         if not image_path:
             return jsonify({"error": "Failed to save image"}), 500
 
-        # Compute file hash and check cache
+        # Check Cache
         file_hash = compute_file_hash(image_path)
         cached_text = get_cached_media(file_hash)
         if cached_text:
-            try:
-                os.remove(image_path)
-            except:
-                pass
+            try: os.remove(image_path)
+            except: pass
             return jsonify({"extracted_text": cached_text, "cached": True})
 
-        # Extract text using OCR if not cached
-        extracted_text = analyze_image_with_ocr(image_path)
+        # ✅ NEW: Use OpenRouter Vision (Better Rate Limits than Direct Google)
+        extracted_text = analyze_image_with_openrouter(image_path)
+
+        # Fallback to Tesseract
+        if not extracted_text:
+             logging.info("AI Vision failed/empty, falling back to Tesseract")
+             extracted_text = analyze_image_with_ocr(image_path)
 
         # Store in cache
         if extracted_text:
             store_media_cache(file_hash, 'image', extracted_text)
 
-        # Clean up the uploaded file
-        try:
-            os.remove(image_path)
-        except:
-            pass
+        # Cleanup
+        try: os.remove(image_path)
+        except: pass
 
         if not extracted_text:
-            return jsonify({"error": "Could not extract text from image. Please ensure the image contains clear text."}), 400
+            return jsonify({"error": "Could not extract text. Image might be unclear."}), 400
 
         return jsonify({"extracted_text": extracted_text, "cached": False})
 
@@ -2758,7 +2885,7 @@ def generate_report():
     # 1. Auth Check (Manual because it's a stream)
     user = get_current_user()
     if not user: return Response(json.dumps({"error": "Unauthorized"}), mimetype="application/json", status=401)
-    
+
     # Setup
     if request.method == "GET":
         claim_idx = request.args.get("claim_idx", type=int)
@@ -2797,10 +2924,10 @@ def generate_report():
             c.execute("SELECT questions_json FROM model_cache WHERE claim_hash=%s", (claim_hash,))
             questions_row = c.fetchone()
             if not questions_row: return Response(json.dumps({"error": "Questions not found."}), mimetype="application/json", status=400)
-            
+
             questions = json_loads(questions_row["questions_json"], [])
             if question_idx >= len(questions): return Response(json.dumps({"error": "Invalid Question Index"}), mimetype="application/json", status=400)
-            
+
             question_text = questions[question_idx]
             rq_hash = sha256_str(claim_text.strip().lower() + "||" + question_text.strip().lower())
 
@@ -2828,8 +2955,8 @@ def generate_report():
     allowed, used, limit = check_and_increment_quota(user["user_id"], "report")
     if not allowed:
         return Response(
-            json.dumps({"error": f"Daily report limit reached ({used}/{limit})."}), 
-            mimetype="application/json", 
+            json.dumps({"error": f"Daily report limit reached ({used}/{limit})."}),
+            mimetype="application/json",
             status=429
         )
 
@@ -2879,15 +3006,15 @@ Generate the research report now.
             # ✅ CALL HYBRID FLOW
             # task_type="report" -> Respects user preference -> Falls back to Google Native
             res, actual_model = call_hybrid_flow(
-                prompt, 
-                stream=True, 
-                json_mode=False, 
-                preferred_model=preferred_model, 
-                task_type="report", 
+                prompt,
+                stream=True,
+                json_mode=False,
+                preferred_model=preferred_model,
+                task_type="report",
                 timeout=290
             )
             used_model_name = actual_model
-            
+
             # Use iter_content to handle both Google (SSE wrapped) and OpenRouter (Raw)
             for chunk in res.iter_content(chunk_size=1024, decode_unicode=True):
                 if not chunk: continue
@@ -2923,7 +3050,14 @@ Generate the research report now.
             finally: conn.close()
         yield "data: [DONE]\n\n"
 
-    return Response(stream_response(), mimetype="text/event-stream")
+    # 1. Create the response object
+    response = Response(stream_response(), mimetype="text/event-stream")
+
+    # 2. Add the header
+    response.headers["X-Accel-Buffering"] = "no"
+
+    # 3. Return it
+    return response
 
 @app.route("/api/available-reports", methods=["GET"])
 def get_available_reports():
@@ -2942,7 +3076,7 @@ def get_available_reports():
                 (analysis_id,)
             )
             claim_rows = c.fetchall()
-            
+
             available_reports = []
 
             for row in claim_rows:
@@ -2984,7 +3118,7 @@ def get_available_reports():
 @app.route("/api/daily-spotlight", methods=["GET"])
 def daily_spotlight():
     target_id = get_todays_spotlight_id()
-    if not target_id: 
+    if not target_id:
         return jsonify({"error": "No spotlight found"}), 404
 
     conn = get_conn()
@@ -2997,11 +3131,16 @@ def daily_spotlight():
                 WHERE a.analysis_id = %s AND c.ordinal = 0
             """, (target_id,))
             row = c.fetchone()
-            
+
             if not row: return jsonify({"error": "Spotlight data missing"}), 404
 
+            # Determine source label
             source_url = row["source_meta"]
-            domain = source_url.split('/')[2] if '//' in source_url else "External Source"
+            domain = "External Source"
+            if source_url and "//" in source_url:
+                try:
+                    domain = source_url.split('/')[2]
+                except: pass
 
             return jsonify({
                 "analysis_id": row["analysis_id"],
@@ -3018,73 +3157,65 @@ def daily_spotlight():
 
 @app.route('/compass')
 def compass_feed():
-    # Capture Filters
     search_query = request.args.get('q', '').strip()
     category_filter = request.args.get('cat', '').strip()
-    
+
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as c:
-            
-            # 1. Get Distinct Categories (for the UI filter list)
-            # Only fetch categories that actually have published articles
-            c.execute("""
-                SELECT DISTINCT c.category 
-                FROM claims c
-                JOIN analyses a ON c.analysis_id = a.analysis_id
-                WHERE a.is_published = TRUE AND c.ordinal = 0 AND c.category IS NOT NULL
-                ORDER BY c.category
-            """)
-            categories = [row[0] for row in c.fetchall()]
+            # 1. Get Categories for Filter
+            # (We perform a quick aggregation on the JSONB column)
+            c.execute("SELECT DISTINCT jsonb_array_elements_text(categories) FROM published_articles")
+            categories = sorted([row[0] for row in c.fetchall()])
 
-            # 2. Build Article Query
-            sql = """
-                SELECT a.published_title, a.published_slug, a.published_at, a.published_image_url,
-                       c.final_verdict, c.category, c.synthesis_summary, c.tags
-                FROM analyses a
-                JOIN claims c ON a.analysis_id = c.analysis_id
-                WHERE a.is_published = TRUE 
-                AND c.ordinal = 0
-            """
+            # 2. Build Query
+            sql = "SELECT id, title, slug, summary, image_url, published_at, categories, tags, content_snapshot FROM published_articles WHERE 1=1"
             params = []
 
-            # Add Category Filter
             if category_filter:
-                sql += " AND c.category = %s"
-                params.append(category_filter)
+                # JSONB contains check
+                sql += " AND categories @> %s"
+                params.append(json.dumps([category_filter]))
 
-            # Add Search Filter (Title, Summary, or Tags)
             if search_query:
-                sql += """ AND (
-                    a.published_title ILIKE %s OR 
-                    c.synthesis_summary ILIKE %s OR
-                    c.tags::text ILIKE %s
-                )"""
-                term = f"%{search_query}%"
-                params.extend([term, term, term])
+                sql += " AND (title ILIKE %s OR summary ILIKE %s)"
+                params.extend([f"%{search_query}%", f"%{search_query}%"])
 
-            # Finish Query
-            sql += " ORDER BY a.published_at DESC"
+            sql += " ORDER BY published_at DESC"
 
             c.execute(sql, tuple(params))
             rows = c.fetchall()
-            
+
             articles = []
             for r in rows:
-                tags = json_loads(r['tags'], [])
+                snapshot = r['content_snapshot']
+
+                # ✅ FIX: Handle empty snapshot or None verdict safely
+                if snapshot and len(snapshot) > 0:
+                    # Get verdict, default to "Pending" if None/Null
+                    raw_verdict = snapshot[0].get('verdict')
+                    first_verdict = raw_verdict if raw_verdict else "Pending"
+                else:
+                    first_verdict = "Pending"
+
+                # Safety check for categories
+                cat_display = "Analysis"
+                if r['categories'] and len(r['categories']) > 0:
+                    cat_display = r['categories'][0]
+
                 articles.append({
-                    "title": r['published_title'] or "Untitled Analysis",
-                    "slug": r['published_slug'],
-                    "date": r['published_at'].strftime("%b %d, %Y") if r['published_at'] else "",
-                    "image": r['published_image_url'],
-                    "verdict": r['final_verdict'] or "Pending",
-                    "category": r['category'] or "Analysis",
-                    "summary": r['synthesis_summary'] or "No summary available.",
-                    "tags": tags[:3]
+                    "title": r['title'],
+                    "slug": r['slug'],
+                    "date": r['published_at'].strftime("%b %d, %Y"),
+                    "image": r['image_url'],
+                    "verdict": first_verdict, # ✅ Now guaranteed to be a string
+                    "category": cat_display,
+                    "summary": r['summary'],
+                    "tags": r['tags'][:3] if r['tags'] else []
                 })
-                
-            return render_template('compass_feed.html', 
-                                   articles=articles, 
+
+            return render_template('compass_feed.html',
+                                   articles=articles,
                                    categories=categories,
                                    active_cat=category_filter,
                                    active_search=search_query)
@@ -3101,88 +3232,98 @@ def simple_markdown(text):
 
 @app.route('/compass/<slug>')
 def compass_article(slug):
+    user = get_current_user()
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as c:
-            # 1. Fetch Metadata
+            # 1. Fetch Article from Archive
             c.execute("""
-                SELECT analysis_id, published_title, published_at, published_summary, published_image_url, canonical_text 
-                FROM analyses 
-                WHERE published_slug = %s AND is_published = TRUE
+                SELECT id, title, published_at, summary, image_url, content_snapshot
+                FROM published_articles
+                WHERE slug = %s
             """, (slug,))
-            meta = c.fetchone()
-            
-            if not meta: return "Article not found", 404
-            
-            analysis_id = meta['analysis_id']
-            
-            # 2. Fetch Claims
+            row = c.fetchone()
+
+            if not row: return "Article not found", 404
+
+            article_id = row['id']
+            content_data = row['content_snapshot'] # This is already the JSON list we need!
+
+            # Helper to process text (Markdown -> HTML) inside the JSON data
+            # We do this at render time to keep the DB clean
+            final_content = []
+            for item in content_data:
+                # We recreate the object to process HTML fields
+                # Note: deep_dives loop is handled in template usually, but we ensure structure here
+                processed_item = item.copy()
+                processed_item['internal_verdict'] = render_report_html(item.get('internal_verdict'))
+                processed_item['external_verdict'] = render_report_html(item.get('external_verdict'))
+
+                # Process reports if they exist
+                if 'deep_dives' in item:
+                    for dd in item['deep_dives']:
+                        dd['content'] = render_report_html(dd['content'])
+
+                final_content.append(processed_item)
+
+            # 2. Fetch Comments (Now linked to article_id)
             c.execute("""
-                SELECT ordinal, claim_text, final_verdict, synthesis_summary, category, tags
-                FROM claims 
-                WHERE analysis_id = %s 
-                ORDER BY ordinal
-            """, (analysis_id,))
-            claim_rows = c.fetchall()
-            
-            # 3. Build Full Data (FILTERED)
-            claims_data = []
-            for r in claim_rows:
-                # ✅ FILTER: Skip claims that haven't been verified yet
-                if not r['final_verdict']:
-                    continue
+                SELECT c.content, c.created_at, u.email
+                FROM comments c
+                JOIN users u ON c.user_id = u.id
+                WHERE c.article_id = %s
+                ORDER BY c.created_at DESC
+            """, (article_id,))
+            comments = c.fetchall()
 
-                ch = sha256_str(r['claim_text'].strip().lower())
-                c.execute("SELECT verdict, used_model, questions_json FROM model_cache WHERE claim_hash=%s", (ch,))
-                mv = c.fetchone()
-                c.execute("SELECT verdict, sources_json FROM external_cache WHERE claim_hash=%s", (ch,))
-                ev = c.fetchone()
-                
-                # Prepare Model Name
-                raw_model = mv['used_model'] if mv and mv['used_model'] else "Unknown"
-                clean_model = raw_model.replace(":free", "").replace("/", " / ")
-                
-                # Fetch Reports
-                deep_dives = []
-                if mv and mv['questions_json']:
-                    questions = json_loads(mv['questions_json'], [])
-                    for q_idx, q_text in enumerate(questions):
-                        rq_hash = sha256_str(r['claim_text'].strip().lower() + "||" + q_text.strip().lower())
-                        c.execute("SELECT report_text, used_model FROM report_cache WHERE rq_hash=%s", (rq_hash,))
-                        report = c.fetchone()
-                        if report:
-                            deep_dives.append({
-                                "question": q_text,
-                                "model": report['used_model'].replace(":free","").replace("/"," / ") if report['used_model'] else "AI",
-                                "content": render_report_html(report['report_text'])
-                            })
-
-                claims_data.append({
-                    "text": r['claim_text'],
-                    "verdict": r['final_verdict'],
-                    "category": r['category'] or "Analysis",
-                    "summary": r['synthesis_summary'],
-                    "tags": json_loads(r['tags'], []) if r['tags'] else [],
-                    "compass_model": clean_model,
-                    
-                    "internal_verdict": render_report_html(mv['verdict']) if mv else None,
-                    "external_verdict": render_report_html(ev['verdict']) if ev else None,
-                    "sources": json_loads(ev['sources_json'], []) if ev else [],
-                    
-                    "deep_dives": deep_dives
+            clean_comments = []
+            for cm in comments:
+                email_parts = cm['email'].split('@')
+                name = email_parts[0]
+                clean_comments.append({
+                    "user": name[:3] + "***" if len(name) > 3 else "User",
+                    "date": cm['created_at'].strftime("%b %d, %Y"),
+                    "content": cm['content']
                 })
-                
-            return render_template('compass_article.html', 
-                                   title=meta['published_title'] or "Untitled", 
-                                   date=meta['published_at'].strftime("%B %d, %Y") if meta['published_at'] else "",
-                                   summary=render_report_html(meta['published_summary']),
-                                   image=meta['published_image_url'],
-                                   content=claims_data)
+
+            return render_template('compass_article.html',
+                                   title=row['title'],
+                                   date=row['published_at'].strftime("%B %d, %Y"),
+                                   summary=render_report_html(row['summary']),
+                                   image=row['image_url'],
+                                   content=final_content,
+                                   comments=clean_comments,
+                                   user=user,
+                                   article_id=article_id) # Pass ID for comments
     finally:
         conn.close()
 
+
+@app.route('/api/post-comment', methods=['POST'])
+@require_user
+def post_comment(user):
+    data = request.json or {}
+    article_id = data.get('article_id') # Changed from analysis_id
+    content = data.get('content', '').strip()
+
+    if not article_id or not content:
+        return jsonify({"error": "Missing data"}), 400
+
+    conn = get_conn()
+    try:
+        with conn.cursor() as c:
+            c.execute("""
+                INSERT INTO comments (article_id, user_id, content, created_at)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            """, (article_id, user['user_id'], content))
+        conn.commit()
+        return jsonify({"status": "success", "user": user['email'].split('@')[0][:3]+"***"})
+    finally:
+        conn.close()
+
+
 @app.route("/api/export-pdf", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["https://epistemiq.vercel.app"], supports_credentials=True, methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
+@cross_origin(origins=["http://epistemiq.pythonanywhere.com/"], supports_credentials=True, methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
 def export_pdf():
     payload = request.json or {}
     selected_reports = payload.get("selected_reports", [])
@@ -3200,9 +3341,9 @@ def export_pdf():
 
             # 2. Fetch Claims + Compass Data
             c.execute("""
-                SELECT ordinal, claim_text, final_verdict, synthesis_summary, category 
-                FROM claims 
-                WHERE analysis_id=%s 
+                SELECT ordinal, claim_text, final_verdict, synthesis_summary, category
+                FROM claims
+                WHERE analysis_id=%s
                 ORDER BY ordinal
             """, (analysis_id,))
             claim_rows = c.fetchall()
@@ -3212,13 +3353,13 @@ def export_pdf():
                 ordinal = row['ordinal']
                 text = row['claim_text']
                 ch = sha256_str(text.strip().lower())
-                
+
                 # Fetch Evidence Caches
                 c.execute("SELECT verdict, sources_json, used_model FROM external_cache WHERE claim_hash=%s", (ch,))
                 ev = c.fetchone()
                 c.execute("SELECT verdict, used_model, questions_json FROM model_cache WHERE claim_hash=%s", (ch,))
                 mv = c.fetchone()
-                
+
                 q_list = json_loads(mv['questions_json'], []) if mv else []
 
                 claims_data[ordinal] = {
@@ -3277,7 +3418,7 @@ def export_pdf():
     p.setFont("Helvetica", 10)
     p.setFillColor(colors.darkgrey)
     p.drawString(header_x, height - 0.8*inch - 18, "Your Compass in the Epistemic Fog")
-    p.drawRightString(width-0.75*inch, height-0.8*inch, "epistemiq.vercel.app")
+    p.drawRightString(width-0.75*inch, height-0.8*inch, "epistemiq.pythonanywhere.com")
     p.drawRightString(width-0.75*inch, height-0.8*inch - 14, "epistemiq.ai@gmail.com")
     p.setStrokeColor(colors.lightgrey)
     p.setLineWidth(1)
@@ -3287,14 +3428,14 @@ def export_pdf():
     y = height - 1.8 * inch
     source_val = analysis_meta["source_meta"] if analysis_meta["source_meta"] else "Pasted Text"
     source_label = "URL/Source" if analysis_meta["source_type"] == "url" else "Input Method"
-    
+
     display_source_val = source_val[:57] + "..." if len(source_val) > 60 else source_val
     date_val = str(analysis_meta["created_at"]).split('.')[0]
-    
+
     p.setFillColor(colors.aliceblue)
     p.setStrokeColor(colors.lightgrey)
     p.roundRect(0.75*inch, y - 55, width - 1.5*inch, 50, 6, fill=1, stroke=1)
-    
+
     p.setFont("Helvetica-Bold", 9)
     p.setFillColor(colors.black)
     p.drawString(0.9*inch, y - 20, "Analysis Metadata")
@@ -3306,7 +3447,7 @@ def export_pdf():
     meta_link_style = ParagraphStyle(name='MetaLink', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=11, textColor=colors.darkgrey)
     safe_url = source_val.replace('&', '&amp;').replace('"', '&quot;') if source_val else ""
     xml_content = f'{source_label}: <link href="{safe_url}" color="blue"><u>{clean_xml(display_source_val)}</u></link>' if (analysis_meta["source_type"] == "url" and source_val) else f'{source_label}: {clean_xml(display_source_val)}'
-    
+
     p_obj = Paragraph(xml_content, meta_link_style)
     p_obj.wrapOn(p, width - 4.0 * inch, 50)
     p_obj.drawOn(p, 3.0 * inch, y - 37)
@@ -3332,18 +3473,18 @@ def export_pdf():
         # Clean Claim Text (Chained correctly)
         raw_claim_text = normalize_text_for_pdf(claim_data['text'])
         raw_claim_text = raw_claim_text.replace("â-", "-").replace("â", "")
-        
+
         y = draw_paragraph(p, f"Claim {claim_idx + 1}: {raw_claim_text}", styles['ClaimHeading'], y, width)
 
         # --- COMPASS SYNTHESIS BOX ---
         if has_summary and claim_data['final_verdict']:
             avail_width = width - 1.5*inch
-            
+
             # Category
             cat_text = f"<b>{claim_data['category'] or 'ANALYSIS'}</b>"
             p_cat = Paragraph(cat_text, ParagraphStyle('Cat', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor("#6c757d")))
             w_c, h_c = p_cat.wrap(avail_width, 0)
-            
+
             # Verdict (Color Logic)
             v_str = str(claim_data['final_verdict']).lower()
             if any(x in v_str for x in ['true', 'verified', 'supported', 'feasible', 'accepted']):
@@ -3352,22 +3493,22 @@ def export_pdf():
                 v_color = "#dc3545" # Red
             else:
                 v_color = "#fd7e14" # Orange
-                
+
             verdict_html = f"<font color='{v_color}' size='12'><b>{claim_data['final_verdict']}</b></font>"
             p_verdict = Paragraph(verdict_html, styles['Normal'])
             w_v, h_v = p_verdict.wrap(avail_width, 0)
-            
+
             # Summary (Cleaned & Chained)
             raw_summary = normalize_text_for_pdf(claim_data['synthesis_summary'])
             raw_summary = raw_summary.replace("â-", "-").replace("â", "")
-            
+
             summary_html = f"<i>{clean_xml(raw_summary)}</i>"
             p_summary = Paragraph(summary_html, styles['ProBody'])
             w_s, h_s = p_summary.wrap(avail_width, 0)
-            
+
             # 2. Dynamic Line
-            total_box_height = h_c + h_v + h_s + 35 
-            
+            total_box_height = h_c + h_v + h_s + 35
+
             # Page Break Check
             if y - total_box_height < 1.0 * inch:
                 draw_page_footer(p, width)
@@ -3380,9 +3521,9 @@ def export_pdf():
             p.setLineWidth(2)
             p.line(0.75*inch, y, 0.75*inch, y - total_box_height)
             p.restoreState()
-            
+
             # Draw
-            p_cat.drawOn(p, 0.85*inch, y - h_c) 
+            p_cat.drawOn(p, 0.85*inch, y - h_c)
             y -= (h_c + 6)
             p_verdict.drawOn(p, 0.85*inch, y - h_v)
             y -= (h_v + 8)
@@ -3394,10 +3535,10 @@ def export_pdf():
             if claim_data['model_verdict']:
                 clean_model = claim_data['used_model'].replace(":free", "").replace("/", " / ")
                 y = draw_paragraph(p, f"<b>Internal Analysis (AI):</b> <font color='#666666' size='8'>{clean_model}</font>", styles['ProBody'], y, width)
-                
+
                 raw_mv = normalize_text_for_pdf(claim_data['model_verdict'])
                 raw_mv = raw_mv.replace("â-", "-").replace("â", "")
-                
+
                 clean_mv = clean_verdict_text(raw_mv)
                 y = draw_paragraph(p, clean_mv, styles['ProBody'], y, width)
 
@@ -3405,10 +3546,10 @@ def export_pdf():
             if claim_data['external_verdict']:
                 clean_ext_model = claim_data['external_model'].replace(":free", "").replace("/", " / ")
                 y = draw_paragraph(p, f"<b>External Verification (Papers):</b> <font color='#666666' size='8'>{clean_ext_model}</font>", styles['ProBody'], y, width)
-                
+
                 raw_ev = normalize_text_for_pdf(claim_data['external_verdict'])
                 raw_ev = raw_ev.replace("â-", "-").replace("â", "")
-                
+
                 clean_ev = clean_verdict_text(raw_ev)
                 y = draw_paragraph(p, clean_ev, styles['ProBody'], y, width)
 
@@ -3418,7 +3559,7 @@ def export_pdf():
                 for src in claim_data['sources']:
                     title = normalize_text_for_pdf(clean_xml(src.get("title", "Source Link")))
                     title = title.replace("â-", "-").replace("â", "")
-                    
+
                     url = src.get("url", "")
                     tag = f"<b>[{clean_xml(src.get('source', 'Source'))}]</b>"
                     if len(title) > 100: title = title[:97] + "..."
@@ -3434,12 +3575,12 @@ def export_pdf():
         for q_idx in selected_q_indices:
             q_text = normalize_text_for_pdf(claim_data["questions"][q_idx])
             q_text = q_text.replace("â-", "-").replace("â", "")
-            
+
             report_data = claim_data["reports"].get(q_idx)
             if not report_data: continue
 
             y = draw_paragraph(p, f"<b>Deep Dive: {clean_xml(q_text)}</b>", styles['SectionHeading'], y, width)
-            
+
             # Report Model
             clean_rep_model = report_data['model'].replace(':free','').replace('/',' / ')
             y = draw_paragraph(p, f"<b>Report Model:</b> <font color='#666666' size='8'>{clean_rep_model}</font>", styles['ProBody'], y, width)
@@ -3447,9 +3588,9 @@ def export_pdf():
             # Report Body
             clean_body = normalize_text_for_pdf(report_data['text'])
             clean_body = clean_body.replace("â-", "-").replace("â", "")
-            
+
             blocks = process_full_report(clean_body)
-            
+
             for block_type, content in blocks:
                 if block_type == 'TABLE':
                     tdata = parse_markdown_table(content)
@@ -3469,7 +3610,7 @@ def export_pdf():
                     style = styles.get(block_type, styles['ProBody'])
                     y = draw_paragraph(p, content, style, y, width)
             y -= 10
-        
+
         y -= 5
         p.setStrokeColor(colors.lightgrey)
         p.setLineWidth(0.5)
@@ -3492,12 +3633,12 @@ def export_pdf():
     y -= 15
     full_text = analysis_meta["canonical_text"] or "No text content available."
     if len(full_text) > 60000: full_text = full_text[:60000] + "\n\n[Text truncated...]"
-    
+
     source_style = ParagraphStyle(name='SourceText', parent=styles['ProBody'], fontSize=8, leading=10, textColor=colors.HexColor("#333333"), spaceAfter=6)
-    
+
     clean_source = normalize_text_for_pdf(full_text)
     clean_source = clean_source.replace("â-", "-").replace("â", "")
-    
+
     for raw_para in clean_xml(clean_source).split('\n'):
         if not raw_para.strip(): continue
         para_obj = Paragraph(raw_para, source_style)
@@ -3581,12 +3722,12 @@ def api_cleanup_cache(user):
 def safe_init_db():
     """
     Ensures that only ONE Gunicorn worker initializes the database.
-    It uses a file lock (/tmp/epistemiq_db_init.lock). 
-    The first worker gets the lock and runs init_db(). 
+    It uses a file lock (/tmp/epistemiq_db_init.lock).
+    The first worker gets the lock and runs init_db().
     The others wait until it is finished.
     """
     lock_file = "/tmp/epistemiq_db_init.lock"
-    
+
     try:
         # Open the lock file (create if doesn't exist)
         with open(lock_file, "w") as f:
@@ -3594,21 +3735,21 @@ def safe_init_db():
                 # Attempt to acquire an EXCLUSIVE, NON-BLOCKING lock
                 # If another process has it, this raises IOError immediately
                 fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                
+
                 print("🔒 Acquired lock. Initializing database schema...")
                 init_db()
                 print("✅ Database initialization complete.")
-                
+
                 # Keep the lock held for a split second to ensure commits finish
                 time.sleep(0.5)
-                
+
             except IOError:
                 # If we get here, another worker has the lock.
                 print("⏳ Database is locked by another worker. Waiting for it to finish...")
                 # Wait for the lock to be released (blocking wait)
                 fcntl.lockf(f, fcntl.LOCK_EX)
                 print("🔓 Lock released. Database is ready. Proceeding.")
-                
+
     except Exception as e:
         print(f"⚠️ Initialization Warning: {e}")
 
@@ -3619,7 +3760,7 @@ def safe_init_db():
 if __name__ != "__main__":
     # This block runs when Gunicorn loads the file (Docker)
     safe_init_db()
-    
+
 elif __name__ == "__main__":
     # This block runs when you run 'python backend.py' manually
     init_db()
